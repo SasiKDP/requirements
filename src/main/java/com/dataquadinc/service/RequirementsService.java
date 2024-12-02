@@ -33,8 +33,12 @@ public class RequirementsService {
 	public RequirementAddedResponse createRequirement(RequirementsDto requirementsDto) {
 
 		RequirementsModel model = requirementsDao.findById(requirementsDto.getJobId()).orElse(null);
+		
 		if (model == null) {
 			RequirementsModel requirement = modelMapper.map(requirementsDto, RequirementsModel.class);
+			requirement.setStatus("In Progress");
+			requirement.setRemark("Assigned To Recruiters");
+			requirement.setRequirementAddedTimeStamp(LocalDateTime.now());
 			requirementsDao.save(requirement);
 			return new RequirementAddedResponse(requirementsDto.getJobId(), requirementsDto.getJobTitle(),
 					" Requirement Added Successfully ");

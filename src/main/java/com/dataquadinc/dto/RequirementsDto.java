@@ -1,5 +1,6 @@
 package com.dataquadinc.dto;
 
+import java.time.LocalDateTime;
 import java.util.Set;
 
 import jakarta.persistence.Id;
@@ -38,6 +39,17 @@ public class RequirementsDto
 
 	    @NotNull(message = "Experience Required cannot be null")
 	    private String experienceRequired;
+	    
+	    @NotNull(message = "Notice Period cannot be null")
+	    private String noticePeriod;  
+
+	    @NotNull(message = "Relevant Experience cannot be null")
+	    private String relevantExperience; 
+	    
+	    @NotNull(message = "Qualification cannot be null")
+	    private String qualification; 
+	    
+	    private LocalDateTime requirementAddedTimeStamp;
 	    
 	    private Set<String> recruiterIds; 
 	    
