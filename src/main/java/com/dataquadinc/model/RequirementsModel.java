@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 import jakarta.persistence.JoinColumn;
 
-
+import java.time.LocalDateTime;
 import java.util.Set;
 
 @Entity
@@ -46,6 +46,17 @@ public class RequirementsModel {
 
     @NotNull(message = "Experience Required cannot be null")
     private String experienceRequired;
+    
+    @NotNull(message = "Notice Period cannot be null")
+    private String noticePeriod;  
+
+    @NotNull(message = "Relevant Experience cannot be null")
+    private String relevantExperience; 
+    
+    @NotNull(message = "Qualification cannot be null")
+    private String qualification; 
+    
+    private LocalDateTime requirementAddedTimeStamp;
 
    
     @ElementCollection
@@ -56,8 +67,8 @@ public class RequirementsModel {
     @Column(name = "recruiter_id")  
     private Set<String> recruiterIds;  
 
-    private String status="In Progress";
+    private String status;
     
-    private String remark="Assigned To Recruiters";
+    private String remark;
     
 }
