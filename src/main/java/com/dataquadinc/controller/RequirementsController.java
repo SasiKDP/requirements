@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.dataquadinc.dto.RecruiterRequirementsDto;
 import com.dataquadinc.dto.RequirementAddedResponse;
 import com.dataquadinc.dto.RequirementsDto;
 import com.dataquadinc.dto.StatusDto;
@@ -53,6 +54,11 @@ public class RequirementsController {
 	public ResponseEntity<Void> updateStatus(@RequestBody StatusDto status) {
 		service.statusUpdate(status);
 		return new ResponseEntity<>(HttpStatus.OK);
+	}
+
+	@GetMapping("/recruiter/{recruiterId}")
+	public ResponseEntity<List<RecruiterRequirementsDto>> getJobsByRecruiter(@PathVariable String recruiterId) {
+		return new ResponseEntity<>(service.getJobsAssignedToRecruiter(recruiterId),HttpStatus.OK);
 	}
 
 }

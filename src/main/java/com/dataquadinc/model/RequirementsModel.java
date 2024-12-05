@@ -32,7 +32,7 @@ public class RequirementsModel {
     private String clientName;
 
     @NotNull(message = "Job Description cannot be null")
-    @Size(min = 10, max = 5000, message = "Job Description must be between 10 and 1000 characters")
+    @Size(min = 10, max = 15000, message = "Job Description must be between 10 and 1000 characters")
     private String jobDescription;
 
     @NotNull(message = "Job Type cannot be null")

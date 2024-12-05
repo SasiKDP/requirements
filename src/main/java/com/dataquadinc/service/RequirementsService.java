@@ -11,10 +11,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dataquadinc.dto.AssignRecruiterResponse;
+import com.dataquadinc.dto.RecruiterRequirementsDto;
 import com.dataquadinc.dto.RequirementAddedResponse;
 import com.dataquadinc.dto.RequirementsDto;
 import com.dataquadinc.dto.StatusDto;
 import com.dataquadinc.exceptions.ErrorResponse;
+import com.dataquadinc.exceptions.NoJobsAssignedToRecruiterException;
 import com.dataquadinc.exceptions.RequirementAlreadyExistsException;
 import com.dataquadinc.exceptions.RequirementNotFoundException;
 import com.dataquadinc.model.RequirementsModel;
@@ -33,7 +35,7 @@ public class RequirementsService {
 	public RequirementAddedResponse createRequirement(RequirementsDto requirementsDto) {
 
 		RequirementsModel model = requirementsDao.findById(requirementsDto.getJobId()).orElse(null);
-		
+
 		if (model == null) {
 			RequirementsModel requirement = modelMapper.map(requirementsDto, RequirementsModel.class);
 			requirement.setStatus("In Progress");
@@ -88,5 +90,16 @@ public class RequirementsService {
 		requirement.setRemark(status.getRemark());
 		requirementsDao.save(requirement);
 
+	}
+
+	public List<RecruiterRequirementsDto> getJobsAssignedToRecruiter(String recruiterId) {
+		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterId(recruiterId);
+		if (jobsByRecruiterId.isEmpty()) {
+			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter : " + recruiterId);
+		} else {
+			return jobsByRecruiterId.stream()
+					.map(recruiter -> modelMapper.map(recruiter, RecruiterRequirementsDto.class))
+					.collect(Collectors.toList());
+		}
 	}
 }
