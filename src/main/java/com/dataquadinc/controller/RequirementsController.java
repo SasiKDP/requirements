@@ -30,12 +30,12 @@ public class RequirementsController {
 	@Autowired
 	private RequirementsService service;
 
-	@PostMapping("/add")
+	@PostMapping("/assignJob")
 	public ResponseEntity<RequirementAddedResponse> addRequirement(@RequestBody RequirementsDto requirementsDto) {
 		return new ResponseEntity<>(service.createRequirement(requirementsDto), HttpStatus.CREATED);
 	}
 
-	@GetMapping("/get")
+	@GetMapping("/getAssignments")
 	public ResponseEntity<?> getRequirements() {
 		return new ResponseEntity<>(service.getRequirementsDetails(), HttpStatus.OK);
 	}
@@ -60,5 +60,7 @@ public class RequirementsController {
 	public ResponseEntity<List<RecruiterRequirementsDto>> getJobsByRecruiter(@PathVariable String recruiterId) {
 		return new ResponseEntity<>(service.getJobsAssignedToRecruiter(recruiterId),HttpStatus.OK);
 	}
+
+
 
 }
