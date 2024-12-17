@@ -61,6 +61,4 @@ public class RequirementsController {
 		return new ResponseEntity<>(service.getJobsAssignedToRecruiter(recruiterId),HttpStatus.OK);
 	}
 
-
-
 }
