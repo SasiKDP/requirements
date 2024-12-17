@@ -37,6 +37,6 @@ public class RecruiterRequirementsDto {
 
 	private String status;
 
-	private String remark;
+
 
 }

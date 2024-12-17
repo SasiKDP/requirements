@@ -33,30 +33,31 @@ public class RequirementsService {
 
 	@Transactional
 	public RequirementAddedResponse createRequirement(RequirementsDto requirementsDto) {
+		// Do not check for jobId existence manually as @PrePersist will handle it
+		RequirementsModel model = modelMapper.map(requirementsDto, RequirementsModel.class);
 
-		RequirementsModel model = requirementsDao.findById(requirementsDto.getJobId()).orElse(null);
-
-		if (model == null) {
-			RequirementsModel requirement = modelMapper.map(requirementsDto, RequirementsModel.class);
-			requirement.setStatus("In Progress");
-			requirement.setRemark("Assigned To Recruiters");
-			requirement.setRequirementAddedTimeStamp(LocalDateTime.now());
-			requirementsDao.save(requirement);
-			return new RequirementAddedResponse(requirementsDto.getJobId(), requirementsDto.getJobTitle(),
-					" Requirement Added Successfully ");
+		// If jobId is not set, let @PrePersist handle the generation
+		if (model.getJobId() == null || model.getJobId().isEmpty()) {
+			model.setStatus("In Progress");
+			model.setRequirementAddedTimeStamp(LocalDateTime.now());
+			requirementsDao.save(model);
 		} else {
+			// Throw exception if the jobId already exists
 			throw new RequirementAlreadyExistsException(
-					"Requirements Already Exists with Job Id : " + requirementsDto.getJobId());
+					"Requirements Already Exists with Job Id : " + model.getJobId());
 		}
+
+		// Return the response using the generated jobId
+		return new RequirementAddedResponse(model.getJobId(), requirementsDto.getJobTitle(), "Requirement Added Successfully");
 	}
 
 	public Object getRequirementsDetails() {
-
 		List<RequirementsModel> list = requirementsDao.findAll();
 		if (list.isEmpty()) {
 			return new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now());
 		} else {
-			return list.stream().map(requirement -> modelMapper.map(requirement, RequirementsDto.class))
+			return list.stream()
+					.map(requirement -> modelMapper.map(requirement, RequirementsDto.class))
 					.collect(Collectors.toList());
 		}
 	}
@@ -71,15 +72,15 @@ public class RequirementsService {
 	public Object assignToRecruiter(String jobId, String recruiterId) {
 		RequirementsModel requirement = requirementsDao.findById(jobId)
 				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + jobId));
+
 		if (requirement.getRecruiterIds().contains(recruiterId)) {
 			return new ErrorResponse(HttpStatus.CONFLICT.value(),
 					"Requirement Already Assigned to Recruiter : " + recruiterId, LocalDateTime.now());
 		} else {
 			requirement.getRecruiterIds().add(recruiterId);
 			requirementsDao.save(requirement);
-			return new AssignRecruiterResponse(jobId, recruiterId, "Assigned Successfully");
+			return new AssignRecruiterResponse(jobId, recruiterId);
 		}
-
 	}
 
 	@Transactional
@@ -87,9 +88,8 @@ public class RequirementsService {
 		RequirementsModel requirement = requirementsDao.findById(status.getJobId()).orElseThrow(
 				() -> new RequirementNotFoundException("Requirement Not Found with Id : " + status.getJobId()));
 		requirement.setStatus(status.getStatus());
-		requirement.setRemark(status.getRemark());
+//        requirement.setRemark(status.getRemark());  // If you are using remark, set it here
 		requirementsDao.save(requirement);
-
 	}
 
 	public List<RecruiterRequirementsDto> getJobsAssignedToRecruiter(String recruiterId) {
