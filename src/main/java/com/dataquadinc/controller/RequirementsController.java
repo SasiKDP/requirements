@@ -24,7 +24,7 @@ import com.dataquadinc.service.RequirementsService;
 
 @RestController
 @RequestMapping("/requirements")
-@CrossOrigin("*")
+//@CrossOrigin("*")
 public class RequirementsController {
 
 	@Autowired

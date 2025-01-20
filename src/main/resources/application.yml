@@ -1,0 +1,38 @@
+server:
+  port: 8111
+
+spring:
+  application:
+    name: DATAQUADREQUIREMENTSAPI
+  cloud:
+    loadbalancer:
+      retry:
+        enabled: true
+      cache:
+        enabled: true
+
+#eureka:
+#  client:
+#    service-url:
+#      defaultZone: http://eurekaserver1:8761/eureka/
+#    fetch-registry: true
+#    register-with-eureka: true
+#  instance:
+#    prefer-ip-address: true
+#    instance-id: ${spring.application.name}:${random.value}
+#management:
+#  endpoints:
+#    web:
+#      exposure:
+#        include: "*"
+#  endpoint:
+#    health:
+#      show-details: always
+
+logging:
+  level:
+    root: INFO
+    org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    io.mymobile.user: DEBUG
