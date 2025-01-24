@@ -4,7 +4,7 @@ pipeline {
 
     DOCKER_IMAGE_NAME = 'requirements'
 
-    registry = "sandycis476/dataquad"
+    registry = "sandycis476/requirements"
     dockerImage = ''
   }
 agent any
