@@ -21,7 +21,7 @@ import com.dataquadinc.dto.RequirementAddedResponse;
 import com.dataquadinc.dto.RequirementsDto;
 import com.dataquadinc.dto.StatusDto;
 import com.dataquadinc.service.RequirementsService;
-@CrossOrigin(origins = "http://192.168.0.140:3000")
+@CrossOrigin(origins = "http://35.188.150.92")
 @RestController
 @RequestMapping("/requirements")
 //@CrossOrigin("*")

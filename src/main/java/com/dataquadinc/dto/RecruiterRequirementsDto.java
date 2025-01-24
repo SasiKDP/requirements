@@ -3,12 +3,14 @@ package com.dataquadinc.dto;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 
 @Data
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class RecruiterRequirementsDto {
 
 	private String jobId;
