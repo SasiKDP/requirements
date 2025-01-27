@@ -62,8 +62,8 @@ public class RequirementsDto
 
 
 
-	private String recruiterId;   // Add recruiterId field
-	private String recruiterEmail;
+//	private String recruiterId;   // Add recruiterId field
+//	private String recruiterEmail;
 
 
 	@PrePersist
@@ -192,19 +192,19 @@ public class RequirementsDto
 		this.status = status;
 	}
 
-	public String getRecruiterId() {
-		return recruiterId;
-	}
-
-	public void setRecruiterId(String recruiterId) {
-		this.recruiterId = recruiterId;
-	}
-
-	public String getRecruiterEmail() {
-		return recruiterEmail;
-	}
-
-	public void setRecruiterEmail(String recruiterEmail) {
-		this.recruiterEmail = recruiterEmail;
-	}
+//	public String getRecruiterId() {
+//		return recruiterId;
+//	}
+//
+//	public void setRecruiterId(String recruiterId) {
+//		this.recruiterId = recruiterId;
+//	}
+//
+//	public String getRecruiterEmail() {
+//		return recruiterEmail;
+//	}
+//
+//	public void setRecruiterEmail(String recruiterEmail) {
+//		this.recruiterEmail = recruiterEmail;
+//	}
 }
