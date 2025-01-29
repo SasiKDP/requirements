@@ -58,6 +58,7 @@ public class RequirementsModel {
 
 
 
+
     @ElementCollection
     @CollectionTable(
             name = "job_recruiters",
@@ -67,10 +68,11 @@ public class RequirementsModel {
     private Set<String> recruiterIds;
 
 
-    private String recruiterId;   // Add recruiterId if you want to track the main recruiter for the job
-    private String recruiterEmail;
+//    private String recruiterId;   // Add recruiterId if you want to track the main recruiter for the job
+//    private String recruiterEmail;
 
     private String status;
+    private Set<String> recruiterName;
 
 
 
@@ -195,21 +197,21 @@ public class RequirementsModel {
         this.recruiterIds = recruiterIds;
     }
 
-    public String getRecruiterId() {
-        return recruiterId;
-    }
-
-    public void setRecruiterId(String recruiterId) {
-        this.recruiterId = recruiterId;
-    }
-
-    public String getRecruiterEmail() {
-        return recruiterEmail;
-    }
-
-    public void setRecruiterEmail(String recruiterEmail) {
-        this.recruiterEmail = recruiterEmail;
-    }
+//    public String getRecruiterId() {
+//        return recruiterId;
+//    }
+//
+//    public void setRecruiterId(String recruiterId) {
+//        this.recruiterId = recruiterId;
+//    }
+//
+//    public String getRecruiterEmail() {
+//        return recruiterEmail;
+//    }
+//
+//    public void setRecruiterEmail(String recruiterEmail) {
+//        this.recruiterEmail = recruiterEmail;
+//    }
 
     public String getStatus() {
         return status;
@@ -219,5 +221,11 @@ public class RequirementsModel {
         this.status = status;
     }
 
+    public Set<String> getRecruiterName() {
+        return recruiterName;
+    }
 
+    public void setRecruiterName(Set<String> recruiterName) {
+        this.recruiterName = recruiterName;
+    }
 }
