@@ -59,7 +59,7 @@ public class RequirementsDto
 	private Set<String> recruiterIds;
 
 	private String status;
-
+	private Set<String> recruiterName;
 
 
 //	private String recruiterId;   // Add recruiterId field
@@ -207,4 +207,13 @@ public class RequirementsDto
 //	public void setRecruiterEmail(String recruiterEmail) {
 //		this.recruiterEmail = recruiterEmail;
 //	}
+
+
+	public Set<String> getRecruiterName() {
+		return recruiterName;
+	}
+
+	public void setRecruiterName(Set<String> recruiterName) {
+		this.recruiterName = recruiterName;
+	}
 }

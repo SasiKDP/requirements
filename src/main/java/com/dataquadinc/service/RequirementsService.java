@@ -4,17 +4,13 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.dataquadinc.dto.*;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.dataquadinc.dto.AssignRecruiterResponse;
-import com.dataquadinc.dto.RecruiterRequirementsDto;
-import com.dataquadinc.dto.RequirementAddedResponse;
-import com.dataquadinc.dto.RequirementsDto;
-import com.dataquadinc.dto.StatusDto;
 import com.dataquadinc.exceptions.ErrorResponse;
 import com.dataquadinc.exceptions.NoJobsAssignedToRecruiterException;
 import com.dataquadinc.exceptions.RequirementAlreadyExistsException;
@@ -101,5 +97,46 @@ public class RequirementsService {
 					.map(recruiter -> modelMapper.map(recruiter, RecruiterRequirementsDto.class))
 					.collect(Collectors.toList());
 		}
+	}
+	@Transactional
+	public ResponseBean updateRequirementDetails(RequirementsDto requirementsDto) {
+		// Fetch the existing requirement by jobId
+		RequirementsModel existingRequirement = requirementsDao.findById(requirementsDto.getJobId())
+				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + requirementsDto.getJobId()));
+
+		// Update the details (excluding jobId)
+		existingRequirement.setJobTitle(requirementsDto.getJobTitle());
+		existingRequirement.setClientName(requirementsDto.getClientName());
+		existingRequirement.setJobDescription(requirementsDto.getJobDescription());
+		existingRequirement.setJobType(requirementsDto.getJobType());
+		existingRequirement.setLocation(requirementsDto.getLocation());
+		existingRequirement.setJobMode(requirementsDto.getJobMode());
+		existingRequirement.setExperienceRequired(requirementsDto.getExperienceRequired());
+		existingRequirement.setNoticePeriod(requirementsDto.getNoticePeriod());
+		existingRequirement.setRelevantExperience(requirementsDto.getRelevantExperience());
+		existingRequirement.setQualification(requirementsDto.getQualification());
+		existingRequirement.setRecruiterIds(requirementsDto.getRecruiterIds());
+		existingRequirement.setStatus(requirementsDto.getStatus());
+		existingRequirement.setRecruiterName(requirementsDto.getRecruiterName());
+
+		// Save the updated requirement to the database
+		requirementsDao.save(existingRequirement);
+
+		// Prepare the response
+		DataResponse dataResponse = new DataResponse(existingRequirement.getJobId());
+		return new ResponseBean(true, "Updated Successfully", null, dataResponse);
+	}
+
+	@Transactional
+	public ResponseBean deleteRequirementDetails(String jobId) {
+		// Fetch the existing requirement by jobId
+		RequirementsModel existingRequirement = requirementsDao.findById(jobId)
+				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + jobId));
+
+		// Delete the requirement from the database
+		requirementsDao.delete(existingRequirement);
+
+		// Return a response indicating successful deletion
+		return new ResponseBean(true, "Deleted Successfully", null, new DataResponse(jobId));
 	}
 }
