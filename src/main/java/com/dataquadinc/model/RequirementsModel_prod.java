@@ -10,11 +10,10 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 
 @Entity
 @Data
-public class RequirementsModel {
+public class RequirementsModel_prod {
 
     @Id
     private String jobId;
@@ -25,7 +24,7 @@ public class RequirementsModel {
 
     @NotNull(message = "Client Name cannot be null")
     @Size(min = 3, max = 100, message = "Client Name must be between 3 and 100 characters")
-    private String clientName;
+    private String  clientName;
 
     @NotNull(message = "Job Description cannot be null")
     @Column( columnDefinition = "LONGTEXT" )
@@ -61,7 +60,7 @@ public class RequirementsModel {
 
     @ElementCollection
     @CollectionTable(
-            name = "job_recruiters",
+            name = "job_recruiters_prod",
             joinColumns = @JoinColumn(name = "job_id")
     )
     @Column(name = "recruiter_id")

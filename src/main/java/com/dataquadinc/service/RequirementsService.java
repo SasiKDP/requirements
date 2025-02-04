@@ -15,7 +15,7 @@ import com.dataquadinc.exceptions.ErrorResponse;
 import com.dataquadinc.exceptions.NoJobsAssignedToRecruiterException;
 import com.dataquadinc.exceptions.RequirementAlreadyExistsException;
 import com.dataquadinc.exceptions.RequirementNotFoundException;
-import com.dataquadinc.model.RequirementsModel;
+import com.dataquadinc.model.RequirementsModel_prod;
 import com.dataquadinc.repository.RequirementsDao;
 
 @Service
@@ -30,7 +30,7 @@ public class RequirementsService {
 	@Transactional
 	public RequirementAddedResponse createRequirement(RequirementsDto requirementsDto) {
 		// Do not check for jobId existence manually as @PrePersist will handle it
-		RequirementsModel model = modelMapper.map(requirementsDto, RequirementsModel.class);
+		RequirementsModel_prod model = modelMapper.map(requirementsDto, RequirementsModel_prod.class);
 
 		// If jobId is not set, let @PrePersist handle the generation
 		if (model.getJobId() == null || model.getJobId().isEmpty()) {
@@ -48,7 +48,7 @@ public class RequirementsService {
 	}
 
 	public Object getRequirementsDetails() {
-		List<RequirementsModel> list = requirementsDao.findAll();
+		List<RequirementsModel_prod> list = requirementsDao.findAll();
 		if (list.isEmpty()) {
 			return new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now());
 		} else {
@@ -59,14 +59,14 @@ public class RequirementsService {
 	}
 
 	public RequirementsDto getRequirementDetailsById(String jobId) {
-		RequirementsModel requirement = requirementsDao.findById(jobId)
+		RequirementsModel_prod requirement = requirementsDao.findById(jobId)
 				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + jobId));
 		return modelMapper.map(requirement, RequirementsDto.class);
 	}
 
 	@Transactional
 	public Object assignToRecruiter(String jobId, String recruiterId) {
-		RequirementsModel requirement = requirementsDao.findById(jobId)
+		RequirementsModel_prod requirement = requirementsDao.findById(jobId)
 				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + jobId));
 
 		if (requirement.getRecruiterIds().contains(recruiterId)) {
@@ -81,7 +81,7 @@ public class RequirementsService {
 
 	@Transactional
 	public void statusUpdate(StatusDto status) {
-		RequirementsModel requirement = requirementsDao.findById(status.getJobId()).orElseThrow(
+		RequirementsModel_prod requirement = requirementsDao.findById(status.getJobId()).orElseThrow(
 				() -> new RequirementNotFoundException("Requirement Not Found with Id : " + status.getJobId()));
 		requirement.setStatus(status.getStatus());
 //        requirement.setRemark(status.getRemark());  // If you are using remark, set it here
@@ -89,7 +89,7 @@ public class RequirementsService {
 	}
 
 	public List<RecruiterRequirementsDto> getJobsAssignedToRecruiter(String recruiterId) {
-		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterId(recruiterId);
+		List<RequirementsModel_prod> jobsByRecruiterId = requirementsDao.findJobsByRecruiterId(recruiterId);
 		if (jobsByRecruiterId.isEmpty()) {
 			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter : " + recruiterId);
 		} else {
@@ -101,7 +101,7 @@ public class RequirementsService {
 	@Transactional
 	public ResponseBean updateRequirementDetails(RequirementsDto requirementsDto) {
 		// Fetch the existing requirement by jobId
-		RequirementsModel existingRequirement = requirementsDao.findById(requirementsDto.getJobId())
+		RequirementsModel_prod existingRequirement = requirementsDao.findById(requirementsDto.getJobId())
 				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + requirementsDto.getJobId()));
 
 		// Update the details (excluding jobId)
@@ -130,7 +130,7 @@ public class RequirementsService {
 	@Transactional
 	public ResponseBean deleteRequirementDetails(String jobId) {
 		// Fetch the existing requirement by jobId
-		RequirementsModel existingRequirement = requirementsDao.findById(jobId)
+		RequirementsModel_prod existingRequirement = requirementsDao.findById(jobId)
 				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + jobId));
 
 		// Delete the requirement from the database
