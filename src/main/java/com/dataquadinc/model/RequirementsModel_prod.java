@@ -10,11 +10,10 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 
 @Entity
 @Data
-public class RequirementsModel {
+public class RequirementsModel_prod {
 
     @Id
     private String jobId;
@@ -61,7 +60,7 @@ public class RequirementsModel {
 
     @ElementCollection
     @CollectionTable(
-            name = "job_recruiters",
+            name = "job_recruiters_prod",
             joinColumns = @JoinColumn(name = "job_id")
     )
     @Column(name = "recruiter_id")
