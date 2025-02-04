@@ -19,12 +19,12 @@ public class RequirementsModel_prod {
     private String jobId;
 
     @NotNull(message = "Job Title cannot be null")
-    @Size(min = 3,  max = 100, message = "Job Title must be between 3 and 100 characters")
+    @Size(min = 3, max = 100, message = "Job Title must be between 3 and 100 characters")
     private String jobTitle;
 
     @NotNull(message = "Client Name cannot be null")
     @Size(min = 3, max = 100, message = "Client Name must be between 3 and 100 characters")
-    private String clientName;
+    private String  clientName;
 
     @NotNull(message = "Job Description cannot be null")
     @Column( columnDefinition = "LONGTEXT" )
