@@ -54,6 +54,10 @@ public class RequirementsDto
 	@NotNull(message = "Qualification cannot be null")
 	private String qualification;
 
+	private String salaryPackage;
+
+	private int noOfPositions;
+
 	private LocalDateTime requirementAddedTimeStamp;
 
 	private Set<String> recruiterIds;
@@ -215,5 +219,21 @@ public class RequirementsDto
 
 	public void setRecruiterName(Set<String> recruiterName) {
 		this.recruiterName = recruiterName;
+	}
+
+	public String getSalaryPackage() {
+		return salaryPackage;
+	}
+
+	public void setSalaryPackage(String salaryPackage) {
+		this.salaryPackage = salaryPackage;
+	}
+
+	public int getNoOfPositions() {
+		return noOfPositions;
+	}
+
+	public void setNoOfPositions(int noOfPositions) {
+		this.noOfPositions = noOfPositions;
 	}
 }
