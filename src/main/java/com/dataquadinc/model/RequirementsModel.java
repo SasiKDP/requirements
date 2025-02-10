@@ -13,7 +13,7 @@ import java.util.Set;
 
 @Entity
 @Data
-public class RequirementsModel_prod {
+public class RequirementsModel {
 
     @Id
     private String jobId;
@@ -52,7 +52,13 @@ public class RequirementsModel_prod {
     @NotNull(message = "Qualification cannot be null")
     private String qualification;
 
+    private String salaryPackage;
+
+    private int noOfPositions;
+
     private LocalDateTime requirementAddedTimeStamp;
+
+
 
 
 
@@ -106,6 +112,22 @@ public class RequirementsModel_prod {
 
     public void setJobTitle(@NotNull(message = "Job Title cannot be null") @Size(min = 3, max = 100, message = "Job Title must be between 3 and 100 characters") String jobTitle) {
         this.jobTitle = jobTitle;
+    }
+
+    public String getSalaryPackage() {
+        return salaryPackage;
+    }
+
+    public void setSalaryPackage(String salaryPackage) {
+        this.salaryPackage = salaryPackage;
+    }
+
+    public int getNoOfPositions() {
+        return noOfPositions;
+    }
+
+    public void setNoOfPositions(int noOfPositions) {
+        this.noOfPositions = noOfPositions;
     }
 
     public @NotNull(message = "Client Name cannot be null") @Size(min = 3, max = 100, message = "Client Name must be between 3 and 100 characters") String getClientName() {
