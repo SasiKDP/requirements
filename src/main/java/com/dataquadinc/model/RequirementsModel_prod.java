@@ -13,7 +13,7 @@ import java.util.Set;
 
 @Entity
 @Data
-public class RequirementsModel {
+public class RequirementsModel_prod {
 
     @Id
     private String jobId;
