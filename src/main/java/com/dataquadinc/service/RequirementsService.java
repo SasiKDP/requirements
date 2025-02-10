@@ -118,6 +118,8 @@ public class RequirementsService {
 		existingRequirement.setRecruiterIds(requirementsDto.getRecruiterIds());
 		existingRequirement.setStatus(requirementsDto.getStatus());
 		existingRequirement.setRecruiterName(requirementsDto.getRecruiterName());
+		existingRequirement.setNoOfPositions(requirementsDto.getNoOfPositions());
+		existingRequirement.setSalaryPackage(requirementsDto.getSalaryPackage());
 
 		// Save the updated requirement to the database
 		requirementsDao.save(existingRequirement);
