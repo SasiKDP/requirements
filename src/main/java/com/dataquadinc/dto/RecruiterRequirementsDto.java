@@ -1,7 +1,7 @@
 package com.dataquadinc.dto;
 
 import java.time.LocalDateTime;
-import java.util.Set;
+
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotNull;
@@ -38,6 +38,10 @@ public class RecruiterRequirementsDto {
 	private LocalDateTime requirementAddedTimeStamp;
 
 	private String status;
+
+	private String salaryPackage;
+
+	private int noOfPositions;
 
 
 
