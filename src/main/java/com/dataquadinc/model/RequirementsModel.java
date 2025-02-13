@@ -59,9 +59,20 @@ public class RequirementsModel {
     private LocalDateTime requirementAddedTimeStamp;
 
 
+
     @ElementCollection
     @CollectionTable(
             name = "job_recruiters",
+
+
+
+
+
+
+    @ElementCollection
+    @CollectionTable(
+            name = "job_recruiters_prod",
+ master
             joinColumns = @JoinColumn(name = "job_id")
     )
     @Column(name = "recruiter_id")
