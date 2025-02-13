@@ -13,7 +13,7 @@ import java.util.Set;
 
 @Entity
 @Data
-public class RequirementsModel {
+public class RequirementsModel_prod {
 
     @Id
     private String jobId;
@@ -62,8 +62,7 @@ public class RequirementsModel {
 
     @ElementCollection
     @CollectionTable(
-            name = "job_recruiters",
-
+            name = "job_recruiters_prod",
 
 
 
