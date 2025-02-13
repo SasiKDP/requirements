@@ -26,13 +26,9 @@ public class RecruiterRequirementsDto {
 	private String location;
 
 	private String jobMode;
-
 	private String experienceRequired;
-
 	private String noticePeriod;
-
 	private String relevantExperience;
-
 	private String qualification;
 
 	private LocalDateTime requirementAddedTimeStamp;
@@ -42,6 +38,11 @@ public class RecruiterRequirementsDto {
 	private String salaryPackage;
 
 	private int noOfPositions;
+
+
+
+	private int noOfPositions;
+
 
 
 
