@@ -28,11 +28,8 @@ public class RecruiterRequirementsDto {
 	private String jobMode;
 
 	private String experienceRequired;
-
 	private String noticePeriod;
-
 	private String relevantExperience;
-
 	private String qualification;
 
 	private LocalDateTime requirementAddedTimeStamp;
