@@ -59,11 +59,6 @@ public class RequirementsModel {
     private LocalDateTime requirementAddedTimeStamp;
 
 
-
-
-
-
-
     @ElementCollection
     @CollectionTable(
             name = "job_recruiters",

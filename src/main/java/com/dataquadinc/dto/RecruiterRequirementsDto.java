@@ -40,8 +40,8 @@ public class RecruiterRequirementsDto {
 	private String status;
 
 	private String salaryPackage;
-
 	private int noOfPositions;
+
 
 
 
