@@ -34,14 +34,13 @@ public class RecruiterRequirementsDto {
 	private LocalDateTime requirementAddedTimeStamp;
 
 	private String status;
-
 	private String salaryPackage;
 
 	private int noOfPositions;
 
 
 
-	private int noOfPositions;
+
 
 
 
