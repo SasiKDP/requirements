@@ -11,7 +11,7 @@ agent any
    stages {
     stage('Cloning Git') {
       steps {
-        git([url: 'https://github.com/NaveenKumar-dataquad/Dataquad-Requirements-Api.git', branch: 'main', credentialsId: 'Naveen-DataQuad'])
+        git([url: 'https://github.com/NaveenKumar-dataquad/Dataquad-Requirements-Api.git', branch: 'master', credentialsId: 'Naveen-DataQuad'])
       }
     }
     stage('Building image') {
