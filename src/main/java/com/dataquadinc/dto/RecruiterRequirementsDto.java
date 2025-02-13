@@ -26,22 +26,22 @@ public class RecruiterRequirementsDto {
 	private String location;
 
 	private String jobMode;
-
 	private String experienceRequired;
-
 	private String noticePeriod;
-
 	private String relevantExperience;
-
 	private String qualification;
 
 	private LocalDateTime requirementAddedTimeStamp;
 
 	private String status;
-
 	private String salaryPackage;
 
 	private int noOfPositions;
+
+
+
+
+
 
 
 
