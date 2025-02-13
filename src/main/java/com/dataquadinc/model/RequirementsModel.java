@@ -66,7 +66,7 @@ public class RequirementsModel {
 
     @ElementCollection
     @CollectionTable(
-            name = "job_recruiters_prod",
+            name = "job_recruiters",
             joinColumns = @JoinColumn(name = "job_id")
     )
     @Column(name = "recruiter_id")
