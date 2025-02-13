@@ -26,7 +26,6 @@ public class RecruiterRequirementsDto {
 	private String location;
 
 	private String jobMode;
-
 	private String experienceRequired;
 	private String noticePeriod;
 	private String relevantExperience;
