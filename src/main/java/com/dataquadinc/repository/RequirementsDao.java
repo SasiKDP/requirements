@@ -11,11 +11,6 @@ import com.dataquadinc.model.RequirementsModel;
 @Repository
 public interface RequirementsDao extends JpaRepository<RequirementsModel, String>
 {
-	
-	@Query("SELECT r FROM RequirementsModel r WHERE :recruiterId MEMBER OF r.recruiterIds")
-	//SELECT j.* FROM requirements_model j JOIN job_recruiters jr ON j.job_id = jr.job_id WHERE jr.recruiter_id = 'recruiter_1';
-
+    @Query("SELECT r FROM RequirementsModel r WHERE :recruiterId MEMBER OF r.recruiterIds")
     List<RequirementsModel> findJobsByRecruiterId(String recruiterId);
-
-	
 }
