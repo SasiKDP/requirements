@@ -10,11 +10,18 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+
+
 	@ExceptionHandler(RequirementAlreadyExistsException.class)
 	public ResponseEntity<ErrorResponse> handleRequirementAlreadyExists(RequirementAlreadyExistsException ex) {
 		ErrorResponse errorResponse = new ErrorResponse(HttpStatus.OK.value(), ex.getMessage(),
 				LocalDateTime.now());
 		return new ResponseEntity<>(errorResponse, HttpStatus.OK);
+	}
+	@ExceptionHandler(IllegalArgumentException.class)
+	public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException e) {
+		// Return a meaningful response with a 400 Bad Request status
+		return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
 	}
 
 	@ExceptionHandler(RequirementNotFoundException.class)

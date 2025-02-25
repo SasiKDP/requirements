@@ -3,17 +3,12 @@ package com.dataquadinc.dto;
 import java.time.LocalDateTime;
 import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
 
 @Data
 public class RequirementsDto
@@ -32,6 +27,26 @@ public class RequirementsDto
 	@NotNull(message = "Job Description cannot be null")
 //	    @Size(min = 10, max = 5000, message = "Job Description must be between 10 and 1000 characters")
 	private String jobDescription;
+
+	private MultipartFile jobDescriptionFile; // This is for file upload
+
+	private byte[]  jobDescriptionBlob;  // BLOB data for saving to database as byte array
+
+	public byte[] getJobDescriptionBlob() {
+		return jobDescriptionBlob;
+	}
+
+	public void setJobDescriptionBlob(byte[] jobDescriptionBlob) {
+		this.jobDescriptionBlob = jobDescriptionBlob;
+	}
+
+	public MultipartFile getJobDescriptionFile() {
+		return jobDescriptionFile;
+	}
+
+	public void setJobDescriptionFile(MultipartFile jobDescriptionFile) {
+		this.jobDescriptionFile = jobDescriptionFile;
+	}
 
 	@NotNull(message = "Job Type cannot be null")
 	private String jobType;
