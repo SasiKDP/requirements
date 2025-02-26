@@ -242,12 +242,22 @@ public class RequirementsController {
 	@GetMapping("/getAssignments")
 	public ResponseEntity<?> getRequirements() {
 		List<RequirementsDto> requirements = (List<RequirementsDto>) service.getRequirementsDetails();
+
 		if (requirements == null || requirements.isEmpty()) {
 			return new ResponseEntity<>(new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now()), HttpStatus.NOT_FOUND);
 		}
+
+		// Clean up recruiterName field
+		for (RequirementsDto dto : requirements) {
+			Set<String> cleanedNames = dto.getRecruiterName().stream()
+					.map(name -> name.replaceAll("[\\[\\]\"]", "")) // Remove brackets and extra quotes
+					.collect(Collectors.toSet());
+
+			dto.setRecruiterName(cleanedNames);
+		}
+
 		return new ResponseEntity<>(requirements, HttpStatus.OK);
 	}
-
 
 	@GetMapping("/get/{jobId}")
 	public ResponseEntity<RequirementsDto> getRequirementById(@PathVariable String jobId) {
@@ -377,33 +387,77 @@ public class RequirementsController {
 
 			// Fetch the existing requirement
 			RequirementsDto existingRequirement = service.getRequirementDetailsById(jobId);
-
-			// Set fields if provided in the request
-			if (jobTitle != null && !jobTitle.isEmpty()) existingRequirement.setJobTitle(jobTitle);
-			if (clientName != null && !clientName.isEmpty()) existingRequirement.setClientName(clientName);
-			if (jobDescription != null && !jobDescription.isEmpty()) existingRequirement.setJobDescription(jobDescription);
-			if (jobDescriptionFile != null && !jobDescriptionFile.isEmpty()) {
-				// Process the file (e.g., convert to byte array for BLOB)
-				byte[] jobDescriptionBlob = jobDescriptionFile.getBytes();
-				existingRequirement.setJobDescriptionBlob(jobDescriptionBlob);  // Set the BLOB field
+			if (existingRequirement == null) {
+				return ResponseEntity.status(HttpStatus.NOT_FOUND)
+						.body(ResponseBean.errorResponse("Requirement not found for the provided jobId", "Not Found"));
 			}
-			if (jobType != null && !jobType.isEmpty()) existingRequirement.setJobType(jobType);
-			if (location != null && !location.isEmpty()) existingRequirement.setLocation(location);
-			if (jobMode != null && !jobMode.isEmpty()) existingRequirement.setJobMode(jobMode);
-			if (experienceRequired != null && !experienceRequired.isEmpty()) existingRequirement.setExperienceRequired(experienceRequired);
-			if (noticePeriod != null && !noticePeriod.isEmpty()) existingRequirement.setNoticePeriod(noticePeriod);
-			if (relevantExperience != null && !relevantExperience.isEmpty()) existingRequirement.setRelevantExperience(relevantExperience);
-			if (qualification != null && !qualification.isEmpty()) existingRequirement.setQualification(qualification);
-			if (salaryPackage != null && !salaryPackage.isEmpty()) existingRequirement.setSalaryPackage(salaryPackage);
-			if (noOfPositions > 0) existingRequirement.setNoOfPositions(noOfPositions);
-			if (recruiterIds != null && !recruiterIds.isEmpty()) existingRequirement.setRecruiterIds(recruiterIds);
-			if (recruiterName != null && !recruiterName.isEmpty()) existingRequirement.setRecruiterName(recruiterName);
 
-			// Update the requirement with jobDescriptionBlob
+			// Set or nullify fields that are not being updated
+			if (jobTitle != null && !jobTitle.isEmpty()) existingRequirement.setJobTitle(jobTitle);
+			else existingRequirement.setJobTitle(null);  // Nullify if not updated
+
+			if (clientName != null && !clientName.isEmpty()) existingRequirement.setClientName(clientName);
+			else existingRequirement.setClientName(null);  // Nullify if not updated
+
+			// Logic to set job description and BLOB
+			String finalJobDescription = null;
+			byte[] jobDescriptionBlob = null;
+
+			// If jobDescriptionFile is provided, process the file and set the BLOB
+			if (jobDescriptionFile != null && !jobDescriptionFile.isEmpty()) {
+				jobDescriptionBlob = jobDescriptionFile.getBytes(); // Save the file as a BLOB
+				finalJobDescription = null; // Use the file (no text)
+			}
+			// If jobDescription (text) is provided, use it and set the BLOB to null
+			else if (jobDescription != null && !jobDescription.isEmpty()) {
+				finalJobDescription = jobDescription;
+				jobDescriptionBlob = null; // Use the text (no file)
+			}
+
+			// Set the job description (from file or text)
+			existingRequirement.setJobDescription(finalJobDescription);
+			existingRequirement.setJobDescriptionBlob(jobDescriptionBlob); // Set the BLOB (or null)
+
+			// Set the other fields and nullify any fields that are not being updated
+			if (jobType != null && !jobType.isEmpty()) existingRequirement.setJobType(jobType);
+			else existingRequirement.setJobType(null);
+
+			if (location != null && !location.isEmpty()) existingRequirement.setLocation(location);
+			else existingRequirement.setLocation(null);
+
+			if (jobMode != null && !jobMode.isEmpty()) existingRequirement.setJobMode(jobMode);
+			else existingRequirement.setJobMode(null);
+
+			if (experienceRequired != null && !experienceRequired.isEmpty()) existingRequirement.setExperienceRequired(experienceRequired);
+			else existingRequirement.setExperienceRequired(null);
+
+			if (noticePeriod != null && !noticePeriod.isEmpty()) existingRequirement.setNoticePeriod(noticePeriod);
+			else existingRequirement.setNoticePeriod(null);
+
+			if (relevantExperience != null && !relevantExperience.isEmpty()) existingRequirement.setRelevantExperience(relevantExperience);
+			else existingRequirement.setRelevantExperience(null);
+
+			if (qualification != null && !qualification.isEmpty()) existingRequirement.setQualification(qualification);
+			else existingRequirement.setQualification(null);
+
+			if (salaryPackage != null && !salaryPackage.isEmpty()) existingRequirement.setSalaryPackage(salaryPackage);
+			else existingRequirement.setSalaryPackage(null);
+
+			if (noOfPositions > 0) existingRequirement.setNoOfPositions(noOfPositions);
+			else existingRequirement.setNoOfPositions(0); // If noOfPositions is not updated, set to 0
+
+			if (recruiterIds != null && !recruiterIds.isEmpty()) existingRequirement.setRecruiterIds(recruiterIds);
+			else existingRequirement.setRecruiterIds(null);
+
+			if (recruiterName != null && !recruiterName.isEmpty()) existingRequirement.setRecruiterName(recruiterName);
+			else existingRequirement.setRecruiterName(null);
+
+			// Call the service to update the requirement
 			ResponseBean response = service.updateRequirementDetails(existingRequirement);
 
 			// Return success response
 			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
+
 		} catch (IllegalArgumentException e) {
 			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
 		} catch (Exception e) {
@@ -411,6 +465,7 @@ public class RequirementsController {
 					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"));
 		}
 	}
+
 
 	@DeleteMapping("/deleteRequirement/{jobId}")
 	public ResponseEntity<ResponseBean> deleteRequirement(@PathVariable String jobId) {
