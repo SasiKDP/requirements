@@ -411,12 +411,19 @@ public class RequirementsService {
 			// Handle job description: either text or file
 			if (requirementsDto.getJobDescription() != null && !requirementsDto.getJobDescription().isEmpty()) {
 				existingRequirement.setJobDescription(requirementsDto.getJobDescription());  // Set text-based description
-				existingRequirement.setJobDescriptionBlob(null);  // Nullify the BLOB
+				existingRequirement.setJobDescriptionBlob(null);  // Nullify the BLOB if text is provided
 			}
 
+			// If a file for job description is provided, set it as BLOB and nullify the text description
 			if (requirementsDto.getJobDescriptionFile() != null && !requirementsDto.getJobDescriptionFile().isEmpty()) {
 				byte[] jobDescriptionBytes = saveJobDescriptionFileAsBlob(requirementsDto.getJobDescriptionFile(), requirementsDto.getJobId());
 				existingRequirement.setJobDescriptionBlob(jobDescriptionBytes);  // Set the BLOB field
+				existingRequirement.setJobDescription(null);  // Nullify the text-based description
+			}
+
+			// If the jobDescriptionFile is null, but jobDescriptionBlob is updated, update the BLOB
+			if (requirementsDto.getJobDescriptionFile() == null && requirementsDto.getJobDescriptionBlob() != null) {
+				existingRequirement.setJobDescriptionBlob(requirementsDto.getJobDescriptionBlob());  // Set the BLOB field
 				existingRequirement.setJobDescription(null);  // Nullify the text-based description
 			}
 
