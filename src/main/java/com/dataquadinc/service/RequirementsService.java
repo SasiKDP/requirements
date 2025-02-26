@@ -393,6 +393,7 @@ public class RequirementsService {
 					.collect(Collectors.toList());
 		}
 	}
+
 	@Transactional
 	public ResponseBean updateRequirementDetails(RequirementsDto requirementsDto) {
 		try {
@@ -400,11 +401,33 @@ public class RequirementsService {
 			RequirementsModel existingRequirement = requirementsDao.findById(requirementsDto.getJobId())
 					.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + requirementsDto.getJobId()));
 
-			// Set the updated values from the DTO
-			existingRequirement.setJobTitle(requirementsDto.getJobTitle());
-			existingRequirement.setClientName(requirementsDto.getClientName());
-			existingRequirement.setJobDescription(requirementsDto.getJobDescription());  // Update the job description
-			existingRequirement.setJobDescriptionBlob(requirementsDto.getJobDescriptionBlob());  // Set the BLOB (job description file)
+			// Log before update
+			logger.info("Before update: " + existingRequirement);
+
+			// Update the existing requirement with the new details from the DTO
+			if (requirementsDto.getJobTitle() != null) existingRequirement.setJobTitle(requirementsDto.getJobTitle());
+			if (requirementsDto.getClientName() != null) existingRequirement.setClientName(requirementsDto.getClientName());
+
+			// Handle job description: either text or file
+			if (requirementsDto.getJobDescription() != null && !requirementsDto.getJobDescription().isEmpty()) {
+				existingRequirement.setJobDescription(requirementsDto.getJobDescription());  // Set text-based description
+				existingRequirement.setJobDescriptionBlob(null);  // Nullify the BLOB if text is provided
+			}
+
+			// If a file for job description is provided, set it as BLOB and nullify the text description
+			if (requirementsDto.getJobDescriptionFile() != null && !requirementsDto.getJobDescriptionFile().isEmpty()) {
+				byte[] jobDescriptionBytes = saveJobDescriptionFileAsBlob(requirementsDto.getJobDescriptionFile(), requirementsDto.getJobId());
+				existingRequirement.setJobDescriptionBlob(jobDescriptionBytes);  // Set the BLOB field
+				existingRequirement.setJobDescription(null);  // Nullify the text-based description
+			}
+
+			// If the jobDescriptionFile is null, but jobDescriptionBlob is updated, update the BLOB
+			if (requirementsDto.getJobDescriptionFile() == null && requirementsDto.getJobDescriptionBlob() != null) {
+				existingRequirement.setJobDescriptionBlob(requirementsDto.getJobDescriptionBlob());  // Set the BLOB field
+				existingRequirement.setJobDescription(null);  // Nullify the text-based description
+			}
+
+			// Set other fields
 			existingRequirement.setJobType(requirementsDto.getJobType());
 			existingRequirement.setLocation(requirementsDto.getLocation());
 			existingRequirement.setJobMode(requirementsDto.getJobMode());
@@ -420,12 +443,20 @@ public class RequirementsService {
 			// Save the updated requirement to the database
 			requirementsDao.save(existingRequirement);
 
+			// Log after update
+			logger.info("After update: " + existingRequirement);
+
+			// Send emails to recruiters (after the requirement has been successfully updated)
+			sendEmailsToRecruiters(existingRequirement); // Assuming this method handles the sending of emails to recruiters
+
 			// Return success response
 			return new ResponseBean(true, "Updated Successfully", null, null);
 		} catch (Exception e) {
+			logger.error("Error updating requirement", e);
 			return new ResponseBean(false, "Error updating requirement", "Internal Server Error", null);
 		}
 	}
+
 
 	@Transactional
 	public ResponseBean deleteRequirementDetails(String jobId) {

@@ -35,10 +35,17 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(NoJobsAssignedToRecruiterException.class)
 	public ResponseEntity<ErrorResponse> handleNoJobsAssignedToRecruiter(NoJobsAssignedToRecruiterException ex) {
-		ErrorResponse errorResponse = new ErrorResponse(HttpStatus.OK.value(), ex.getMessage(),
-				LocalDateTime.now());
-		return new ResponseEntity<>(errorResponse, HttpStatus.OK);
+		// Prepare the error response
+		ErrorResponse errorResponse = new ErrorResponse(
+				HttpStatus.NOT_FOUND.value(),  // Using 404 to indicate resource not found
+				ex.getMessage(),
+				LocalDateTime.now()
+		);
+
+		// Return the response entity with 404 status
+		return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND);
 	}
+
 
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ErrorResponse> handleGlobalException(Exception ex) {

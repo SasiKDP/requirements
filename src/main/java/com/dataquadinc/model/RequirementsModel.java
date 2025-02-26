@@ -83,6 +83,15 @@ public class RequirementsModel {
     private String status;
     private Set<String> recruiterName;
 
+    // Setter for recruiterName to handle stringified list format properly
+    public void setRecruiterName(String recruiterNameJson) {
+        if (recruiterNameJson != null && !recruiterNameJson.isEmpty()) {
+            // Clean the stringified list if necessary
+            recruiterNameJson = recruiterNameJson.replaceAll("[\\[\\]\"]", "");  // Removes brackets and quotes
+            this.recruiterName = Set.of(recruiterNameJson.split(","));
+        }
+    }
+
     public byte[] getJobDescriptionBlob() {
         return jobDescriptionBlob;
     }
@@ -126,6 +135,7 @@ public class RequirementsModel {
         }
     }
 
+
     private void generateJobId() {
         try {
             // Use EntityManager through EntityManagerFactory instead of field injection
@@ -146,10 +156,12 @@ public class RequirementsModel {
             }
 
             int nextNumber = maxNumber + 1;
-            this.jobId = PREFIX + nextNumber;
+
+            // Format the number with leading zeros to ensure the length is always 3 digits
+            this.jobId = PREFIX + String.format("%03d", nextNumber);  // Adjust the number of zeros as needed
 
         } catch (NoResultException e) {
-            this.jobId = PREFIX + INITIAL_VALUE;
+            this.jobId = PREFIX + String.format("%03d", INITIAL_VALUE);  // Handle the case for the initial value
         } catch (Exception e) {
             throw new RuntimeException("Error generating job ID", e);
         }
