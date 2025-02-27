@@ -1,13 +1,11 @@
 package com.dataquadinc.dto;
 
 import java.time.LocalDateTime;
-import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-
 
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -20,6 +18,8 @@ public class RecruiterRequirementsDto {
 	private String clientName;
 
 	private String jobDescription;
+
+	private byte[] jobDescriptionBlob;  // Add the jobDescriptionBlob field as byte array
 
 	private String jobType;
 
@@ -35,10 +35,12 @@ public class RecruiterRequirementsDto {
 
 	private String qualification;
 
+	private String salaryPackage;
+
+	private int noOfPositions;
+
 	private LocalDateTime requirementAddedTimeStamp;
 
 	private String status;
-
-
 
 }
