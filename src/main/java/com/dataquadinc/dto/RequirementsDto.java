@@ -11,7 +11,7 @@ import lombok.Data;
 import org.springframework.web.multipart.MultipartFile;
 
 @Data
-public class RequirementsDto
+public class 	RequirementsDto
 {
 	@Id
 	private String jobId;  // No need to add @NotNull here if it's auto-generated

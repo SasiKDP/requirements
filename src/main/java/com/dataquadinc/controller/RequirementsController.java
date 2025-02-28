@@ -34,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.dataquadinc.service.RequirementsService;
 import org.springframework.web.multipart.MultipartFile;
 
-@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com"})
+@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000"})
 @RestController
 @RequestMapping("/requirements")
 //@CrossOrigin("*")
@@ -166,32 +166,35 @@ public class RequirementsController {
 			// Use Apache Tika to detect the content type
 			Tika tika = new Tika();
 			String contentType = tika.detect(jobDescriptionBytes);  // Detects the content type of the byte array
-			String fileExtension = "bin"; // Default extension for unknown files
+			String fileExtension = ""; // Default extension will be empty to handle dynamic extension
 
 			// Based on detected content type, set appropriate file extension
 			if (contentType.equals("application/pdf")) {
-				fileExtension = "pdf";
+				fileExtension = ".pdf";
 			} else if (contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
-				fileExtension = "docx";
+				fileExtension = ".docx";
 			} else if (contentType.equals("text/plain")) {
-				fileExtension = "txt";
+				fileExtension = ".txt";
 			} else if (contentType.equals("image/png")) {
-				fileExtension = "png";
+				fileExtension = ".png";
 			} else if (contentType.equals("image/jpeg")) {
-				fileExtension = "jpg";
+				fileExtension = ".jpg";
 			} else {
-				// If it's an unknown type, keep "bin" as the extension (generic binary)
+				// Log warning for unknown content types
 				logger.warn("Unknown content type detected: {}", contentType);
 			}
 
-			filename += "." + fileExtension;
+			// Append the detected file extension to the filename if available
+			if (!fileExtension.isEmpty()) {
+				filename += fileExtension;
+			}
 
 			// Convert the byte array to a ByteArrayResource for downloading
 			ByteArrayResource resource = new ByteArrayResource(jobDescriptionBytes);
 
-			// Return the file as a response for download
+			// Return the file as a response for download with the proper content type and filename
 			return ResponseEntity.ok()
-					.contentType(MediaType.parseMediaType(contentType))
+					.contentType(MediaType.parseMediaType(contentType))  // Set the content type based on detection
 					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
 					.body(resource);
 
@@ -208,7 +211,6 @@ public class RequirementsController {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
 		}
 	}
-
 	// Helper method to check if the byte array is a PDF (you could improve this with more detailed checks)
 	private boolean isPdf(byte[] data) {
 		return data != null && data.length > 4 && data[0] == '%'
@@ -241,14 +243,14 @@ public class RequirementsController {
 
 	@GetMapping("/getAssignments")
 	public ResponseEntity<?> getRequirements() {
-		List<RequirementsDto> requirements = (List<RequirementsDto>) service.getRequirementsDetails();
+		List<AssignedRequirementsDto> requirements = (List<AssignedRequirementsDto>) service.getRequirementsDetails();
 
 		if (requirements == null || requirements.isEmpty()) {
 			return new ResponseEntity<>(new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now()), HttpStatus.NOT_FOUND);
 		}
 
 		// Clean up recruiterName field
-		for (RequirementsDto dto : requirements) {
+		for (AssignedRequirementsDto dto : requirements) {
 			Set<String> cleanedNames = dto.getRecruiterName().stream()
 					.map(name -> name.replaceAll("[\\[\\]\"]", "")) // Remove brackets and extra quotes
 					.collect(Collectors.toSet());
