@@ -4,14 +4,19 @@ import java.time.LocalDateTime;
 import java.util.Random;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.web.multipart.MultipartFile;
 
 @Data
-public class 	RequirementsDto
+@NoArgsConstructor
+@AllArgsConstructor
+public class RequirementsDto
 {
 	@Id
 	private String jobId;  // No need to add @NotNull here if it's auto-generated
@@ -78,6 +83,7 @@ public class 	RequirementsDto
 	private Set<String> recruiterIds;
 
 	private String status;
+	@JsonFormat(without = JsonFormat.Feature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED)
 	private Set<String> recruiterName;
 
 

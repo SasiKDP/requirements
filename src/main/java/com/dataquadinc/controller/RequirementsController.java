@@ -477,5 +477,20 @@ public class RequirementsController {
 		// Return the response entity with the appropriate status code
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
+	@GetMapping("/{jobId}")
+	public ResponseEntity<RecruiterDetailsDTO> getRecruiterDetails(@PathVariable String jobId) {
+		RecruiterDetailsDTO recruiterDetails = service.getRecruiterDetailsByJobId(jobId);
+
+		if (recruiterDetails != null) {
+			return ResponseEntity.ok(recruiterDetails);
+		} else {
+			return ResponseEntity.notFound().build();
+		}
+	}
+	@GetMapping("/full-details/{jobId}")
+	public ExtendedRequirementsDto getFullRequirementDetails(@PathVariable String jobId) {
+		return service.getFullRequirementDetails(jobId);
+	}
+
 
 }
