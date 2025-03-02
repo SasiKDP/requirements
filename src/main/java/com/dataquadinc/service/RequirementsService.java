@@ -294,17 +294,16 @@ public class RequirementsService {
 
 
 	public Object getRequirementsDetails() {
-		List<RequirementsDto> dtoList = requirementsDao.findAll().stream()
+		List<AssignedRequirementsDto> dtoList = requirementsDao.findAll().stream()
 				.map(requirement -> {
 					// Directly map the model to DTO
-					RequirementsDto dto = new RequirementsDto();
+					AssignedRequirementsDto dto = new AssignedRequirementsDto();
 
 					// Manually set the properties of RequirementsDto from RequirementsModel
 					dto.setJobId(requirement.getJobId());
 					dto.setJobTitle(requirement.getJobTitle());
 					dto.setClientName(requirement.getClientName());
 					dto.setJobDescription(requirement.getJobDescription());
-					dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());  // Ensure jobDescriptionBlob is mapped
 					dto.setJobType(requirement.getJobType());
 					dto.setLocation(requirement.getLocation());
 					dto.setJobMode(requirement.getJobMode());
@@ -330,6 +329,8 @@ public class RequirementsService {
 			return dtoList;
 		}
 	}
+
+
 
 
 
