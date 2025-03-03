@@ -2,15 +2,16 @@ package com.dataquadinc.service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import com.dataquadinc.config.UserRegisterClient;
 import com.dataquadinc.dto.*;
 import com.dataquadinc.exceptions.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import feign.FeignException;
+import jakarta.persistence.Tuple;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -28,6 +29,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class RequirementsService {
+	private static final Logger logger = LoggerFactory.getLogger(RequirementsService.class);
+
 
 	@Autowired
 	private RequirementsDao requirementsDao;
@@ -38,8 +41,6 @@ public class RequirementsService {
 	@Autowired
 	private EmailService emailService;
 
-	@Autowired
-	private UserRegisterClient userRegisterClient;
 
 	@Transactional
 	public RequirementAddedResponse createRequirement(RequirementsDto requirementsDto) throws IOException {
@@ -117,6 +118,11 @@ public class RequirementsService {
 		// Remove all quotes, brackets, and whitespace
 		return recruiterId.replaceAll("[\"\\[\\]\\s]", "");
 	}
+	public String getRecruiterEmail(String recruiterId) {
+		Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(recruiterId);
+		return userTuple != null ? userTuple.get(0, String.class) : null;
+	}
+
 
 
 	private byte[] saveJobDescriptionFileAsBlob(MultipartFile jobDescriptionFile, String jobId) throws IOException {
@@ -145,88 +151,80 @@ public class RequirementsService {
 
 	// Update the sendEmailsToRecruiters method to handle comma-separated string
 	public void sendEmailsToRecruiters(RequirementsModel model) {
+		logger.info("Starting email sending process for job ID: {}", model.getJobId());
+
 		try {
 			Set<String> recruiterIds = model.getRecruiterIds();
-			if (recruiterIds != null && !recruiterIds.isEmpty()){
-				// Iterate over the recruiter IDs
-				for (String recruiterId : recruiterIds) {
-					try {
-						// Clean the recruiterId (remove quotes if present)
-						String cleanedRecruiterId = cleanRecruiterId(recruiterId);
+			if (recruiterIds == null || recruiterIds.isEmpty()) {
+				logger.warn("No recruiter IDs found for job ID: {}", model.getJobId());
+				return;
+			}
 
-						// Fetch recruiter email from the user service
-						String recruiterEmail = userRegisterClient.getRecruiterEmail(cleanedRecruiterId);
+			logger.info("Found {} recruiters to send emails to for job ID: {}", recruiterIds.size(), model.getJobId());
+
+			for (String recruiterId : recruiterIds) {
+				try {
+					// Clean the recruiterId (remove quotes if present)
+					String cleanedRecruiterId = cleanRecruiterId(recruiterId);
+					logger.debug("Processing recruiter with ID: {} (cleaned ID: {})", recruiterId, cleanedRecruiterId);
+
+					// Fetch recruiter email and username from the database
+					Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
+
+					if (userTuple != null) {
+						String recruiterEmail = userTuple.get(0, String.class);  // Fetch email
+						String recruiterName = userTuple.get(1, String.class);  // Fetch username
 
 						if (recruiterEmail != null && !recruiterEmail.isEmpty()) {
 							// Construct and send email
 							String subject = "New Job Assignment: " + model.getJobTitle();
-							String text = constructEmailBody(model,cleanedRecruiterId);
-							emailService.sendEmail(recruiterEmail, subject, text);
+							String text = constructEmailBody(model, recruiterName);
+
+							logger.info("Attempting to send email to recruiter: {} <{}> for job ID: {}",
+									recruiterName, recruiterEmail, model.getJobId());
+
+							try {
+								emailService.sendEmail(recruiterEmail, subject, text);
+								logger.info("Email successfully sent to recruiter: {} <{}> for job ID: {}",
+										recruiterName, recruiterEmail, model.getJobId());
+							} catch (Exception e) {
+								logger.error("Failed to send email to recruiter: {} <{}> for job ID: {}. Error: {}",
+										recruiterName, recruiterEmail, model.getJobId(), e.getMessage(), e);
+							}
+						} else {
+							logger.error("Empty or null email found for recruiter ID: {} (Name: {}) for job ID: {}",
+									cleanedRecruiterId, recruiterName, model.getJobId());
 						}
-					} catch (Exception e) {
-						System.err.println("Error processing recruiter " + recruiterId + ": " + e.getMessage());
+					} else {
+						logger.error("No user information found for recruiter ID: {} for job ID: {}",
+								cleanedRecruiterId, model.getJobId());
 					}
+				} catch (Exception e) {
+					logger.error("Error processing recruiter {} for job ID: {}. Error: {}",
+							recruiterId, model.getJobId(), e.getMessage(), e);
 				}
 			}
+
+			logger.info("Completed email sending process for job ID: {}", model.getJobId());
 		} catch (Exception e) {
-			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage());
+			logger.error("Critical error in sending emails to recruiters for job ID: {}. Error: {}",
+					model.getJobId(), e.getMessage(), e);
+			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage(), e);
 		}
 	}
-
-	// Helper method to save recruiter email to database
-	private void saveRecruiterEmail(RequirementsModel requirement, Set<String> recruiterId, String email) {
-		try {
-			// Create new JobRecruiterEmail entity
-			RequirementsModel jobRecruiterEmail = new RequirementsModel();
-			jobRecruiterEmail.setJobId(recruiterId.toString());
-			jobRecruiterEmail.setRecruiterIds(recruiterId);
-		} catch (Exception e) {
-			throw new RuntimeException("Error saving recruiter email to database: " + e.getMessage());
-		}
-	}
-
-	// Helper method to construct email body
-	private String constructEmailBody(RequirementsModel model, String recruiterId) {
-
-		// Fetch recruiter ID from the model
-
-		// Fetch the recruiter name using the recruiter ID
-		String recruiterName = userRegisterClient.getRecruiterUsername(recruiterId);  // Pass the recruiterId to fetch their name
-
-		return "Dear " + recruiterName + ",\n\n"  +
+	// Update constructEmailBody method to use recruiterName instead of fetching separately
+	private String constructEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",\n\n" +
 				"I hope this message finds you well. \n\n" +
 				"You have been assigned a new job requirement, and the details are outlined below:  \n\n" +
 				"**Job Title:** " + model.getJobTitle() + "\n" +
 				"**Client:** " + model.getClientName() + "\n" +
 				"**Location:** " + model.getLocation() + "\n" +
 				"**Job Type:** " + model.getJobType() + "\n" +
-				"**Experience Required:** " + model.getExperienceRequired() + " years\n" +
+				"**Experience Required:** " + model.getExperienceRequired() + " years\n\n" +
 				"Please take a moment to review the details and proceed with the necessary actions. Additional information can be accessed via your dashboard.\n\n" +
 				"If you have any questions or require further clarification, feel free to reach out.\n\n" +
 				"Best Regards,\nDataquad";
-	}
-
-
-
-
-	private static final Logger logger = LoggerFactory.getLogger(RequirementsService.class);
-
-
-	// Fetch recruiter email (you would need to implement this, e.g., from a database)
-	public String getRecruiterEmail(String recruiterId) {
-		// Log the recruiterId being fetched
-		logger.info("Fetching email for recruiter ID: " + recruiterId);
-
-		// Fetch the recruiter email directly
-		String email = userRegisterClient.getRecruiterEmail(recruiterId);
-
-		if (email == null || email.isEmpty()) {
-			logger.error("Failed to fetch email for recruiter ID: " + recruiterId);
-			throw new RuntimeException("Failed to fetch recruiter email for ID: " + recruiterId);
-		}
-
-		logger.info("Successfully fetched email: " + email);
-		return email;
 	}
 
 
@@ -473,13 +471,169 @@ public class RequirementsService {
 
 	public String getRecruiterName(String recruiterId) {
 		String cleanedRecruiterId = recruiterId.trim().replace("\"", "");
+
 		try {
-			return userRegisterClient.getRecruiterUsername(cleanedRecruiterId);
-		} catch (FeignException e) {
-			// Handle FeignException, such as logging the error or rethrowing it with more details
+			Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
+
+			if (userTuple != null) {
+				return userTuple.get(1, String.class); // Fetching username from tuple
+			} else {
+				System.out.println("No recruiter found with ID: " + recruiterId);
+				return null; // Or throw an exception if necessary
+			}
+		} catch (Exception e) {
 			System.out.println("Error fetching recruiter username: " + e.getMessage());
 			throw new RuntimeException("Error fetching recruiter username: " + e.getMessage());
 		}
+	}
+
+	public RecruiterDetailsDTO getRecruiterDetailsByJobId(String jobId) {
+		// Fetch the requirement by job ID
+		Optional<RequirementsModel> requirement = requirementsDao.findRecruitersByJobId(jobId);
+
+		if (requirement.isEmpty()) {
+			throw new RequirementNotFoundException("Requirement Not Found with Id: " + jobId);
+		}
+
+		RequirementsModel req = requirement.get();
+
+		// Assuming recruiterIds and recruiterNames are stored in the model as List<String>
+		List<String> recruiterIds = new ArrayList<>(req.getRecruiterIds());
+		List<String> recruiterNames = new ArrayList<>(req.getRecruiterName());
+
+		if (recruiterIds.size() != recruiterNames.size()) {
+			throw new IllegalStateException("Mismatch between recruiter IDs and recruiter names.");
+		}
+
+		// Clean the recruiter names by trimming unwanted characters (if any)
+		for (int i = 0; i < recruiterNames.size(); i++) {
+			recruiterNames.set(i, recruiterNames.get(i).replaceAll("[\"\\[\\]]", "").trim());
+		}
+
+		// Ensure the correct mapping for recruiter IDs and names
+		Map<String, String> recruiterMap = new HashMap<>();
+		for (int i = 0; i < recruiterIds.size(); i++) {
+			recruiterMap.put(recruiterIds.get(i), recruiterNames.get(i));
+		}
+
+		// Create a list of recruiters
+		List<RecruiterInfoDto> recruiters = new ArrayList<>();
+		for (String recruiterId : recruiterIds) {
+			recruiters.add(new RecruiterInfoDto(recruiterId, recruiterMap.get(recruiterId)));
+		}
+
+		// Initialize maps for submitted and interview scheduled candidates
+		Map<String, List<CandidateDto>> submittedCandidates = new HashMap<>();
+		Map<String, List<InterviewCandidateDto>> interviewScheduledCandidates = new HashMap<>();
+
+		// Loop over recruiters and fetch their candidates
+		for (RecruiterInfoDto recruiter : recruiters) {
+			String recruiterId = recruiter.getRecruiterId();
+
+			// Fetch the list of assigned candidates for this recruiter
+			List<Tuple> assignedCandidatesList = requirementsDao.findCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
+			List<CandidateDto> assignedCandidateDtos = mapCandidates(assignedCandidatesList);
+			submittedCandidates.put(recruiterId, assignedCandidateDtos);
+
+			// Fetch interview-scheduled candidates for this recruiter
+			List<Tuple> interviewCandidatesList = requirementsDao.findInterviewScheduledCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
+			List<InterviewCandidateDto> interviewCandidateDtos = mapInterviewCandidates(interviewCandidatesList);
+			interviewScheduledCandidates.put(recruiterId, interviewCandidateDtos);
+		}
+
+		// Return DTO with the recruiter details and candidate groups
+		return new RecruiterDetailsDTO(recruiters, submittedCandidates, interviewScheduledCandidates);
+	}
+
+
+	private List<CandidateDto> mapCandidates(List<Tuple> candidatesList) {
+		return candidatesList.stream().map(candidate -> new CandidateDto(
+				candidate.get("candidate_id", String.class), // Candidate ID
+				candidate.get("full_name", String.class), // Candidate Name (Previously mapped wrongly)
+				candidate.get("candidate_email_id", String.class), // Candidate Email
+				candidate.get("interview_status", String.class) // Interview Status
+		)).collect(Collectors.toList());
+	}
+
+	private List<InterviewCandidateDto> mapInterviewCandidates(List<Tuple> interviewCandidatesList) {
+		return interviewCandidatesList.stream().map(candidate -> {
+			Timestamp interviewTimestamp = candidate.get("interview_date_time", Timestamp.class); // ✅ Fetch as Timestamp
+			String interviewDateTime = interviewTimestamp != null
+					? interviewTimestamp.toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) // ✅ Convert to String
+					: null; // Handle null case
+
+			return new InterviewCandidateDto(
+					candidate.get("candidate_id", String.class),
+					candidate.get("full_name", String.class),
+					candidate.get("candidate_email_id", String.class),
+					candidate.get("interview_status", String.class),
+					candidate.get("interview_level", String.class),
+					interviewDateTime // ✅ Use formatted date-time string
+			);
+		}).collect(Collectors.toList());
+	}
+	private List<RecruiterInfoDto> getRecruitersByRequirement(RequirementsModel requirement) {
+		List<String> recruiterIds = new ArrayList<>(requirement.getRecruiterIds());
+		List<String> recruiterNames = new ArrayList<>(requirement.getRecruiterName());
+
+		if (recruiterIds.size() != recruiterNames.size()) {
+			throw new IllegalStateException("Mismatch between recruiter IDs and recruiter names.");
+		}
+
+		// ✅ Enhanced Cleanup Logic
+		recruiterNames = recruiterNames.stream()
+				.map(name -> name.replaceAll("[\\[\\]\"]", "").trim())  // Remove brackets & quotes
+				.map(name -> name.replaceAll("\\s*,\\s*", ","))         // Trim spaces around commas
+				.collect(Collectors.toList());
+
+		// ✅ Create RecruiterInfoDto list
+		List<RecruiterInfoDto> recruiters = new ArrayList<>();
+		for (int i = 0; i < recruiterIds.size(); i++) {
+			recruiters.add(new RecruiterInfoDto(recruiterIds.get(i), recruiterNames.get(i)));
+		}
+
+		return recruiters;
+	}
+
+	public ExtendedRequirementsDto getFullRequirementDetails(String jobId) {
+		// Fetch the requirement details from the database
+		RequirementsModel requirement = requirementsDao.findById(jobId)
+				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id: " + jobId));
+
+		// ✅ Clean recruiter names before processing and convert to Set
+		Set<String> recruiterNames = requirement.getRecruiterName().stream()
+				.map(name -> name.replaceAll("[\\[\\]\"]", "").trim())  // Remove unwanted characters
+				.collect(Collectors.toSet());  // Convert to Set
+
+		requirement.setRecruiterName(recruiterNames); // Update the cleaned names in requirement
+
+		// Extract recruiter details
+		List<RecruiterInfoDto> recruiters = getRecruitersByRequirement(requirement);
+
+		// Initialize maps for candidates
+		Map<String, List<CandidateDto>> submittedCandidates = new HashMap<>();
+		Map<String, List<InterviewCandidateDto>> interviewScheduledCandidates = new HashMap<>();
+
+		// Fetch candidates for each recruiter
+		for (RecruiterInfoDto recruiter : recruiters) {
+			String recruiterId = recruiter.getRecruiterId();
+
+			// Fetch submitted candidates
+			List<Tuple> assignedCandidatesList = requirementsDao.findCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
+			List<CandidateDto> assignedCandidateDtos = mapCandidates(assignedCandidatesList);
+			submittedCandidates.put(recruiterId, assignedCandidateDtos);
+
+			// Fetch interview-scheduled candidates
+			List<Tuple> interviewCandidatesList = requirementsDao.findInterviewScheduledCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
+			List<InterviewCandidateDto> interviewCandidateDtos = mapInterviewCandidates(interviewCandidatesList);
+			interviewScheduledCandidates.put(recruiterId, interviewCandidateDtos);
+		}
+
+		// ✅ Clean recruiter names before converting to DTO
+		ModelMapper modelMapper = new ModelMapper();
+		RequirementsinfoDto requirementDto = modelMapper.map(requirement, RequirementsinfoDto.class);
+
+		return new ExtendedRequirementsDto(requirementDto, submittedCandidates, interviewScheduledCandidates);
 	}
 
 }
