@@ -8,11 +8,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import com.dataquadinc.config.UserRegisterClient;
 import com.dataquadinc.dto.*;
 import com.dataquadinc.exceptions.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import feign.FeignException;
 import jakarta.persistence.Tuple;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -41,8 +39,6 @@ public class RequirementsService {
 	@Autowired
 	private EmailService emailService;
 
-	@Autowired
-	private UserRegisterClient userRegisterClient;
 
 	@Transactional
 	public RequirementAddedResponse createRequirement(RequirementsDto requirementsDto) throws IOException {
@@ -152,33 +148,68 @@ public class RequirementsService {
 
 	// Update the sendEmailsToRecruiters method to handle comma-separated string
 	public void sendEmailsToRecruiters(RequirementsModel model) {
+		logger.info("Starting email sending process for job ID: {}", model.getJobId());
+
 		try {
 			Set<String> recruiterIds = model.getRecruiterIds();
-			if (recruiterIds != null && !recruiterIds.isEmpty()){
-				// Iterate over the recruiter IDs
-				for (String recruiterId : recruiterIds) {
-					try {
-						// Clean the recruiterId (remove quotes if present)
-						String cleanedRecruiterId = cleanRecruiterId(recruiterId);
+			if (recruiterIds == null || recruiterIds.isEmpty()) {
+				logger.warn("No recruiter IDs found for job ID: {}", model.getJobId());
+				return;
+			}
 
-						// Fetch recruiter email from the user service
-						String recruiterEmail = userRegisterClient.getRecruiterEmail(cleanedRecruiterId);
+			logger.info("Found {} recruiters to send emails to for job ID: {}", recruiterIds.size(), model.getJobId());
+
+			for (String recruiterId : recruiterIds) {
+				try {
+					// Clean the recruiterId (remove quotes if present)
+					String cleanedRecruiterId = cleanRecruiterId(recruiterId);
+					logger.debug("Processing recruiter with ID: {} (cleaned ID: {})", recruiterId, cleanedRecruiterId);
+
+					// Fetch recruiter email and username from the database
+					Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
+
+					if (userTuple != null) {
+						String recruiterEmail = userTuple.get(0, String.class);  // Fetch email
+						String recruiterName = userTuple.get(1, String.class);  // Fetch username
 
 						if (recruiterEmail != null && !recruiterEmail.isEmpty()) {
 							// Construct and send email
 							String subject = "New Job Assignment: " + model.getJobTitle();
-							String text = constructEmailBody(model,cleanedRecruiterId);
-							emailService.sendEmail(recruiterEmail, subject, text);
+							String text = constructEmailBody(model, recruiterName);
+
+							logger.info("Attempting to send email to recruiter: {} <{}> for job ID: {}",
+									recruiterName, recruiterEmail, model.getJobId());
+
+							try {
+								emailService.sendEmail(recruiterEmail, subject, text);
+								logger.info("Email successfully sent to recruiter: {} <{}> for job ID: {}",
+										recruiterName, recruiterEmail, model.getJobId());
+							} catch (Exception e) {
+								logger.error("Failed to send email to recruiter: {} <{}> for job ID: {}. Error: {}",
+										recruiterName, recruiterEmail, model.getJobId(), e.getMessage(), e);
+							}
+						} else {
+							logger.error("Empty or null email found for recruiter ID: {} (Name: {}) for job ID: {}",
+									cleanedRecruiterId, recruiterName, model.getJobId());
 						}
-					} catch (Exception e) {
-						System.err.println("Error processing recruiter " + recruiterId + ": " + e.getMessage());
+					} else {
+						logger.error("No user information found for recruiter ID: {} for job ID: {}",
+								cleanedRecruiterId, model.getJobId());
 					}
+				} catch (Exception e) {
+					logger.error("Error processing recruiter {} for job ID: {}. Error: {}",
+							recruiterId, model.getJobId(), e.getMessage(), e);
 				}
 			}
+
+			logger.info("Completed email sending process for job ID: {}", model.getJobId());
 		} catch (Exception e) {
-			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage());
+			logger.error("Critical error in sending emails to recruiters for job ID: {}. Error: {}",
+					model.getJobId(), e.getMessage(), e);
+			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage(), e);
 		}
 	}
+
 
 	// Helper method to save recruiter email to database
 	private void saveRecruiterEmail(RequirementsModel requirement, Set<String> recruiterId, String email) {
@@ -193,21 +224,15 @@ public class RequirementsService {
 	}
 
 	// Helper method to construct email body
-	private String constructEmailBody(RequirementsModel model, String recruiterId) {
-
-		// Fetch recruiter ID from the model
-
-		// Fetch the recruiter name using the recruiter ID
-		String recruiterName = userRegisterClient.getRecruiterUsername(recruiterId);  // Pass the recruiterId to fetch their name
-
-		return "Dear " + recruiterName + ",\n\n"  +
+	private String constructEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",\n\n" +
 				"I hope this message finds you well. \n\n" +
 				"You have been assigned a new job requirement, and the details are outlined below:  \n\n" +
 				"**Job Title:** " + model.getJobTitle() + "\n" +
 				"**Client:** " + model.getClientName() + "\n" +
 				"**Location:** " + model.getLocation() + "\n" +
 				"**Job Type:** " + model.getJobType() + "\n" +
-				"**Experience Required:** " + model.getExperienceRequired() + " years\n" +
+				"**Experience Required:** " + model.getExperienceRequired() + " years\n\n" +
 				"Please take a moment to review the details and proceed with the necessary actions. Additional information can be accessed via your dashboard.\n\n" +
 				"If you have any questions or require further clarification, feel free to reach out.\n\n" +
 				"Best Regards,\nDataquad";
@@ -221,19 +246,8 @@ public class RequirementsService {
 
 	// Fetch recruiter email (you would need to implement this, e.g., from a database)
 	public String getRecruiterEmail(String recruiterId) {
-		// Log the recruiterId being fetched
-		logger.info("Fetching email for recruiter ID: " + recruiterId);
-
-		// Fetch the recruiter email directly
-		String email = userRegisterClient.getRecruiterEmail(recruiterId);
-
-		if (email == null || email.isEmpty()) {
-			logger.error("Failed to fetch email for recruiter ID: " + recruiterId);
-			throw new RuntimeException("Failed to fetch recruiter email for ID: " + recruiterId);
-		}
-
-		logger.info("Successfully fetched email: " + email);
-		return email;
+		Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(recruiterId);
+		return userTuple != null ? userTuple.get(0, String.class) : null;
 	}
 
 
@@ -480,14 +494,22 @@ public class RequirementsService {
 
 	public String getRecruiterName(String recruiterId) {
 		String cleanedRecruiterId = recruiterId.trim().replace("\"", "");
+
 		try {
-			return userRegisterClient.getRecruiterUsername(cleanedRecruiterId);
-		} catch (FeignException e) {
-			// Handle FeignException, such as logging the error or rethrowing it with more details
+			Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
+
+			if (userTuple != null) {
+				return userTuple.get(1, String.class); // Fetching username from tuple
+			} else {
+				System.out.println("No recruiter found with ID: " + recruiterId);
+				return null; // Or throw an exception if necessary
+			}
+		} catch (Exception e) {
 			System.out.println("Error fetching recruiter username: " + e.getMessage());
 			throw new RuntimeException("Error fetching recruiter username: " + e.getMessage());
 		}
 	}
+
 	public RecruiterDetailsDTO getRecruiterDetailsByJobId(String jobId) {
 		// Fetch the requirement by job ID
 		Optional<RequirementsModel> requirement = requirementsDao.findRecruitersByJobId(jobId);
