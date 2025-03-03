@@ -270,9 +270,8 @@ public class RequirementsController {
 		try {
 			// Retrieve the job requirement to check if the job exists
 			RequirementsModel requirement = requirementsDao.findById(jobId)
-					.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + jobId));
+					.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id: " + jobId));
 
-			// Flag to check if any error occurs before sending emails
 			boolean allEmailsSentSuccessfully = true;
 
 			// Convert List to Set and clean the recruiter IDs
@@ -280,35 +279,27 @@ public class RequirementsController {
 					.map(id -> id.replaceAll("[\"\\[\\]]", "").trim())
 					.collect(Collectors.toSet());
 
-			// Assign each recruiter to the job and send emails immediately
-			for (String recruiterId : recruiterIds) {
+			// Assign recruiters and send emails
+			for (String recruiterId : cleanedRecruiterIds) {
 				try {
-					// Assign the recruiter and save email to DB
+					// Assign the recruiter (assuming this handles updating recruiter names in DB)
 					service.assignToRecruiter(jobId, Collections.singleton(recruiterId));
 
-					// Fetch the recruiter's email and name (assuming these methods exist in your service)
+					// Fetch recruiter details
 					String recruiterEmail = service.getRecruiterEmail(recruiterId);
-					String recruiterName = service.getRecruiterName(recruiterId); // This should be available in the service
+					String recruiterName = service.getRecruiterName(recruiterId); // Fetch name from service
 
-					// Log recruiter ID and fetched email
 					logger.info("Fetched recruiterId: {} with email: {}", recruiterId, recruiterEmail);
 
-					// Check if the email and name are not null or empty
 					if (recruiterEmail == null || recruiterEmail.isEmpty()) {
 						throw new RecruiterNotFoundException("Email for recruiter " + recruiterId + " not found");
 					}
 
-					// Add the recruiter name to the job requirement's recruiterName set
-					requirement.getRecruiterName().add(recruiterName); // Add recruiter name to Set
-
-					System.out.println("Recruiter names before saving: " + requirement.getRecruiterName());
-
-					// Prepare the email subject and body
+					// Prepare email content
 					String subject = "New Job Assignment: " + requirement.getJobTitle();
-
 					String body = "Dear " + recruiterName + ",\n\n" +
-							"I hope this message finds you well. \n\n" +
-							"You have been assigned a new job requirement, and the details are outlined below:  \n\n" +
+							"I hope this message finds you well.\n\n" +
+							"You have been assigned a new job requirement, and the details are outlined below:\n\n" +
 							"Job Title: " + requirement.getJobTitle() + "\n" +
 							"Client: " + requirement.getClientName() + "\n" +
 							"Location: " + requirement.getLocation() + "\n" +
@@ -318,34 +309,29 @@ public class RequirementsController {
 							"If you have any questions or require further clarification, feel free to reach out.\n\n" +
 							"Best Regards,\nDataquad";
 
-					// Send email to the recruiter
+					// Send email
 					emailService.sendEmail(recruiterEmail, subject, body);
-
-					// Log the email sending action
-					logger.info("Email sent to recruiter {} at {} for job: {}", recruiterEmail, requirement.getJobTitle());
+					logger.info("Email sent to recruiter {} at {} for job: {}", recruiterName, recruiterEmail, requirement.getJobTitle());
 
 				} catch (Exception e) {
-					// Log the full exception stack trace for better error diagnosis
 					logger.error("Failed to send email to recruiter {} for job {}. Error: {}", recruiterId, requirement.getJobTitle(), e.getMessage(), e);
 					allEmailsSentSuccessfully = false;
 				}
 			}
 
-			// Return success response after attempting to assign recruiters and send emails
+			// Return response based on email status
 			if (allEmailsSentSuccessfully) {
 				return ResponseEntity.ok(ResponseBean.successResponse("Recruiters assigned and email notifications sent successfully.", null));
 			} else {
 				return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
-						.body(ResponseBean.errorResponse("Some recruiter emails failed to send. Please check the logs for details.", null));
+						.body(ResponseBean.errorResponse("Some recruiter emails failed to send. Please check logs for details.", null));
 			}
 
 		} catch (Exception e) {
-			// Handle errors (e.g., if jobId doesn't exist)
 			logger.error("Error assigning recruiters: {}", e.getMessage(), e);
 			return ResponseEntity.badRequest().body(ResponseBean.errorResponse("Error assigning recruiters: " + e.getMessage(), e.toString()));
 		}
 	}
-
 
 
 	@PutMapping("/updateStatus")
