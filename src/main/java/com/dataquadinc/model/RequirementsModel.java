@@ -75,6 +75,8 @@ public class RequirementsModel {
 
     private String status;
     private Set<String> recruiterName;
+    private String assignedBy;
+
 
     public byte[] getJobDescriptionBlob() {
         return jobDescriptionBlob;
@@ -285,4 +287,11 @@ public class RequirementsModel {
         }
     }
 
+    public String getAssignedBy() {
+        return assignedBy;
+    }
+
+    public void setAssignedBy(String assignedBy) {
+        this.assignedBy = assignedBy;
+    }
 }
