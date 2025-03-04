@@ -364,7 +364,6 @@ public class RequirementsController {
 	public ResponseEntity<List<RecruiterRequirementsDto>> getJobsByRecruiter(@PathVariable String recruiterId) {
 		return new ResponseEntity<>(service.getJobsAssignedToRecruiter(recruiterId),HttpStatus.OK);
 	}
-
 	@PutMapping("/updateRequirement/{jobId}")
 	public ResponseEntity<ResponseBean> updateRequirement(
 			@PathVariable String jobId,
@@ -375,7 +374,7 @@ public class RequirementsController {
 			@RequestParam("jobType") String jobType,
 			@RequestParam("location") String location,
 			@RequestParam("jobMode") String jobMode,
-			@RequestParam("status")String status,
+			@RequestParam("status") String status,
 			@RequestParam("experienceRequired") String experienceRequired,
 			@RequestParam("noticePeriod") String noticePeriod,
 			@RequestParam("relevantExperience") String relevantExperience,
@@ -401,15 +400,24 @@ public class RequirementsController {
 						.body(ResponseBean.errorResponse("Requirement not found for the provided jobId", "Not Found"));
 			}
 
+			// Debugging: Check the current status
+			System.out.println("Existing status before update: " + existingRequirement.getStatus());
+
 			// Set or nullify fields that are not being updated
 			if (jobTitle != null && !jobTitle.isEmpty()) existingRequirement.setJobTitle(jobTitle);
 			else existingRequirement.setJobTitle(null);
-			// Nullify if not
-			if(status!=null&& !status.isEmpty())existingRequirement.setStatus(status);
-			else existingRequirement.setStatus(null);
 
+			// Check and update the status
+			if (status != null && !status.isEmpty()) {
+				existingRequirement.setStatus(status);
+				System.out.println("Updated status to: " + status); // Debugging: Log updated status
+			} else {
+				existingRequirement.setStatus(null);
+			}
+
+			// Handle clientName and other fields similarly
 			if (clientName != null && !clientName.isEmpty()) existingRequirement.setClientName(clientName);
-			else existingRequirement.setClientName(null);  // Nullify if not updated
+			else existingRequirement.setClientName(null);
 
 			// Logic to set job description and BLOB
 			String finalJobDescription = null;
@@ -466,8 +474,12 @@ public class RequirementsController {
 
 			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
 			else existingRequirement.setAssignedBy(null);
+
 			// Call the service to update the requirement
 			ResponseBean response = service.updateRequirementDetails(existingRequirement);
+
+			// Debugging: Log the updated status after saving
+			System.out.println("Status after saving: " + existingRequirement.getStatus());
 
 			// Return success response
 			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
