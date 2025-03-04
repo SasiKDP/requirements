@@ -63,6 +63,7 @@ public class RequirementsModel {
     private String salaryPackage;
 
     private int noOfPositions;
+    private String assignedBy;
 
     @Lob
     @Column(name = "job_description_blob")
@@ -291,6 +292,14 @@ public class RequirementsModel {
 
     public Set<String> getRecruiterIds() {
         return recruiterIds;
+    }
+
+    public String getAssignedBy() {
+        return assignedBy;
+    }
+
+    public void setAssignedBy(String assignedBy) {
+        this.assignedBy = assignedBy;
     }
 
     public void setRecruiterIds(Set<String> recruiterIds) {
