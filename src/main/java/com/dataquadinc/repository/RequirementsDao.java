@@ -35,9 +35,8 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     @Query(value = "SELECT * FROM candidates WHERE job_id = :jobId AND user_id = :recruiterId AND interview_status = 'Scheduled'", nativeQuery = true)
     List<Tuple> findInterviewScheduledCandidatesByJobIdAndRecruiterId(@Param("jobId") String jobId, @Param("recruiterId") String recruiterId);
 
-    @Query(value = "SELECT email, user_name FROM user_details WHERE user_id = :userId", nativeQuery = true)
+    @Query(value = "SELECT email, user_name FROM user_details WHERE user_id = :userId AND status != 'inactive'", nativeQuery = true)
     Tuple findUserEmailAndUsernameByUserId(@Param("userId") String userId);
-
 
 
 }

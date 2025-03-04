@@ -68,7 +68,8 @@ public class RequirementsController {
 			@RequestParam(value = "salaryPackage", required = false) String salaryPackage,
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
-			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName
+			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
+			@RequestParam("assignedBy") String assignedBy // Added assignedBy parameter
 	) throws IOException {
 		try {
 			// Validate that only one of jobDescription or jobDescriptionFile is provided
@@ -119,7 +120,7 @@ public class RequirementsController {
 			requirementsDto.setNoOfPositions(noOfPositions);
 			requirementsDto.setRecruiterIds(recruiterIds);
 			requirementsDto.setRecruiterName(recruiterName);
-
+			requirementsDto.setAssignedBy(assignedBy);
 			// Call the service to create the requirement
 			RequirementAddedResponse response = service.createRequirement(requirementsDto);
 
@@ -305,6 +306,7 @@ public class RequirementsController {
 							"Location: " + requirement.getLocation() + "\n" +
 							"Job Type: " + requirement.getJobType() + "\n" +
 							"Experience Required: " + requirement.getExperienceRequired() + " years\n\n" +
+							"**Assigned By:** " + requirement.getAssignedBy() + "\n\n" + // Added Assigned By field
 							"Please take a moment to review the details and proceed with the necessary actions. Additional information can be accessed via your dashboard.\n\n" +
 							"If you have any questions or require further clarification, feel free to reach out.\n\n" +
 							"Best Regards,\nDataquad";
@@ -362,50 +364,42 @@ public class RequirementsController {
 			@RequestParam(value = "salaryPackage", required = false) String salaryPackage,
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
-			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName
+			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
+			@RequestParam("assignedBy") String assignedBy // Added assignedBy parameter
 	) throws IOException {
 		try {
-			// Validate that only one of jobDescription or jobDescriptionFile is provided
 			if ((jobDescription != null && !jobDescription.isEmpty()) &&
 					(jobDescriptionFile != null && !jobDescriptionFile.isEmpty())) {
 				return ResponseEntity.badRequest()
 						.body(ResponseBean.errorResponse("You can either provide a job description text or upload a job description file, but not both.", "Bad Request"));
 			}
 
-			// Fetch the existing requirement
 			RequirementsDto existingRequirement = service.getRequirementDetailsById(jobId);
 			if (existingRequirement == null) {
 				return ResponseEntity.status(HttpStatus.NOT_FOUND)
 						.body(ResponseBean.errorResponse("Requirement not found for the provided jobId", "Not Found"));
 			}
 
-			// Set or nullify fields that are not being updated
 			if (jobTitle != null && !jobTitle.isEmpty()) existingRequirement.setJobTitle(jobTitle);
-			else existingRequirement.setJobTitle(null);  // Nullify if not updated
+			else existingRequirement.setJobTitle(null);
 
 			if (clientName != null && !clientName.isEmpty()) existingRequirement.setClientName(clientName);
-			else existingRequirement.setClientName(null);  // Nullify if not updated
+			else existingRequirement.setClientName(null);
 
-			// Logic to set job description and BLOB
 			String finalJobDescription = null;
 			byte[] jobDescriptionBlob = null;
 
-			// If jobDescriptionFile is provided, process the file and set the BLOB
 			if (jobDescriptionFile != null && !jobDescriptionFile.isEmpty()) {
-				jobDescriptionBlob = jobDescriptionFile.getBytes(); // Save the file as a BLOB
-				finalJobDescription = null; // Use the file (no text)
-			}
-			// If jobDescription (text) is provided, use it and set the BLOB to null
-			else if (jobDescription != null && !jobDescription.isEmpty()) {
+				jobDescriptionBlob = jobDescriptionFile.getBytes();
+				finalJobDescription = null;
+			} else if (jobDescription != null && !jobDescription.isEmpty()) {
 				finalJobDescription = jobDescription;
-				jobDescriptionBlob = null; // Use the text (no file)
+				jobDescriptionBlob = null;
 			}
 
-			// Set the job description (from file or text)
 			existingRequirement.setJobDescription(finalJobDescription);
-			existingRequirement.setJobDescriptionBlob(jobDescriptionBlob); // Set the BLOB (or null)
+			existingRequirement.setJobDescriptionBlob(jobDescriptionBlob);
 
-			// Set the other fields and nullify any fields that are not being updated
 			if (jobType != null && !jobType.isEmpty()) existingRequirement.setJobType(jobType);
 			else existingRequirement.setJobType(null);
 
@@ -431,7 +425,7 @@ public class RequirementsController {
 			else existingRequirement.setSalaryPackage(null);
 
 			if (noOfPositions > 0) existingRequirement.setNoOfPositions(noOfPositions);
-			else existingRequirement.setNoOfPositions(0); // If noOfPositions is not updated, set to 0
+			else existingRequirement.setNoOfPositions(0);
 
 			if (recruiterIds != null && !recruiterIds.isEmpty()) existingRequirement.setRecruiterIds(recruiterIds);
 			else existingRequirement.setRecruiterIds(null);
@@ -439,10 +433,11 @@ public class RequirementsController {
 			if (recruiterName != null && !recruiterName.isEmpty()) existingRequirement.setRecruiterName(recruiterName);
 			else existingRequirement.setRecruiterName(null);
 
-			// Call the service to update the requirement
+			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
+			else existingRequirement.setAssignedBy(null);
+
 			ResponseBean response = service.updateRequirementDetails(existingRequirement);
 
-			// Return success response
 			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
 
 		} catch (IllegalArgumentException e) {
@@ -452,6 +447,7 @@ public class RequirementsController {
 					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"));
 		}
 	}
+
 
 	@DeleteMapping("/deleteRequirement/{jobId}")
 	public ResponseEntity<ResponseBean> deleteRequirement(@PathVariable String jobId) {
@@ -471,9 +467,9 @@ public class RequirementsController {
 			return ResponseEntity.notFound().build();
 		}
 	}
-	@GetMapping("/full-details/{jobId}")
-	public ExtendedRequirementsDto getFullRequirementDetails(@PathVariable String jobId) {
-		return service.getFullRequirementDetails(jobId);
-	}
+//	@GetMapping("/full-details/{jobId}")
+//	public ExtendedRequirementsDto getFullRequirementDetails(@PathVariable String jobId) {
+//		return service.getFullRequirementDetails(jobId);
+//	}
 
 }
