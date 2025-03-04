@@ -264,6 +264,7 @@ public class RequirementsController {
 	}
 
 
+
 	@GetMapping("/get/{jobId}")
 	public ResponseEntity<RequirementsDto> getRequirementById(@PathVariable String jobId) {
 		return new ResponseEntity<>(service.getRequirementDetailsById(jobId), HttpStatus.OK);
@@ -374,6 +375,7 @@ public class RequirementsController {
 			@RequestParam("jobType") String jobType,
 			@RequestParam("location") String location,
 			@RequestParam("jobMode") String jobMode,
+			@RequestParam("status")String status,
 			@RequestParam("experienceRequired") String experienceRequired,
 			@RequestParam("noticePeriod") String noticePeriod,
 			@RequestParam("relevantExperience") String relevantExperience,
@@ -401,7 +403,10 @@ public class RequirementsController {
 
 			// Set or nullify fields that are not being updated
 			if (jobTitle != null && !jobTitle.isEmpty()) existingRequirement.setJobTitle(jobTitle);
-			else existingRequirement.setJobTitle(null);  // Nullify if not updated
+			else existingRequirement.setJobTitle(null);
+			// Nullify if not
+			if(status!=null&& !status.isEmpty())existingRequirement.setStatus(status);
+			else existingRequirement.setStatus(null);
 
 			if (clientName != null && !clientName.isEmpty()) existingRequirement.setClientName(clientName);
 			else existingRequirement.setClientName(null);  // Nullify if not updated

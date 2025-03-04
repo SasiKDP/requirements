@@ -106,15 +106,15 @@ public class RequirementsService {
 
 
 		// If jobId is not set, let @PrePersist handle the generation
+		// If jobId is not set, let @PrePersist handle the generation
 		if (model.getJobId() == null || model.getJobId().isEmpty()) {
-			if (model.getStatus() == null || model.getStatus().isEmpty()) {
-				model.setStatus(null); // Ensure it does not default to "In Progress"
-			}
+			model.setStatus("In Progress");
 			model.setRequirementAddedTimeStamp(LocalDateTime.now());
 			requirementsDao.save(model);
 		} else {
+			// Throw exception if the jobId already exists
 			throw new RequirementAlreadyExistsException(
-					"Requirements Already Exist with Job Id : " + model.getJobId());
+					"Requirements Already Exists with Job Id : " + model.getJobId());
 		}
 
 
