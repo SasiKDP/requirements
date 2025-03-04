@@ -87,26 +87,35 @@ public class RequirementsService {
 			model.setJobDescriptionBlob(null);  // Ensure the file-based description is null
 		}
 
-		// If a file for the job description is uploaded, save it as BLOB and set the text-based description to null
+		// If a file for the job description is uploaded, process the file using processJobDescriptionFile
 		if (requirementsDto.getJobDescriptionFile() != null && !requirementsDto.getJobDescriptionFile().isEmpty()) {
-			byte[] jobDescriptionBytes = saveJobDescriptionFileAsBlob(requirementsDto.getJobDescriptionFile(),
-					requirementsDto.getJobId());
-			model.setJobDescriptionBlob(jobDescriptionBytes);  // Set the BLOB field
-			model.setJobDescription(null);  // Ensure the text-based description is null
+			// Use processJobDescriptionFile to extract text or convert image to Base64
+			String processedJobDescription = processJobDescriptionFile(requirementsDto.getJobDescriptionFile());
+
+			// If it's text-based, set it as the job description
+			model.setJobDescription(processedJobDescription);
+
+			// If it's a Base64 image, store it as a BLOB (in case you need to handle images differently)
+			if (processedJobDescription.startsWith("data:image")) { // This means it is an image in Base64 format
+				byte[] jobDescriptionBytes = Base64.getDecoder().decode(processedJobDescription.split(",")[1]);
+				model.setJobDescriptionBlob(jobDescriptionBytes);
+			} else {
+				model.setJobDescriptionBlob(null);  // Ensure BLOB is null if text is extracted
+			}
 		}
 
 
 		// If jobId is not set, let @PrePersist handle the generation
 		if (model.getJobId() == null || model.getJobId().isEmpty()) {
-			if (model.getStatus() == null || model.getStatus().isEmpty()) {
-				model.setStatus(null); // Ensure it does not default to "In Progress"
-			}
+			model.setStatus("In Progress");
 			model.setRequirementAddedTimeStamp(LocalDateTime.now());
 			requirementsDao.save(model);
 		} else {
+			// Throw exception if the jobId already exists
 			throw new RequirementAlreadyExistsException(
-					"Requirements Already Exist with Job Id : " + model.getJobId());
+					"Requirements Already Exists with Job Id : " + model.getJobId());
 		}
+
 
 
 		// Send email to each recruiter assigned to the requirement
