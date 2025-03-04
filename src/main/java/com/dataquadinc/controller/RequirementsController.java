@@ -357,6 +357,7 @@ public class RequirementsController {
 			@RequestParam("jobType") String jobType,
 			@RequestParam("location") String location,
 			@RequestParam("jobMode") String jobMode,
+			@RequestParam("status")String status,
 			@RequestParam("experienceRequired") String experienceRequired,
 			@RequestParam("noticePeriod") String noticePeriod,
 			@RequestParam("relevantExperience") String relevantExperience,
@@ -403,6 +404,8 @@ public class RequirementsController {
 			if (jobType != null && !jobType.isEmpty()) existingRequirement.setJobType(jobType);
 			else existingRequirement.setJobType(null);
 
+			if(status!=null&& !status.isEmpty())existingRequirement.setStatus(status);
+            else existingRequirement.setStatus(null);
 			if (location != null && !location.isEmpty()) existingRequirement.setLocation(location);
 			else existingRequirement.setLocation(null);
 
