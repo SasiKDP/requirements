@@ -42,5 +42,6 @@ public class RecruiterRequirementsDto {
 	private LocalDateTime requirementAddedTimeStamp;
 
 	private String status;
+	private String assignedBy;
 
 }

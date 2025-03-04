@@ -68,7 +68,8 @@ public class RequirementsController {
 			@RequestParam(value = "salaryPackage", required = false) String salaryPackage,
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
-			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName
+			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
+			@RequestParam("assignedBy") String assignedBy
 	) throws IOException {
 		try {
 			// Validate that only one of jobDescription or jobDescriptionFile is provided
@@ -119,6 +120,7 @@ public class RequirementsController {
 			requirementsDto.setNoOfPositions(noOfPositions);
 			requirementsDto.setRecruiterIds(recruiterIds);
 			requirementsDto.setRecruiterName(recruiterName);
+			requirementsDto.setAssignedBy(assignedBy);
 
 			// Call the service to create the requirement
 			RequirementAddedResponse response = service.createRequirement(requirementsDto);
@@ -243,14 +245,14 @@ public class RequirementsController {
 
 	@GetMapping("/getAssignments")
 	public ResponseEntity<?> getRequirements() {
-		List<AssignedRequirementsDto> requirements = (List<AssignedRequirementsDto>) service.getRequirementsDetails();
+		List<RequirementsDto> requirements = (List<RequirementsDto>) service.getRequirementsDetails();
 
 		if (requirements == null || requirements.isEmpty()) {
 			return new ResponseEntity<>(new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now()), HttpStatus.NOT_FOUND);
 		}
 
 		// Clean up recruiterName field
-		for (AssignedRequirementsDto dto : requirements) {
+		for (RequirementsDto dto : requirements) {
 			Set<String> cleanedNames = dto.getRecruiterName().stream()
 					.map(name -> name.replaceAll("[\\[\\]\"]", "")) // Remove brackets and extra quotes
 					.collect(Collectors.toSet());
@@ -260,6 +262,8 @@ public class RequirementsController {
 
 		return new ResponseEntity<>(requirements, HttpStatus.OK);
 	}
+
+
 
 	@GetMapping("/get/{jobId}")
 	public ResponseEntity<RequirementsDto> getRequirementById(@PathVariable String jobId) {
@@ -315,6 +319,7 @@ public class RequirementsController {
 							"Location: " + requirement.getLocation() + "\n" +
 							"Job Type: " + requirement.getJobType() + "\n" +
 							"Experience Required: " + requirement.getExperienceRequired() + " years\n\n" +
+							"Assigned By: " + requirement.getAssignedBy() + "\n\n" + // Added Assigned By field
 							"Please take a moment to review the details and proceed with the necessary actions. Additional information can be accessed via your dashboard.\n\n" +
 							"If you have any questions or require further clarification, feel free to reach out.\n\n" +
 							"Best Regards,\nDataquad";
@@ -370,6 +375,7 @@ public class RequirementsController {
 			@RequestParam("jobType") String jobType,
 			@RequestParam("location") String location,
 			@RequestParam("jobMode") String jobMode,
+			@RequestParam("status")String status,
 			@RequestParam("experienceRequired") String experienceRequired,
 			@RequestParam("noticePeriod") String noticePeriod,
 			@RequestParam("relevantExperience") String relevantExperience,
@@ -377,7 +383,8 @@ public class RequirementsController {
 			@RequestParam(value = "salaryPackage", required = false) String salaryPackage,
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
-			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName
+			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
+			@RequestParam("assignedBy") String assignedBy // Added assignedBy parameter
 	) throws IOException {
 		try {
 			// Validate that only one of jobDescription or jobDescriptionFile is provided
@@ -396,7 +403,10 @@ public class RequirementsController {
 
 			// Set or nullify fields that are not being updated
 			if (jobTitle != null && !jobTitle.isEmpty()) existingRequirement.setJobTitle(jobTitle);
-			else existingRequirement.setJobTitle(null);  // Nullify if not updated
+			else existingRequirement.setJobTitle(null);
+			// Nullify if not
+			if(status!=null&& !status.isEmpty())existingRequirement.setStatus(status);
+			else existingRequirement.setStatus(null);
 
 			if (clientName != null && !clientName.isEmpty()) existingRequirement.setClientName(clientName);
 			else existingRequirement.setClientName(null);  // Nullify if not updated
@@ -454,6 +464,8 @@ public class RequirementsController {
 			if (recruiterName != null && !recruiterName.isEmpty()) existingRequirement.setRecruiterName(recruiterName);
 			else existingRequirement.setRecruiterName(null);
 
+			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
+			else existingRequirement.setAssignedBy(null);
 			// Call the service to update the requirement
 			ResponseBean response = service.updateRequirementDetails(existingRequirement);
 
@@ -487,10 +499,10 @@ public class RequirementsController {
 			return ResponseEntity.notFound().build();
 		}
 	}
-	@GetMapping("/full-details/{jobId}")
-	public ExtendedRequirementsDto getFullRequirementDetails(@PathVariable String jobId) {
-		return service.getFullRequirementDetails(jobId);
-	}
+//	@GetMapping("/full-details/{jobId}")
+//	public ExtendedRequirementsDto getFullRequirementDetails(@PathVariable String jobId) {
+//		return service.getFullRequirementDetails(jobId);
+//	}
 
 
 }
