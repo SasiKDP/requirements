@@ -462,6 +462,7 @@ public class RequirementsService {
 			existingRequirement.setRecruiterIds(requirementsDto.getRecruiterIds());
 			existingRequirement.setRecruiterName(requirementsDto.getRecruiterName());
 			existingRequirement.setAssignedBy(requirementsDto.getAssignedBy());
+			if (requirementsDto.getStatus() != null) existingRequirement.setStatus(requirementsDto.getStatus());
 
 			// Save the updated requirement to the database
 			requirementsDao.save(existingRequirement);
