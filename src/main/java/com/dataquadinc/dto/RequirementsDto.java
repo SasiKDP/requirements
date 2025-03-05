@@ -81,6 +81,7 @@ public class RequirementsDto
 	private LocalDateTime requirementAddedTimeStamp;
 
 	private Set<String> recruiterIds;
+	private String assignedBy;
 
 	private String status;
 	@JsonFormat(without = JsonFormat.Feature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED)
@@ -253,8 +254,18 @@ public class RequirementsDto
 	public int getNoOfPositions() {
 		return noOfPositions;
 	}
-
 	public void setNoOfPositions(int noOfPositions) {
 		this.noOfPositions = noOfPositions;
 	}
+
+	public String getAssignedBy() {
+		return assignedBy;
+	}
+
+	public void setAssignedBy(String assignedBy) {
+		this.assignedBy = assignedBy;
+	}
+
+
+
 }

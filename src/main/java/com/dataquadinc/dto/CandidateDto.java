@@ -12,5 +12,11 @@ public class CandidateDto {
     private String candidateName;
     private String email;
     private String interviewStatus;
+    private String contactNumber;
+    private String qualification;
+    private String skills;
+    private String overallFeedback;
+
 }
+
 
