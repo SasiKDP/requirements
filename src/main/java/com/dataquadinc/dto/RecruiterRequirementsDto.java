@@ -12,38 +12,19 @@ import lombok.Data;
 public class RecruiterRequirementsDto {
 
 	private String jobId;
-
 	private String jobTitle;
-
 	private String clientName;
-
 	private String jobDescription;
-
-	private byte[] jobDescriptionBlob;  // Add the jobDescriptionBlob field as byte array
-
+//	private byte[] jobDescriptionBlob;  // Add the jobDescriptionBlob field as byte array
 	private String jobType;
-
 	private String location;
-
 	private String jobMode;
-
 	private String experienceRequired;
-
 	private String noticePeriod;
-
 	private String relevantExperience;
-
 	private String qualification;
-
 	private String salaryPackage;
-
 	private int noOfPositions;
-
-	private LocalDateTime requirementAddedTimeStamp;
-
-	private String status;
-
-   private String assignedBy;
 
 	public String getJobId() {
 		return jobId;
@@ -75,14 +56,6 @@ public class RecruiterRequirementsDto {
 
 	public void setJobDescription(String jobDescription) {
 		this.jobDescription = jobDescription;
-	}
-
-	public byte[] getJobDescriptionBlob() {
-		return jobDescriptionBlob;
-	}
-
-	public void setJobDescriptionBlob(byte[] jobDescriptionBlob) {
-		this.jobDescriptionBlob = jobDescriptionBlob;
 	}
 
 	public String getJobType() {
@@ -181,12 +154,20 @@ public class RecruiterRequirementsDto {
 		this.assignedBy = assignedBy;
 	}
 
+	private LocalDateTime requirementAddedTimeStamp;
+	private String status;
+	private String assignedBy;
+
+	// No-argument constructor
+	public RecruiterRequirementsDto() {
+	}
+
+	// Parameterized constructor (already provided)
 	public RecruiterRequirementsDto(String jobId, String jobTitle, String clientName, String jobDescription, byte[] jobDescriptionBlob, String jobType, String location, String jobMode, String experienceRequired, String noticePeriod, String relevantExperience, String qualification, String salaryPackage, int noOfPositions, LocalDateTime requirementAddedTimeStamp, String status, String assignedBy) {
 		this.jobId = jobId;
 		this.jobTitle = jobTitle;
 		this.clientName = clientName;
 		this.jobDescription = jobDescription;
-		this.jobDescriptionBlob = jobDescriptionBlob;
 		this.jobType = jobType;
 		this.location = location;
 		this.jobMode = jobMode;
