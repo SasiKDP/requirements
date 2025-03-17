@@ -26,7 +26,7 @@ import java.util.Optional;
         "http://192.168.0.135:8080"
 })
 @RestController
-@RequestMapping("/BDM")
+@RequestMapping("/requirements")
 public class BDM_Controller {
 
     @Autowired
@@ -34,7 +34,7 @@ public class BDM_Controller {
 
     private final ObjectMapper objectMapper = new ObjectMapper(); // Reuse ObjectMapper
 
-    @PostMapping("/addClient")
+    @PostMapping("/bdm/addClient")
     public ResponseEntity<ResponseBean> createClient(
             @RequestPart("dto") String dtoJson,
             @RequestPart(value = "supportingDocuments", required = false) MultipartFile file) {
@@ -56,13 +56,13 @@ public class BDM_Controller {
         }
     }
 
-    @GetMapping("/getAll")
+    @GetMapping("/bdm/getAll")
     public ResponseEntity<ResponseBean> getAllClients() {
         List<BDM_Dto> clients = service.getAllClients();
         return ResponseEntity.ok(ResponseBean.successResponse("Clients fetched successfully", clients));
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/bdm/{id}")
     public ResponseEntity<ResponseBean> getClientById(@PathVariable String id) {
         return service.getClientById(id)
                 .map(client -> ResponseEntity.ok(ResponseBean.successResponse("Client found", client)))
@@ -70,7 +70,7 @@ public class BDM_Controller {
                         .body(ResponseBean.errorResponse("Client not found", "No client exists with ID: " + id)));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/bdm/{id}")
     public ResponseEntity<ResponseBean> updateClient(
             @PathVariable String id,
             @RequestPart("dto") String dtoJson,
@@ -91,13 +91,13 @@ public class BDM_Controller {
         }
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/bdm/{id}")
     public ResponseEntity<ResponseBean> deleteClient(@PathVariable String id) {
         service.deleteClient(id);
         return ResponseEntity.ok(ResponseBean.successResponse("Client deleted successfully", null));
     }
 
-    @GetMapping("/{id}/download")
+    @GetMapping("/bdm/{id}/download")
     public ResponseEntity<?> downloadSupportingDocument(@PathVariable String id) {
         Optional<BDM_Dto> clientDtoOptional = service.getClientById(id);
 
