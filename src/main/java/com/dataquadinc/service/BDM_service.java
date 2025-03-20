@@ -17,6 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.sql.Timestamp;
 import java.time.format.DateTimeFormatter;
@@ -63,7 +66,6 @@ public class BDM_service {
         dto.setId(client.getId());
         dto.setClientName(client.getClientName());
         dto.setClientAddress(client.getClientAddress());
-        dto.setPositionType(client.getPositionType());
         dto.setNetPayment(client.getNetPayment());
         dto.setGst(client.getGst());
         dto.setSupportingCustomers(client.getSupportingCustomers());
@@ -83,7 +85,6 @@ public class BDM_service {
         client.setId(dto.getId());
         client.setClientName(dto.getClientName());
         client.setClientAddress(dto.getClientAddress());
-        client.setPositionType(dto.getPositionType());
         client.setNetPayment(dto.getNetPayment());
         client.setGst(dto.getGst());
         client.setSupportingCustomers(dto.getSupportingCustomers());
@@ -103,20 +104,32 @@ public class BDM_service {
     }
 
 
-    public BDM_Dto createClient(BDM_Dto dto, MultipartFile file) throws IOException {
+    public BDM_Dto createClient(BDM_Dto dto, List<MultipartFile> files) throws IOException {
         BDM_Client entity = convertToEntity(dto);
-        entity.setId(generateCustomId());
+        entity.setId(generateCustomId()); // Generate custom ID
 
-        // Check if file is present before setting it
-        if (file != null && !file.isEmpty()) {
-            System.out.println("Received File: " + file.getOriginalFilename());
-            System.out.println("File Size: " + file.getSize());
-            entity.setSupportingDocuments(file.getOriginalFilename());
-            entity.setDocumentedData(file.getBytes());
+        Path uploadDir = Paths.get("uploads");
+        if (!Files.exists(uploadDir)) {
+            Files.createDirectories(uploadDir);
         }
 
+        // Store only file names
+        List<String> fileNames = new ArrayList<>();
+        if (files != null && !files.isEmpty()) {
+            for (MultipartFile file : files) {
+                if (!file.isEmpty()) {
+                    String fileName = file.getOriginalFilename();
+                    fileNames.add(fileName);
 
-        entity = repository.save(entity);
+                    // Save file to disk
+                    Path filePath = uploadDir.resolve(fileName);
+                    Files.write(filePath, file.getBytes());
+                }
+            }
+        }
+        entity.setSupportingDocuments(fileNames);  // ✅ Store file names in DB
+
+        entity = repository.save(entity); // Save client in DB
         return convertToDTO(entity);
     }
 
