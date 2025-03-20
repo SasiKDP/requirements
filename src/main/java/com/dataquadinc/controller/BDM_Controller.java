@@ -2,10 +2,13 @@ package com.dataquadinc.controller;
 
 import com.dataquadinc.dto.BDM_Dto;
 import com.dataquadinc.dto.ResponseBean;
+import com.dataquadinc.model.BDM_Client;
+import com.dataquadinc.repository.BDM_Repo;
 import com.dataquadinc.service.BDM_service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -13,9 +16,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @CrossOrigin(origins = {
         "http://35.188.150.92",
@@ -31,22 +41,27 @@ public class BDM_Controller {
 
     @Autowired
     private BDM_service service;
+    @Autowired
+    private BDM_Repo repo;
 
-    private final ObjectMapper objectMapper = new ObjectMapper(); // Reuse ObjectMapper
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
+    // Reuse ObjectMapper
     @PostMapping("/bdm/addClient")
     public ResponseEntity<ResponseBean> createClient(
             @RequestPart("dto") String dtoJson,
-            @RequestPart(value = "supportingDocuments", required = false) MultipartFile file) {
+            @RequestPart(value = "supportingDocuments", required = false) List<MultipartFile> files) {
 
         try {
+            // Convert JSON string to DTO object
             BDM_Dto dto = objectMapper.readValue(dtoJson, BDM_Dto.class);
 
-            if (file != null && !file.isEmpty()) {
-                dto.setSupportingDocuments(file.getOriginalFilename());
-            }
+            // Debugging logs (optional)
+            System.out.println("Parsed DTO: " + dto);
+            System.out.println("Received Files: " + (files != null ? files.size() : 0));
 
-            BDM_Dto createdClient = service.createClient(dto, file);
+            // Pass DTO and files to the service
+            BDM_Dto createdClient = service.createClient(dto, files);
             return ResponseEntity.ok(ResponseBean.successResponse("Client added successfully", createdClient));
 
         } catch (IOException e) {
@@ -55,6 +70,9 @@ public class BDM_Controller {
                     .body(ResponseBean.errorResponse("Invalid JSON", "Error parsing client data"));
         }
     }
+
+
+
 
     @GetMapping("/bdm/getAll")
     public ResponseEntity<ResponseBean> getAllClients() {
@@ -74,12 +92,12 @@ public class BDM_Controller {
     public ResponseEntity<ResponseBean> updateClient(
             @PathVariable String id,
             @RequestPart("dto") String dtoJson,
-            @RequestPart(value = "supportingDocuments", required = false) MultipartFile file) {
+            @RequestPart(value = "supportingDocuments", required = false) List<MultipartFile> files) {
 
         try {
             BDM_Dto dto = objectMapper.readValue(dtoJson, BDM_Dto.class);
 
-            Optional<BDM_Dto> updatedClient = service.updateClient(id, dto, file);
+            Optional<BDM_Dto> updatedClient = service.updateClient(id, dto, files);
             return updatedClient.map(client -> ResponseEntity.ok(ResponseBean.successResponse("Client updated successfully", client)))
                     .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                             .body(ResponseBean.errorResponse("Update failed", "No client exists with ID: " + id)));
@@ -97,29 +115,50 @@ public class BDM_Controller {
         return ResponseEntity.ok(ResponseBean.successResponse("Client deleted successfully", null));
     }
 
-    @GetMapping("/bdm/{id}/download")
-    public ResponseEntity<?> downloadSupportingDocument(@PathVariable String id) {
-        Optional<BDM_Dto> clientDtoOptional = service.getClientById(id);
 
-        if (clientDtoOptional.isPresent()) {
-            BDM_Dto clientDto = clientDtoOptional.get();
-            byte[] documentData = clientDto.getDocumentData();
-            String fileName = clientDto.getSupportingDocuments();
 
-            if (documentData != null && documentData.length > 0) {
-                ByteArrayResource resource = new ByteArrayResource(documentData);
+    @GetMapping("/bdm/{id}/downloadAll")
+    public ResponseEntity<Resource> downloadAllSupportingDocuments(@PathVariable String id) {
+        Optional<BDM_Client> clientOptional = repo.findById(id);
+
+        if (clientOptional.isPresent()) {
+            BDM_Client client = clientOptional.get();
+            List<String> fileNames = client.getSupportingDocuments();
+
+            if (fileNames == null || fileNames.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+            }
+
+            try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                 ZipOutputStream zipOutputStream = new ZipOutputStream(byteArrayOutputStream)) {
+
+                for (String fileName : fileNames) {
+                    Path filePath = Paths.get("uploads", fileName);
+                    if (Files.exists(filePath)) {
+                        zipOutputStream.putNextEntry(new ZipEntry(fileName));
+                        Files.copy(filePath, zipOutputStream);
+                        zipOutputStream.closeEntry();
+                    }
+                }
+                zipOutputStream.finish();
+
+                ByteArrayResource resource = new ByteArrayResource(byteArrayOutputStream.toByteArray());
+
                 return ResponseEntity.ok()
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"Client_" + id + "_Documents.zip\"")
                         .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                        .contentLength(documentData.length)
+                        .contentLength(resource.contentLength())
                         .body(resource);
-            } else {
-                return ResponseEntity.status(HttpStatus.NO_CONTENT)
-                        .body(ResponseBean.errorResponse("No document found", "No document data available for client ID: " + id));
+
+            } catch (IOException e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
             }
         } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ResponseBean.errorResponse("Client not found", "No client exists with ID: " + id));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
+
+
+
+
 }
