@@ -14,7 +14,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @CrossOrigin(origins = {
@@ -122,4 +125,37 @@ public class BDM_Controller {
                     .body(ResponseBean.errorResponse("Client not found", "No client exists with ID: " + id));
         }
     }
+    @GetMapping(value = "/bdm/jobs/{clientName}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<?> getJobsAndDetailsByClientName(@PathVariable String clientName) {
+        try {
+            // ✅ Log the request
+            System.out.println("Fetching jobs for client: " + clientName);
+
+            // ✅ Directly return the ResponseEntity from service
+            ResponseEntity<?> response = service.getJobsAndDetailsByClientName(clientName);
+
+            // ✅ Log the response
+            System.out.println("Response: " + response.getStatusCode());
+
+            return response;
+        } catch (RuntimeException ex) {
+            System.err.println("Client Not Found: " + ex.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(createErrorResponse(404, ex.getMessage()));
+        } catch (Exception ex) {
+            System.err.println("Unexpected Error: " + ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse(500, "An unexpected error occurred"));
+        }
+    }
+
+
+    private Map<String, Object> createErrorResponse(int statusCode, String message) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("message", message);
+        errorResponse.put("timestamp", LocalDateTime.now().toString());
+        errorResponse.put("statusCode", statusCode);
+        return errorResponse;
+    }
+
 }

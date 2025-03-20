@@ -18,6 +18,17 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     @Query("SELECT r FROM RequirementsModel r WHERE :recruiterId MEMBER OF r.recruiterIds")
     List<RequirementsModel> findJobsByRecruiterId(String recruiterId);
 
+    // Get job details by clientName (client_name is assumed to be in RequirementsModel)
+    @Query(value = """
+     SELECT r.job_id, r.job_title, client.id AS client_id 
+     FROM requirements_model r 
+     JOIN bdm_client client ON r.client_name = client.client_name 
+     WHERE client.client_name = :clientName
+ """, nativeQuery = true)
+    List<Object[]> findByClientName(@Param("clientName") String clientName);
+
+
+
 
     // Fetch recruiters for a given jobId
     @Query("SELECT r FROM RequirementsModel r WHERE r.jobId = :jobId")
@@ -38,6 +49,14 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     @Query(value = "SELECT email, user_name FROM user_details WHERE user_id = :userId AND status != 'inactive'", nativeQuery = true)
     Tuple findUserEmailAndUsernameByUserId(@Param("userId") String userId);
 
+    @Query(value = "SELECT * FROM candidates WHERE job_id = :jobId AND user_id = :recruiterId", nativeQuery = true)
+    List<Tuple> findCandidatesByJobIdAndRecruiterIdAndClientName(@Param("jobId") String jobId,
+                                                                 @Param("recruiterId") String recruiterId);
+
+    @Query(value = "SELECT * FROM candidates WHERE job_id = :jobId AND user_id = :recruiterId AND interview_status = 'Scheduled' AND client_name = :clientName", nativeQuery = true)
+    List<Tuple> findInterviewScheduledCandidatesByJobIdAndRecruiterIdAndClientName(@Param("jobId") String jobId,
+                                                                                   @Param("recruiterId") String recruiterId,
+                                                                                   @Param("clientName") String clientName);
 
 }
 

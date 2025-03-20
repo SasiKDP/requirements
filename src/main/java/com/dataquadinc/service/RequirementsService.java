@@ -329,7 +329,7 @@ public class RequirementsService {
 					dto.setRecruiterIds(requirement.getRecruiterIds());
 					dto.setStatus(requirement.getStatus());
 					dto.setRecruiterName(requirement.getRecruiterName());
-					dto.setAssignedBy(requirement.getAssignedBy());
+//					dto.setAssignedBy(requirement.getAssignedBy());
 
 					return dto;
 				})

@@ -19,13 +19,12 @@ public class ExtendedRequirementsDto extends RequirementsinfoDto {
     public ExtendedRequirementsDto(RequirementsinfoDto requirement,
                                    Map<String, List<CandidateDto>> submittedCandidates,
                                    Map<String, List<InterviewCandidateDto>> interviewScheduledCandidates) {
-        super(
-                requirement.getJobId(),
+        // Call parameterized constructor of RequirementsinfoDto
+        super(requirement.getJobId(),
                 requirement.getJobTitle(),
                 requirement.getClientName(),
                 requirement.getJobDescription(),
-                requirement.getJobDescriptionFile(), // Keeping this
-                // Removed jobDescriptionBlob
+                requirement.getJobDescriptionFile(),
                 requirement.getJobType(),
                 requirement.getLocation(),
                 requirement.getJobMode(),
@@ -38,9 +37,26 @@ public class ExtendedRequirementsDto extends RequirementsinfoDto {
                 requirement.getRequirementAddedTimeStamp(),
                 requirement.getRecruiterIds(),
                 requirement.getStatus(),
-                requirement.getRecruiterName()
-        );
+                requirement.getRecruiterName());
+
+        // Initialize additional fields specific to ExtendedRequirementsDto
         this.submittedCandidates = submittedCandidates;
+        this.interviewScheduledCandidates = interviewScheduledCandidates;
+    }
+
+    public Map<String, List<CandidateDto>> getSubmittedCandidates() {
+        return submittedCandidates;
+    }
+
+    public void setSubmittedCandidates(Map<String, List<CandidateDto>> submittedCandidates) {
+        this.submittedCandidates = submittedCandidates;
+    }
+
+    public Map<String, List<InterviewCandidateDto>> getInterviewScheduledCandidates() {
+        return interviewScheduledCandidates;
+    }
+
+    public void setInterviewScheduledCandidates(Map<String, List<InterviewCandidateDto>> interviewScheduledCandidates) {
         this.interviewScheduledCandidates = interviewScheduledCandidates;
     }
 }
