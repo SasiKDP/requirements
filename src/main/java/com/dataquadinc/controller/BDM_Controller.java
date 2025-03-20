@@ -109,7 +109,7 @@ public class BDM_Controller {
         }
     }
 
-    @DeleteMapping("/bdm/{id}")
+    @DeleteMapping("/bdm/delete/{id}")
     public ResponseEntity<ResponseBean> deleteClient(@PathVariable String id) {
         service.deleteClient(id);
         return ResponseEntity.ok(ResponseBean.successResponse("Client deleted successfully", null));
