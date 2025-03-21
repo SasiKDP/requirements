@@ -2,6 +2,7 @@ package com.dataquadinc.exceptions;
 
 import java.time.LocalDateTime;
 
+import com.dataquadinc.dto.ResponseBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -43,5 +44,11 @@ public class GlobalExceptionHandler {
 		ErrorResponse errorResponse = new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(),
 				"An unexpected error occurred", LocalDateTime.now());
 		return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+	}
+
+	@ExceptionHandler(ClientAlreadyExistsException.class)
+	public ResponseEntity<ResponseBean> handleClientAlreadyExists(ClientAlreadyExistsException ex) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+				.body(ResponseBean.errorResponse("Client already exists", ex.getMessage()));
 	}
 }

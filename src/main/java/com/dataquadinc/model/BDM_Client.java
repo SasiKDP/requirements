@@ -20,50 +20,35 @@ public class BDM_Client {
 
     @Id
     private String id;  // Custom-generated ID
-
+    @Column(unique = true, nullable = false)
     private String clientName;
     private String onBoardedBy;
     private String clientAddress;
+    private String positionType;
     private int netPayment;
     private double gst;
 
-    @ElementCollection
-    @CollectionTable(name = "client_supporting_customers", joinColumns = @JoinColumn(name = "client_id"))
-    @Column(name = "customer_name")
+    @JdbcTypeCode(SqlTypes.JSON)
     private List<String> supportingCustomers;
-    @Column(length = 2000)
-    @Pattern(regexp = "^(https?:\\/\\/)?([\\w.-]+)+(:\\d+)?(\\/.*)?$",
-            message = "Invalid LinkedIn URL format")
+
     private String clientWebsiteUrl;
-    @Column(length = 2000)
-    @Pattern(regexp = "^(https?:\\/\\/)?([\\w.-]+)+(:\\d+)?(\\/.*)?$",
-            message = "Invalid LinkedIn URL format")
+    @Column(length = 1000)
     private String clientLinkedInUrl;
 
-    @ElementCollection
-    @CollectionTable(name = "client_spoc_names", joinColumns = @JoinColumn(name = "client_id"))
-    @Column(name = "spoc_name")
+    @JdbcTypeCode(SqlTypes.JSON)
     private List<String> clientSpocName;
 
-    @ElementCollection
-    @CollectionTable(name = "client_spoc_emails", joinColumns = @JoinColumn(name = "client_id"))
-    @Column(name = "spoc_email")
+    @JdbcTypeCode(SqlTypes.JSON)
     private List<String> clientSpocEmailid;
 
-    @ElementCollection
-    @CollectionTable(name = "client_spoc_linkedin", joinColumns = @JoinColumn(name = "client_id"))
-    @Column(name = "spoc_linkedin")
+    @JdbcTypeCode(SqlTypes.JSON)
     private List<String> clientSpocLinkedin;
 
-    @ElementCollection
-    @CollectionTable(name = "client_spoc_mobile_numbers", joinColumns = @JoinColumn(name = "client_id"))
-    @Column(name = "spoc_mobile_number")
+    @JdbcTypeCode(SqlTypes.JSON)
     private List<String> clientSpocMobileNumber;
 
-    @ElementCollection
-    @CollectionTable(name = "client_supporting_documents", joinColumns = @JoinColumn(name = "client_id"))
-    @Column(name = "document_name")
-    private List<String> supportingDocuments =new ArrayList<>();  // Stores file paths as JSON
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<String> supportingDocuments;  // Stores file paths as JSON
 
     @Lob
     @Column(columnDefinition = "LONGBLOB")
@@ -75,6 +60,4 @@ public class BDM_Client {
             this.id = "BDM" + UUID.randomUUID().toString().substring(0, 8);  // Generate Unique ID
         }
     }
-
-
 }
