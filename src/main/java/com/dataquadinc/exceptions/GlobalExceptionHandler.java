@@ -62,5 +62,11 @@ public class GlobalExceptionHandler {
 		return new ResponseEntity<>(errorMessage.toString(), HttpStatus.BAD_REQUEST);
 	}
 
+	@ExceptionHandler(ClientAlreadyExistsException.class)
+	public ResponseEntity<ResponseBean> handleClientAlreadyExists(ClientAlreadyExistsException ex) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+				.body(ResponseBean.errorResponse("Client already exists", ex.getMessage()));
+	}
+
 
 }

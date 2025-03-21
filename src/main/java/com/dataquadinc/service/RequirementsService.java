@@ -332,6 +332,7 @@ public class RequirementsService {
 					dto.setRecruiterName(requirement.getRecruiterName());
 					dto.setAssignedBy(requirement.getAssignedBy());
 
+
 					return dto;
 				})
 				.collect(Collectors.toList());
