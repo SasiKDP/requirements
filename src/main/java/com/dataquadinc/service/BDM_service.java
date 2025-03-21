@@ -204,15 +204,92 @@ public class BDM_service {
 
                 for (RecruiterInfoDto recruiter : recruiterDetailsDTO.getRecruiters()) {
                     String recruiterName = recruiter.getRecruiterName();
-                    List<CandidateDto> submittedCandidatesForRecruiter = recruiterDetailsDTO.getSubmittedCandidates(recruiterName);
-                    List<InterviewCandidateDto> interviewScheduledCandidatesForRecruiter = recruiterDetailsDTO.getInterviewScheduledCandidates(recruiterName);
+                    // Convert submitted candidates (Map<String, Object>) to CandidateDto
+                    // Map submitted candidates for the recruiter
+                    List<CandidateDto> submittedCandidatesForRecruiter = recruiterDetailsDTO.getSubmittedCandidates(recruiterName).stream()
+                            .map(candidateData -> {
+                                try {
+                                    // Debug log to inspect candidateData
+                                    System.out.println("Candidate Data: " + candidateData);
 
-                    System.out.println("Job " + jobId + " | Recruiter: " + recruiterName + " → Submitted: " + submittedCandidatesForRecruiter.size());
-                    System.out.println("Job " + jobId + " | Recruiter: " + recruiterName + " → Interview Scheduled: " + interviewScheduledCandidatesForRecruiter.size());
+                                    // Safely get values from the CandidateDto (you should access the fields via getters, not directly from a Map)
+                                    String candidateId = candidateData.getCandidateId();
+                                    String candidateName = candidateData.getCandidateName();
+                                    String email = candidateData.getEmail();
+                                    String interviewStatus = candidateData.getInterviewStatus();  // Assuming it's a field in CandidateDto
+                                    String contactNumber = candidateData.getContactNumber();  // Assuming it's a field in CandidateDto
+                                    String qualification = candidateData.getQualification();  // Assuming it's a field in CandidateDto
+                                    String skills = candidateData.getSkills();  // Assuming it's a field in CandidateDto
+                                    String overallFeedback = candidateData.getOverallFeedback();  // Assuming it's a field in CandidateDto
 
+                                    // Check for null values before creating CandidateDto (optional, depending on your requirements)
+                                    if (candidateId == null || candidateName == null) {
+                                        // Log missing data for debugging
+                                        System.out.println("Missing candidate data for: " + candidateData);
+                                        return null; // or throw an exception if you prefer
+                                    }
+
+                                    return new CandidateDto(
+                                            candidateId,
+                                            candidateName,
+                                            recruiter.getRecruiterId(),
+                                            email,
+                                            interviewStatus,
+                                            contactNumber,
+                                            qualification,
+                                            skills,
+                                            overallFeedback
+                                    );
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    return null; // Catch and print any exceptions
+                                }
+                            })
+                            .filter(Objects::nonNull) // Filter out null candidates if any were skipped due to missing data
+                            .collect(Collectors.toList());
+
+// Map interview scheduled candidates for the recruiter
+                    List<InterviewCandidateDto> interviewScheduledCandidatesForRecruiter = recruiterDetailsDTO.getInterviewScheduledCandidates(recruiterName).stream()
+                            .map(interviewData -> {
+                                try {
+                                    // Debug log to inspect interviewData
+                                    System.out.println("Interview Data: " + interviewData);
+
+                                    // Safely get values from the InterviewCandidateDto
+                                    String candidateId = interviewData.getCandidateId();
+                                    String candidateName = interviewData.getCandidateName();  // Assuming it's a field in InterviewCandidateDto
+                                    String candidateEmailId = interviewData.getEmail();  // Assuming it's a field in InterviewCandidateDto
+                                    String interviewStatus = interviewData.getInterviewStatus();  // Assuming it's a field in InterviewCandidateDto
+                                    String interviewLevel = interviewData.getInterviewLevel();  // Assuming it's a field in InterviewCandidateDto
+                                    String interviewDateTime = interviewData.getInterviewDateTime();  // Assuming it's a field in InterviewCandidateDto
+
+                                    // Check for null values before creating InterviewCandidateDto
+                                    if (candidateId == null || candidateName == null) {
+                                        // Log missing data for debugging
+                                        System.out.println("Missing interview data for: " + interviewData);
+                                        return null; // or throw an exception if you prefer
+                                    }
+
+                                    return new InterviewCandidateDto(
+                                            candidateId,
+                                            candidateName,
+                                            candidateEmailId,
+                                            interviewStatus,
+                                            interviewLevel,
+                                            interviewDateTime
+                                    );
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    return null; // Catch and print any exceptions
+                                }
+                            })
+                            .filter(Objects::nonNull) // Filter out null candidates if any were skipped due to missing data
+                            .collect(Collectors.toList());
+
+// Store the candidates in the maps
                     submittedCandidates.put(recruiterName, submittedCandidatesForRecruiter);
                     interviewScheduledCandidates.put(recruiterName, interviewScheduledCandidatesForRecruiter);
-                }
+}
 
                 submittedCandidatesMap.put(jobId, submittedCandidates);
                 interviewScheduledCandidatesMap.put(jobId, interviewScheduledCandidates);
@@ -246,10 +323,12 @@ public class BDM_service {
             String recruiterId = recruiter.getRecruiterId();
             String recruiterName = recruiter.getRecruiterName();
 
+            // Fetch assigned candidates for the recruiter
             List<Tuple> assignedCandidatesList = requirementsDao.findCandidatesByJobIdAndRecruiterIdAndClientName(jobId, recruiterId);
             List<CandidateDto> assignedCandidateDtos = mapCandidates(assignedCandidatesList, recruiterName, recruiterId);
             submittedCandidates.put(recruiterName, assignedCandidateDtos);
 
+            // Fetch interview scheduled candidates for the recruiter
             List<Tuple> interviewCandidatesList = requirementsDao.findInterviewScheduledCandidatesByJobIdAndRecruiterIdAndClientName(jobId, recruiterId, clientName);
             List<InterviewCandidateDto> interviewCandidateDtos = mapInterviewCandidates(interviewCandidatesList, recruiterName, clientName);
             interviewScheduledCandidates.put(recruiterName, interviewCandidateDtos);
@@ -257,8 +336,25 @@ public class BDM_service {
 
         return new RecruiterDetailsDTO(recruiters, submittedCandidates, interviewScheduledCandidates);
     }
+    // Add client and recruiter details to candidates
+    private List<CandidateWithDetailsDto> addClientAndRecruiterDetailsToCandidates(List<CandidateWithDetailsDto> candidates, String clientName, String recruiterName) {
+        return candidates.stream().map(candidate -> {
+            // Set clientName and recruiterName in the existing CandidateWithDetailsDto
+            candidate.setClientName(clientName);  // Set the client name
+            candidate.setRecruiterName(recruiterName);  // Set the recruiter name
+            return candidate;  // No need to wrap again, just return the updated candidate
+        }).collect(Collectors.toList());
+    }
 
-
+    // Add client and recruiter details to interview candidates
+    private List<InterviewCandidateWithDetailsDto> addClientAndRecruiterDetailsToInterviewCandidates(List<InterviewCandidateWithDetailsDto> candidates, String clientName, String recruiterName) {
+        return candidates.stream().map(candidate -> {
+            // Set clientName and recruiterName in the existing InterviewCandidateWithDetailsDto
+            candidate.setClientName(clientName);  // Set the client name
+            candidate.setRecruiterName(recruiterName);  // Set the recruiter name
+            return candidate;  // Return the updated interview candidate with details
+        }).collect(Collectors.toList());
+    }
 
     private Map<String, Object> createErrorResponse(int statusCode, String message) {
         Map<String, Object> errorResponse = new HashMap<>();
@@ -291,50 +387,38 @@ public class BDM_service {
         return recruiters;
     }
 
+    // Convert List<Tuple> of candidates into CandidateDto objects
     private List<CandidateDto> mapCandidates(List<Tuple> candidatesList, String recruiterName, String recruiterId) {
         return candidatesList.stream()
-                .map(candidate -> {
-                    try {
-                        System.out.println("Mapping Candidate: " + getTupleValue(candidate, "candidate_id"));
-                        return new CandidateDto(
-                                getTupleValue(candidate, "candidate_id"),
-                                getTupleValue(candidate, "full_name"),
-                                recruiterId,
-                                getTupleValue(candidate, "email"),
-                                getTupleValue(candidate, "interview_status"),
-                                getTupleValue(candidate, "contact_number"),
-                                getTupleValue(candidate, "qualification"),
-                                getTupleValue(candidate, "skills"),
-                                getTupleValue(candidate, "overall_feedback")
-                        );
-                    } catch (Exception e) {
-                        System.err.println("Error mapping candidate: " + e.getMessage());
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
+                .map(candidate -> new CandidateDto(
+                        getTupleValue(candidate, "candidate_id"),
+                        getTupleValue(candidate, "full_name"),
+                        recruiterId,
+                        getTupleValue(candidate, "email"),
+                        getTupleValue(candidate, "interview_status"),
+                        getTupleValue(candidate, "contact_number"),
+                        getTupleValue(candidate, "qualification"),
+                        getTupleValue(candidate, "skills"),
+                        getTupleValue(candidate, "overall_feedback")
+                ))
                 .collect(Collectors.toList());
     }
 
+    // Convert List<Tuple> of interview candidates into InterviewCandidateDto objects
     private List<InterviewCandidateDto> mapInterviewCandidates(List<Tuple> candidatesList, String recruiterName, String clientName) {
         return candidatesList.stream()
                 .map(candidate -> {
-                    try {
-                        Timestamp interviewTimestamp = candidate.get("interview_date_time", Timestamp.class);
-                        String interviewDateTime = (interviewTimestamp != null) ? interviewTimestamp.toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : null;
-                        return new InterviewCandidateDto(
-                                getTupleValue(candidate, "candidate_id"),
-                                getTupleValue(candidate, "full_name"),
-                                getTupleValue(candidate, "candidate_email_id"),
-                                getTupleValue(candidate, "interview_status"),
-                                getTupleValue(candidate, "interview_level"),
-                                interviewDateTime
-                        );
-                    } catch (Exception e) {
-                        return null;
-                    }
+                    Timestamp interviewTimestamp = candidate.get("interview_date_time", Timestamp.class);
+                    String interviewDateTime = (interviewTimestamp != null) ? interviewTimestamp.toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) : null;
+                    return new InterviewCandidateDto(
+                            getTupleValue(candidate, "candidate_id"),
+                            getTupleValue(candidate, "full_name"),
+                            getTupleValue(candidate, "candidate_email_id"),
+                            getTupleValue(candidate, "interview_status"),
+                            getTupleValue(candidate, "interview_level"),
+                            interviewDateTime
+                    );
                 })
-                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
@@ -346,6 +430,7 @@ public class BDM_service {
             return null;
         }
     }
+
 
     public void deleteClient(String id) {
         repository.deleteById(id);
