@@ -21,9 +21,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -43,6 +41,8 @@ public class BDM_Controller {
     private BDM_service service;
     @Autowired
     private BDM_Repo repo;
+
+    private final Path UPLOAD_DIR = Paths.get("uploads");
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -70,8 +70,6 @@ public class BDM_Controller {
                     .body(ResponseBean.errorResponse("Invalid JSON", "Error parsing client data"));
         }
     }
-
-
 
 
     @GetMapping("/bdm/getAll")
@@ -109,12 +107,11 @@ public class BDM_Controller {
         }
     }
 
-    @DeleteMapping("/bdm/{id}")
+    @DeleteMapping("/bdm/delete/{id}")
     public ResponseEntity<ResponseBean> deleteClient(@PathVariable String id) {
         service.deleteClient(id);
         return ResponseEntity.ok(ResponseBean.successResponse("Client deleted successfully", null));
     }
-
 
 
     @GetMapping("/bdm/{id}/downloadAll")
@@ -157,6 +154,9 @@ public class BDM_Controller {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
+
+
+
 
 
 

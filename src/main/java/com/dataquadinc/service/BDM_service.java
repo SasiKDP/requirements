@@ -1,6 +1,7 @@
 package com.dataquadinc.service;
 
 import com.dataquadinc.dto.BDM_Dto;
+import com.dataquadinc.exceptions.ClientAlreadyExistsException;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +27,16 @@ public class BDM_service {
     @Autowired
     private BDM_Repo repo;
 
+    private final Path UPLOAD_DIR = Paths.get("uploads");
+
     public BDM_Client saveClient(BDM_Client client) {
+
+        String normalizedClientName = client.getClientName().trim().toLowerCase();
+        boolean exists = repository.existsByClientNameIgnoreCase(normalizedClientName);
+
+        if (repository.existsByClientNameIgnoreCase(client.getClientName().toLowerCase())) {
+            throw new RuntimeException("Client name '" + client.getClientName() + "' already exists!");
+        }
         client.setId(generateCustomId());
         return repository.save(client);
     }
@@ -63,6 +74,7 @@ public class BDM_service {
         dto.setClientSpocLinkedin(client.getClientSpocLinkedin());
         dto.setClientSpocMobileNumber(client.getClientSpocMobileNumber());
         dto.setOnBoardedBy(client.getOnBoardedBy());
+        dto.setPositionType(client.getPositionType());
         return dto;
     }
 
@@ -83,10 +95,15 @@ public class BDM_service {
         client.setClientSpocLinkedin(dto.getClientSpocLinkedin());
         client.setClientSpocMobileNumber(dto.getClientSpocMobileNumber());
         client.setOnBoardedBy(dto.getOnBoardedBy());
+        client.setPositionType(dto.getPositionType());
         return client;
     }
 
     public BDM_Dto createClient(BDM_Dto dto, List<MultipartFile> files) throws IOException {
+
+        if (!repo.findByClientName(dto.getClientName()).isEmpty()) {
+            throw new ClientAlreadyExistsException("Client Name '" + dto.getClientName() + "' already exists.");
+        }
         BDM_Client entity = convertToEntity(dto);
         entity.setId(generateCustomId()); // Generate custom ID
 
@@ -117,8 +134,6 @@ public class BDM_service {
 
 
 
-
-
     public List<BDM_Dto> getAllClients() {
         return repository.findAll().stream()
                 .map(this::convertToDTO)
@@ -144,6 +159,7 @@ public class BDM_service {
             if (dto.getClientSpocEmailid() != null) existingClient.setClientSpocEmailid(dto.getClientSpocEmailid());
             if (dto.getClientSpocLinkedin() != null) existingClient.setClientSpocLinkedin(dto.getClientSpocLinkedin());
             if (dto.getClientSpocMobileNumber() != null) existingClient.setClientSpocMobileNumber(dto.getClientSpocMobileNumber());
+            if(dto.getPositionType()!=null)existingClient.setPositionType(dto.getPositionType());
 
             try {
                 if (files != null && !files.isEmpty()) {
