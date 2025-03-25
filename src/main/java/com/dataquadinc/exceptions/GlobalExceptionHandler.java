@@ -1,8 +1,9 @@
 package com.dataquadinc.exceptions;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
-import com.dataquadinc.dto.ResponseBean;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -62,11 +63,25 @@ public class GlobalExceptionHandler {
 		return new ResponseEntity<>(errorMessage.toString(), HttpStatus.BAD_REQUEST);
 	}
 
-	@ExceptionHandler(ClientAlreadyExistsException.class)
-	public ResponseEntity<ResponseBean> handleClientAlreadyExists(ClientAlreadyExistsException ex) {
-		return ResponseEntity.status(HttpStatus.CONFLICT)
-				.body(ResponseBean.errorResponse("Client already exists", ex.getMessage()));
+	// ❌ Handles Client Not Found Exception
+	@ExceptionHandler(ClientNotFoundException.class)
+	public ResponseEntity<Map<String, Object>> handleClientNotFound(ClientNotFoundException ex) {
+		return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
 	}
 
+	// ❌ Handles No Jobs Found Exception
+	@ExceptionHandler(NoJobsFoundException.class)
+	public ResponseEntity<Map<String, Object>> handleNoJobsFound(NoJobsFoundException ex) {
+		return buildErrorResponse(ex.getMessage(), HttpStatus.NOT_FOUND);
+	}
 
+	// ✅ Utility method to structure the response
+	private ResponseEntity<Map<String, Object>> buildErrorResponse(String message, HttpStatus status) {
+		Map<String, Object> errorDetails = new HashMap<>();
+		errorDetails.put("timestamp", LocalDateTime.now());
+		errorDetails.put("statusCode", status.value());
+		errorDetails.put("message", message);
+
+		return new ResponseEntity<>(errorDetails, status);
+	}
 }

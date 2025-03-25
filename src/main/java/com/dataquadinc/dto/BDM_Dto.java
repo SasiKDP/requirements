@@ -1,3 +1,4 @@
+
 package com.dataquadinc.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;

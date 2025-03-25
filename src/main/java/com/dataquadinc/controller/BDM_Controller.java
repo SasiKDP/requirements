@@ -1,10 +1,13 @@
+
 package com.dataquadinc.controller;
 
 import com.dataquadinc.dto.BDM_Dto;
+import com.dataquadinc.dto.BdmClientDetailsDTO;
 import com.dataquadinc.dto.ResponseBean;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
 import com.dataquadinc.service.BDM_service;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
@@ -18,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -86,26 +90,38 @@ public class BDM_Controller {
                         .body(ResponseBean.errorResponse("Client not found", "No client exists with ID: " + id)));
     }
 
-    @PutMapping("/bdm/{id}")
+    @PutMapping(value = "/bdm/{id}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<ResponseBean> updateClient(
             @PathVariable String id,
-            @RequestPart("dto") String dtoJson,
+            @RequestPart("dto") String dtoJson,  // Expect JSON as a String
             @RequestPart(value = "supportingDocuments", required = false) List<MultipartFile> files) {
 
         try {
+            // ✅ Debugging - Print received JSON before parsing
+            System.out.println("Received JSON: " + dtoJson);
+
+            // ✅ Convert JSON string to DTO object
             BDM_Dto dto = objectMapper.readValue(dtoJson, BDM_Dto.class);
 
+            // ✅ Call service to update client
             Optional<BDM_Dto> updatedClient = service.updateClient(id, dto, files);
+
             return updatedClient.map(client -> ResponseEntity.ok(ResponseBean.successResponse("Client updated successfully", client)))
                     .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                             .body(ResponseBean.errorResponse("Update failed", "No client exists with ID: " + id)));
 
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (JsonProcessingException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ResponseBean.errorResponse("Invalid JSON", "Error parsing client data"));
+                    .body(ResponseBean.errorResponse("Invalid JSON Format", "Error in JSON structure: " + e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ResponseBean.errorResponse("JSON Parsing Error", "Could not parse client data."));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ResponseBean.errorResponse("Unexpected Error", "Something went wrong: " + e.getMessage()));
         }
     }
+
 
     @DeleteMapping("/bdm/delete/{id}")
     public ResponseEntity<ResponseBean> deleteClient(@PathVariable String id) {
@@ -154,11 +170,8 @@ public class BDM_Controller {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
-
-
-
-
-
-
-
+    @GetMapping("/bdm/details/{userId}")
+    public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
+        return service.getBdmClientDetails(userId);
+    }
 }

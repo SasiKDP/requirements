@@ -246,14 +246,14 @@ public class RequirementsController {
 
 	@GetMapping("/getAssignments")
 	public ResponseEntity<?> getRequirements() {
-		List<RequirementsDto> requirements = (List<RequirementsDto>) service.getRequirementsDetails();
+		List<AssignedRequirementsDto> requirements = (List<AssignedRequirementsDto>) service.getRequirementsDetails();
 
 		if (requirements == null || requirements.isEmpty()) {
 			return new ResponseEntity<>(new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now()), HttpStatus.NOT_FOUND);
 		}
 
 		// Clean up recruiterName field
-		for (RequirementsDto dto : requirements) {
+		for (AssignedRequirementsDto dto : requirements) {
 			Set<String> cleanedNames = dto.getRecruiterName().stream()
 					.map(name -> name.replaceAll("[\\[\\]\"]", "")) // Remove brackets and extra quotes
 					.collect(Collectors.toSet());

@@ -1,9 +1,11 @@
 package com.dataquadinc.service;
 
-import com.dataquadinc.dto.BDM_Dto;
+import com.dataquadinc.dto.*;
 import com.dataquadinc.exceptions.ClientAlreadyExistsException;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
+import com.dataquadinc.repository.RequirementsDao;
+import jakarta.persistence.Tuple;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,9 +15,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.sql.Timestamp;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +32,9 @@ public class BDM_service {
 
     @Autowired
     private BDM_Repo repo;
+
+    @Autowired
+    private RequirementsDao requirementsDao;
 
     private final Path UPLOAD_DIR = Paths.get("uploads");
 
@@ -196,5 +205,192 @@ public class BDM_service {
 
     public void deleteClient(String id) {
         repository.deleteById(id);
+    }
+
+    public BdmClientDetailsDTO getBdmClientDetails(String userId) {
+        // 1️⃣ Fetch BDM Details
+        List<BdmDetailsDto> bdmDetails = getBdmDetails(userId);
+
+        // 2️⃣ Fetch Clients onboarded by the BDM
+        List<BdmClientDto> clientDetails = getClientDetails(userId);
+
+        // 3️⃣ Fetch Submissions for each client
+        Map<String, List<BdmSubmissionDTO>> submissions = new HashMap<>();
+        for (BdmClientDto client : clientDetails) {
+            submissions.put(client.getClientName(), getSubmissions(client.getClientName()));
+        }
+
+        // 4️⃣ Fetch Interviews for each client
+        Map<String, List<BdmInterviewDTO>> interviews = new HashMap<>();
+        for (BdmClientDto client : clientDetails) {
+            interviews.put(client.getClientName(), getInterviews(client.getClientName()));
+        }
+
+        // 5️⃣ Fetch Placements for each client
+        Map<String, List<BdmPlacementDTO>> placements = new HashMap<>();
+        for (BdmClientDto client : clientDetails) {
+            placements.put(client.getClientName(), getPlacements(client.getClientName()));
+        }
+
+        // Return DTO with all details
+        return new BdmClientDetailsDTO(bdmDetails, clientDetails, submissions, interviews, placements);
+    }
+
+    private List<BdmDetailsDto> getBdmDetails(String userId) {
+        List<Tuple> bdmTuples = requirementsDao.findBdmEmployeeByUserId(userId);
+
+        return bdmTuples.stream()
+                .map(tuple -> new BdmDetailsDto(
+                        tuple.get("user_id", String.class),
+                        tuple.get("user_name", String.class),
+                        tuple.get("role_name", String.class), // Ensure alias matches query
+                        tuple.get("email", String.class),
+                        tuple.get("designation", String.class),
+                        formatDate(tuple.get("joining_date")), // Handles both String and Date
+                        tuple.get("gender", String.class),
+                        formatDate(tuple.get("dob")), // Handles both String and Date
+                        tuple.get("phone_number", String.class),
+                        tuple.get("personalemail", String.class), // Ensure alias matches query
+                        tuple.get("status", String.class),
+                        tuple.get("client_name", String.class)
+                ))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Helper method to format date fields to 'yyyy-MM-dd'.
+     */
+    private String formatDate(Object dateObj) {
+        if (dateObj == null) {
+            return null;
+        }
+        try {
+            if (dateObj instanceof String) {
+                return dateObj.toString();
+            } else if (dateObj instanceof java.sql.Date || dateObj instanceof java.util.Date) {
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+                return dateFormat.format(dateObj);
+            }
+        } catch (Exception e) {
+            e.printStackTrace(); // Log error if necessary
+        }
+        return null;
+    }
+
+
+    // Utility method to safely convert Object to String date
+    private String convertDate(Object dateObj) {
+        if (dateObj == null) return null;
+
+        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+
+        if (dateObj instanceof java.sql.Date || dateObj instanceof java.util.Date) {
+            return dateFormat.format(dateObj);
+        } else if (dateObj instanceof String) {
+            try {
+                return dateFormat.format(dateFormat.parse((String) dateObj)); // Convert String to Date then format
+            } catch (ParseException e) {
+                return (String) dateObj; // Return as-is if parsing fails
+            }
+        }
+        return null;
+    }
+
+
+
+    private List<BdmClientDto> getClientDetails(String userId) {
+        List<Tuple> clientTuples = requirementsDao.findClientsByBdmUserId(userId);
+
+        return clientTuples.stream()
+                .map(tuple -> new BdmClientDto(
+                        tuple.get("id", String.class),
+                        tuple.get("client_name", String.class),
+                        tuple.get("on_boarded_by", String.class),
+                        tuple.get("client_address", String.class),
+                        cleanAndConvertToList(tuple.get("client_spoc_name", String.class)),
+                        cleanAndConvertToList(tuple.get("client_spoc_emailid", String.class)),
+                        cleanAndConvertToList(tuple.get("client_spoc_mobile_number", String.class))
+                ))
+                .collect(Collectors.toList());
+    }
+
+    // ✅ Helper Method to Clean and Convert JSON Arrays / Comma-Separated Strings to List<String>
+    private List<String> cleanAndConvertToList(String input) {
+        if (input == null || input.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // Remove extra quotes and brackets if it's a JSON array
+        input = input.replace("[", "").replace("]", "").replace("\"", "");
+
+        // Split by commas and return a clean list
+        return Arrays.stream(input.split(","))
+                .map(String::trim) // Trim spaces
+                .filter(s -> !s.isEmpty()) // Remove empty entries
+                .collect(Collectors.toList());
+    }
+
+    // Utility method to safely split strings
+    private List<String> splitString(String str) {
+        return (str != null && !str.isEmpty()) ? Arrays.asList(str.split(",")) : new ArrayList<>();
+    }
+
+
+    private List<BdmSubmissionDTO> getSubmissions(String clientName) {
+        List<Tuple> submissionTuples = requirementsDao.findAllSubmissionsByClientName(clientName);
+        return submissionTuples.stream()
+                .map(tuple -> new BdmSubmissionDTO(
+                        tuple.get("candidate_id", String.class),
+                        tuple.get("full_name", String.class),
+                        tuple.get("candidateEmailId", String.class), // Use exact alias from SQL
+                        tuple.get("contact_number", String.class),
+                        tuple.get("qualification", String.class),
+                        tuple.get("skills", String.class),
+                        tuple.get("overall_feedback", String.class),
+                        tuple.get("job_id", String.class),
+                        tuple.get("job_title", String.class),
+                        tuple.get("client_name", String.class)
+                ))
+                .collect(Collectors.toList());
+    }
+
+    private List<BdmInterviewDTO> getInterviews(String clientName) {
+        List<Tuple> interviewTuples = requirementsDao.findAllInterviewsByClientName(clientName);
+        return interviewTuples.stream()
+                .map(tuple -> {
+                    Timestamp timestamp = tuple.get("interview_date_time", Timestamp.class);
+                    String interviewDateTimeStr = (timestamp != null)
+                            ? OffsetDateTime.ofInstant(timestamp.toInstant(), ZoneId.systemDefault())
+                            .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                            : null;
+
+                    return new BdmInterviewDTO(
+                            tuple.get("candidate_id", String.class),  // candidateId
+                            tuple.get("full_name", String.class),     // fullName
+                            tuple.get("candidateEmailId", String.class), // email
+                            tuple.get("contact_number", String.class), // contactNumber
+                            tuple.get("qualification", String.class),  // qualification
+                            tuple.get("skills", String.class),         // skills
+                            tuple.get("interview_status", String.class), // interviewStatus
+                            tuple.get("interview_level", String.class),  // interviewLevel
+                            interviewDateTimeStr  // interviewDateTime (converted to String)
+                    );
+                })
+                .collect(Collectors.toList());
+    }
+
+
+    private List<BdmPlacementDTO> getPlacements(String clientName) {
+        List<Tuple> placementTuples = requirementsDao.findAllPlacementsByClientName(clientName);
+        return placementTuples.stream()
+                .map(tuple -> new BdmPlacementDTO(
+                        tuple.get("candidate_id", String.class),
+                        tuple.get("full_name", String.class),
+                        tuple.get("candidateEmailId", String.class), // Fix alias
+                        tuple.get("job_id", String.class),
+                        tuple.get("job_title", String.class),
+                        tuple.get("client_name", String.class)
+                ))
+                .collect(Collectors.toList());
     }
 }
