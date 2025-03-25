@@ -194,7 +194,7 @@ public class BDM_service {
 
     public BdmClientDetailsDTO getBdmClientDetails(String userId) {
         // 1️⃣ Fetch BDM Details
-        List<BdmDetailsDto> bdmDetails = getBdmDetails();
+        List<BdmDetailsDto> bdmDetails = getBdmDetails(userId);
 
         // 2️⃣ Fetch Clients onboarded by the BDM
         List<BdmClientDto> clientDetails = getClientDetails(userId);
@@ -221,9 +221,8 @@ public class BDM_service {
         return new BdmClientDetailsDTO(bdmDetails, clientDetails, submissions, interviews, placements);
     }
 
-    private List<BdmDetailsDto> getBdmDetails() {
-        List<Tuple> bdmTuples = requirementsDao.findBdmEmployeesFromDatabase();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd"); // Ensure date format is correct
+    private List<BdmDetailsDto> getBdmDetails(String userId) {
+        List<Tuple> bdmTuples = requirementsDao.findBdmEmployeeByUserId(userId);
 
         return bdmTuples.stream()
                 .map(tuple -> new BdmDetailsDto(
@@ -232,9 +231,9 @@ public class BDM_service {
                         tuple.get("role_name", String.class), // Ensure alias matches query
                         tuple.get("email", String.class),
                         tuple.get("designation", String.class),
-                        convertDate(tuple.get("joining_date")), // Handle both String and Date
+                        formatDate(tuple.get("joining_date")), // Handles both String and Date
                         tuple.get("gender", String.class),
-                        convertDate(tuple.get("dob")), // Handle both String and Date
+                        formatDate(tuple.get("dob")), // Handles both String and Date
                         tuple.get("phone_number", String.class),
                         tuple.get("personalemail", String.class), // Ensure alias matches query
                         tuple.get("status", String.class),
@@ -242,6 +241,27 @@ public class BDM_service {
                 ))
                 .collect(Collectors.toList());
     }
+
+    /**
+     * Helper method to format date fields to 'yyyy-MM-dd'.
+     */
+    private String formatDate(Object dateObj) {
+        if (dateObj == null) {
+            return null;
+        }
+        try {
+            if (dateObj instanceof String) {
+                return dateObj.toString();
+            } else if (dateObj instanceof java.sql.Date || dateObj instanceof java.util.Date) {
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+                return dateFormat.format(dateObj);
+            }
+        } catch (Exception e) {
+            e.printStackTrace(); // Log error if necessary
+        }
+        return null;
+    }
+
 
     // Utility method to safely convert Object to String date
     private String convertDate(Object dateObj) {
@@ -330,15 +350,15 @@ public class BDM_service {
                             : null;
 
                     return new BdmInterviewDTO(
-                            tuple.get("candidate_id", String.class),
-                            tuple.get("full_name", String.class),
-                            tuple.get("candidateEmailId", String.class),
-                            tuple.get("interview_status", String.class),
-                            tuple.get("interview_level", String.class),
-                            interviewDateTimeStr,  // ✅ Now safely converted to String
-                            tuple.get("job_id", String.class),
-                            tuple.get("job_title", String.class),
-                            tuple.get("client_name", String.class)
+                            tuple.get("candidate_id", String.class),  // candidateId
+                            tuple.get("full_name", String.class),     // fullName
+                            tuple.get("candidateEmailId", String.class), // email
+                            tuple.get("contact_number", String.class), // contactNumber
+                            tuple.get("qualification", String.class),  // qualification
+                            tuple.get("skills", String.class),         // skills
+                            tuple.get("interview_status", String.class), // interviewStatus
+                            tuple.get("interview_level", String.class),  // interviewLevel
+                            interviewDateTimeStr  // interviewDateTime (converted to String)
                     );
                 })
                 .collect(Collectors.toList());

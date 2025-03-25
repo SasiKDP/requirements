@@ -38,9 +38,10 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     LEFT JOIN user_roles_prod ur ON u.user_id = ur.user_id 
     LEFT JOIN roles_prod r ON ur.role_id = r.id
     LEFT JOIN bdm_client_prod b ON u.user_id = b.on_boarded_by
-    WHERE r.name = 'BDM'
+    WHERE r.name = 'BDM' AND u.user_id = :userId
     """, nativeQuery = true)
-    List<Tuple> findBdmEmployeesFromDatabase();
+    List<Tuple> findBdmEmployeeByUserId(@Param("userId") String userId);
+
 
     // Get Clients onboarded by BDM (based on userId)
     @Query(value = """
@@ -62,25 +63,43 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     """, nativeQuery = true)
     List<Tuple> findJobsByBdmUserId(@Param("userId") String userId);
 
-    // Fetch all submissions for a client across ALL job IDs
-    @Query(value = """
-    SELECT c.candidate_id, c.full_name, c.candidate_email_id AS candidateEmailId, 
-           c.contact_number, c.qualification, c.skills, c.overall_feedback, c.user_id,
-           r.job_id, r.job_title, b.client_name
-    FROM candidates_prod c
-    JOIN requirements_model_prod r ON c.job_id = r.job_id
-    JOIN bdm_client_prod b ON r.client_name = b.client_name
-    WHERE b.client_name = :clientName
-    """, nativeQuery = true)
-    List<Tuple> findAllSubmissionsByClientName(@Param("clientName") String clientName);
+        // Fetch all submissions for a client across ALL job IDs
+        @Query(value = """
+        SELECT c.candidate_id, c.full_name, c.candidate_email_id AS candidateEmailId, 
+               c.contact_number, c.qualification, c.skills, c.overall_feedback, c.user_id,
+               r.job_id, r.job_title, b.client_name
+        FROM candidates_prod c
+        JOIN requirements_model_prod r ON c.job_id = r.job_id
+        JOIN bdm_client_prod b ON r.client_name = b.client_name
+        WHERE b.client_name = :clientName
+        """, nativeQuery = true)
+        List<Tuple> findAllSubmissionsByClientName(@Param("clientName") String clientName);
 
     // Fetch all interview scheduled candidates for a client
     @Query(value = """
-    SELECT c.candidate_id, c.full_name, c.candidate_email_id AS candidateEmailId, 
-           c.interview_status, c.interview_level, c.interview_date_time,
-           c.contact_number, c.qualification, c.skills,
-           r.job_id, r.job_title, b.client_name
-    FROM candidates_prod c 
+    SELECT c.candidate_id, 
+           c.full_name, 
+           c.candidate_email_id AS candidateEmailId, 
+           c.contact_number, 
+           c.qualification, 
+           c.skills, 
+           -- ✅ Extract the latest status from JSON or direct string
+           CASE 
+               WHEN JSON_VALID(c.interview_status) 
+               THEN JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) 
+               ELSE c.interview_status 
+           END AS interview_status, 
+           c.interview_level, 
+           c.interview_date_time, 
+           r.job_id, 
+           r.job_title, 
+           b.client_name
+    FROM (
+        SELECT candidate_id, full_name, candidate_email_id, contact_number, qualification, 
+               skills, interview_status, interview_level, interview_date_time, job_id, 
+               ROW_NUMBER() OVER (PARTITION BY candidate_id ORDER BY interview_date_time DESC) AS rn 
+        FROM candidates_prod 
+    ) c
     JOIN requirements_model_prod r ON c.job_id = r.job_id
     LEFT JOIN bdm_client_prod b ON r.client_name = b.client_name
     WHERE (b.client_name = :clientName OR r.client_name = :clientName 
@@ -88,26 +107,37 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                 SELECT 1 FROM candidates_prod c2 
                 WHERE c2.job_id = r.job_id
            )) )
-    AND c.interview_status = 'Scheduled'
-    """, nativeQuery = true)
+    AND c.rn = 1  -- ✅ Fetch only the latest interview status per candidate
+    -- ✅ Ensure only "Scheduled" candidates are included
+    AND b.client_name IS NOT NULL 
+    AND c.interview_date_time IS NOT NULL
+""", nativeQuery = true)
     List<Tuple> findAllInterviewsByClientName(@Param("clientName") String clientName);
+
+
+
 
     // Fetch all placements for a client across ALL job IDs
     @Query(value = """
-    SELECT c.candidate_id, c.full_name, c.candidate_email_id AS candidateEmailId, 
-           c.interview_status, 
-           r.job_id, r.job_title, b.client_name
+    SELECT c.candidate_id, 
+           c.full_name, 
+           c.candidate_email_id AS candidateEmailId,  
+           r.job_id, 
+           r.job_title, 
+           b.client_name
     FROM candidates_prod c
     JOIN requirements_model_prod r ON c.job_id = r.job_id
     JOIN bdm_client_prod b ON r.client_name = b.client_name
-
-    -- Handle both JSON and non-JSON interview_status
     WHERE b.client_name = :clientName
     AND (
-        (JSON_VALID(c.interview_status) AND 
-         JSON_SEARCH(c.interview_status, 'one', 'PLACED', NULL, '$[*].status') IS NOT NULL)
-        OR c.interview_status = 'PLACED'
+        -- ✅ Check if interview_status is a valid JSON and contains "Placed"
+        (JSON_VALID(c.interview_status) 
+         AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
+        -- ✅ OR check if interview_status is stored as plain text "Placed"
+        OR UPPER(c.interview_status) = 'PLACED'
     )
 """, nativeQuery = true)
     List<Tuple> findAllPlacementsByClientName(@Param("clientName") String clientName);
+
+
 }
