@@ -1,3 +1,4 @@
+
 package com.dataquadinc.dto;
 
 import java.util.List;

@@ -1,3 +1,4 @@
+
 package com.dataquadinc.controller;
 
 import com.dataquadinc.dto.BDM_Dto;
@@ -6,6 +7,7 @@ import com.dataquadinc.dto.ResponseBean;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
 import com.dataquadinc.service.BDM_service;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
@@ -19,14 +21,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -44,12 +43,14 @@ public class BDM_Controller {
 
     @Autowired
     private BDM_service service;
-
     @Autowired
     private BDM_Repo repo;
 
-    private final ObjectMapper objectMapper = new ObjectMapper(); // Reuse ObjectMapper
+    private final Path UPLOAD_DIR = Paths.get("uploads");
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // Reuse ObjectMapper
     @PostMapping("/bdm/addClient")
     public ResponseEntity<ResponseBean> createClient(
             @RequestPart("dto") String dtoJson,
@@ -74,6 +75,7 @@ public class BDM_Controller {
         }
     }
 
+
     @GetMapping("/bdm/getAll")
     public ResponseEntity<ResponseBean> getAllClients() {
         List<BDM_Dto> clients = service.getAllClients();
@@ -88,32 +90,45 @@ public class BDM_Controller {
                         .body(ResponseBean.errorResponse("Client not found", "No client exists with ID: " + id)));
     }
 
-    @PutMapping("/bdm/{id}")
+    @PutMapping(value = "/bdm/{id}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<ResponseBean> updateClient(
             @PathVariable String id,
-            @RequestPart("dto") String dtoJson,
-            @RequestPart(value = "supportingDocuments", required = false) MultipartFile file) {
+            @RequestPart("dto") String dtoJson,  // Expect JSON as a String
+            @RequestPart(value = "supportingDocuments", required = false) List<MultipartFile> files) {
 
         try {
+            // ✅ Debugging - Print received JSON before parsing
+            System.out.println("Received JSON: " + dtoJson);
+
+            // ✅ Convert JSON string to DTO object
             BDM_Dto dto = objectMapper.readValue(dtoJson, BDM_Dto.class);
 
-            Optional<BDM_Dto> updatedClient = service.updateClient(id, dto, file);
+            // ✅ Call service to update client
+            Optional<BDM_Dto> updatedClient = service.updateClient(id, dto, files);
+
             return updatedClient.map(client -> ResponseEntity.ok(ResponseBean.successResponse("Client updated successfully", client)))
                     .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                             .body(ResponseBean.errorResponse("Update failed", "No client exists with ID: " + id)));
 
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (JsonProcessingException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ResponseBean.errorResponse("Invalid JSON", "Error parsing client data"));
+                    .body(ResponseBean.errorResponse("Invalid JSON Format", "Error in JSON structure: " + e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ResponseBean.errorResponse("JSON Parsing Error", "Could not parse client data."));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ResponseBean.errorResponse("Unexpected Error", "Something went wrong: " + e.getMessage()));
         }
     }
 
-    @DeleteMapping("/bdm/{id}")
+
+    @DeleteMapping("/bdm/delete/{id}")
     public ResponseEntity<ResponseBean> deleteClient(@PathVariable String id) {
         service.deleteClient(id);
         return ResponseEntity.ok(ResponseBean.successResponse("Client deleted successfully", null));
     }
+
 
     @GetMapping("/bdm/{id}/downloadAll")
     public ResponseEntity<Resource> downloadAllSupportingDocuments(@PathVariable String id) {
@@ -155,43 +170,8 @@ public class BDM_Controller {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
-
-    @GetMapping(value = "/bdm/jobs/{clientName}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<?> getJobsAndDetailsByClientName(@PathVariable String clientName) {
-        try {
-            // ✅ Log the request
-            System.out.println("Fetching jobs for client: " + clientName);
-
-            // ✅ Directly return the ResponseEntity from service
-            ResponseEntity<?> response = service.getJobsAndDetailsByClientName(clientName);
-
-            // ✅ Log the response
-            System.out.println("Response: " + response.getStatusCode());
-
-            return response;
-        } catch (RuntimeException ex) {
-            System.err.println("Client Not Found: " + ex.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(createErrorResponse(404, ex.getMessage()));
-        } catch (Exception ex) {
-            System.err.println("Unexpected Error: " + ex.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(createErrorResponse(500, "An unexpected error occurred"));
-        }
-    }
-
-
-    private Map<String, Object> createErrorResponse(int statusCode, String message) {
-        Map<String, Object> errorResponse = new HashMap<>();
-        errorResponse.put("message", message);
-        errorResponse.put("timestamp", LocalDateTime.now().toString());
-        errorResponse.put("statusCode", statusCode);
-        return errorResponse;
-    }
-
     @GetMapping("/bdm/details/{userId}")
     public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
         return service.getBdmClientDetails(userId);
     }
-
 }

@@ -1,7 +1,11 @@
+
+
 package com.dataquadinc.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @JsonInclude(JsonInclude.Include.NON_NULL) // Ignore null fields in JSON response
 @Data
