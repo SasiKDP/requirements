@@ -511,10 +511,17 @@ public class RequirementsController {
 			return ResponseEntity.notFound().build();
 		}
 	}
-//	@GetMapping("/full-details/{jobId}")
-//	public ExtendedRequirementsDto getFullRequirementDetails(@PathVariable String jobId) {
-//		return service.getFullRequirementDetails(jobId);
-//	}
+	@GetMapping("/stats")
+	public ResponseEntity<List<EmployeeCandidateDTO>> getEmployeeStats() {
+		List<EmployeeCandidateDTO> stats = service.getEmployeeStats();
+		return ResponseEntity.ok(stats);
+	}
+
+	// Fetch both Submitted Candidates and Scheduled Interviews in one API call
+	@GetMapping("/list/{userId}")
+	public CandidateResponseDTO getCandidateData(@PathVariable String userId) {
+		return service.getCandidateData(userId);
+	}
 
 
 }
