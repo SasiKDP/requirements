@@ -3,6 +3,9 @@ package com.dataquadinc.repository;
 import java.util.List;
 import java.util.Optional;
 
+import com.dataquadinc.dto.InterviewScheduledDTO;
+import com.dataquadinc.dto.JobDetailsDTO;
+import com.dataquadinc.dto.SubmittedCandidateDTO;
 import jakarta.persistence.Tuple;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -138,6 +141,95 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     )
 """, nativeQuery = true)
     List<Tuple> findAllPlacementsByClientName(@Param("clientName") String clientName);
+
+    // ✅ Fetch employee candidate statistics for all employees (including those with no submissions)
+    @Query(value = """
+                SELECT 
+                    u.user_id AS employeeId,
+                    u.user_name AS employeeName,
+                    u.email AS employeeEmail,
+                    r.name AS role,
+                    COALESCE(COUNT(c.candidate_id), 0) AS numberOfSubmissions,
+                    COALESCE(SUM(CASE 
+                        WHEN c.interview_status = 'Scheduled' OR c.interview_date_time IS NOT NULL 
+                        THEN 1 ELSE 0 
+                    END), 0) AS numberOfInterviews,
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN c.interview_status = 'Placed' THEN 1  -- Non-JSON case
+                            ELSE 0 
+                        END
+                    ), 0) +
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN JSON_VALID(c.interview_status) = 1  
+                            AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL 
+                            THEN 1 ELSE 0 
+                        END
+                    ), 0) AS numberOfPlacements -- Use a single alias
+                FROM user_details_prod u
+                JOIN user_roles_prod ur ON u.user_id = ur.user_id
+                JOIN roles_prod r ON ur.role_id = r.id
+                LEFT JOIN candidates_prod c ON c.user_id = u.user_id
+                WHERE r.name IN ('Employee', 'Teamlead')
+                GROUP BY u.user_id, u.user_name, u.email, r.name
+            """, nativeQuery = true)
+    List<Tuple> getEmployeeCandidateStats();
+
+
+
+    @Query(value = """
+        SELECT 
+            c.candidate_id AS candidateId,
+            c.full_name AS fullName,
+            c.candidate_email_id AS candidateEmailId,
+            c.contact_number AS contactNumber,
+            c.qualification AS qualification,
+            c.skills AS skills,
+            c.overall_feedback AS overallFeedback,
+            r.job_id AS jobId,
+            r.job_title AS jobTitle
+        FROM candidates_prod c
+        JOIN user_details_prod u ON c.user_id = u.user_id
+        JOIN requirements_model_prod r ON c.job_id = r.job_id
+        WHERE u.user_id = :userId
+    """, nativeQuery = true)
+    List<SubmittedCandidateDTO> findSubmittedCandidatesByUserId(@Param("userId") String userId);
+
+    @Query(value = """
+        SELECT 
+            c.candidate_id AS candidateId,
+            c.full_name AS fullName,
+            c.candidate_email_id AS candidateEmailId,
+            c.contact_number AS contactNumber,
+            c.qualification AS qualification,
+            c.skills AS skills,
+            c.interview_status AS interviewStatus,
+            c.interview_level AS interviewLevel,
+            c.interview_date_time AS interviewDateTime
+        FROM candidates_prod c
+        JOIN user_details_prod u ON c.user_id = u.user_id
+        JOIN requirements_model_prod r ON c.job_id = r.job_id
+        WHERE u.user_id = :userId
+          AND c.interview_status = 'Scheduled'
+          AND c.interview_date_time IS NOT NULL
+    """, nativeQuery = true)
+    List<InterviewScheduledDTO> findScheduledInterviewsByUserId(@Param("userId") String userId);
+
+    @Query(value = """
+        SELECT 
+            TRIM(r.job_id) AS jobId,  -- Trim job_id to remove leading/trailing spaces
+            TRIM(r.job_title) AS jobTitle,  -- Trim job_title
+            TRIM(r.client_name) AS clientName  -- Trim client_name
+        FROM requirements_model_prod r
+        JOIN job_recruiters_prod jr ON r.job_id = jr.job_id
+        JOIN user_details_prod u ON jr.recruiter_id = u.user_id
+        WHERE u.user_id = :userId
+    """, nativeQuery = true)
+    List<JobDetailsDTO> findJobDetailsByUserId(@Param("userId") String userId);
+
+
+
 
 
 }

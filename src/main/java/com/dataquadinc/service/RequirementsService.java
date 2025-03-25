@@ -2,6 +2,7 @@ package com.dataquadinc.service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -653,78 +654,37 @@ public class RequirementsService {
 		}
 	}
 
-//	private List<RecruiterInfoDto> getRecruitersByRequirement(RequirementsModel requirement) {
-//		List<String> recruiterIds = new ArrayList<>(requirement.getRecruiterIds());
-//		List<String> recruiterNames = new ArrayList<>(requirement.getRecruiterName());
-//
-//		if (recruiterIds.size() != recruiterNames.size()) {
-//			throw new IllegalStateException("Mismatch between recruiter IDs and recruiter names.");
-//		}
-//
-//		// ✅ Enhanced Cleanup Logic
-//		recruiterNames = recruiterNames.stream()
-//				.map(name -> name.replaceAll("[\\[\\]\"]", "").trim())  // Remove brackets & quotes
-//				.map(name -> name.replaceAll("\\s*,\\s*", ","))         // Trim spaces around commas
-//				.collect(Collectors.toList());
-//
-//		// ✅ Create RecruiterInfoDto list
-//		List<RecruiterInfoDto> recruiters = new ArrayList<>();
-//		for (int i = 0; i < recruiterIds.size(); i++) {
-//			recruiters.add(new RecruiterInfoDto(recruiterIds.get(i), recruiterNames.get(i)));
-//		}
-//
-//		return recruiters;
-//	}
-//
-//	public ExtendedRequirementsDto getFullRequirementDetails(String jobId) {
-//		// ✅ Fetch requirement details
-//		RequirementsModel requirement = requirementsDao.findById(jobId)
-//				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id: " + jobId));
-//
-//		// ✅ Extract recruiter IDs
-//		List<String> recruiterIds = new ArrayList<>(requirement.getRecruiterIds());
-//
-//		// ✅ List to store recruiter names in correct order
-//		List<String> recruiterNames = new ArrayList<>();
-//
-//		// ✅ Fetch recruiter names for each recruiterId (one by one)
-//		for (String recruiterId : recruiterIds) {
-//			Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(recruiterId);
-//			String recruiterName = (userTuple != null) ? userTuple.get("user_name", String.class) : "Unknown";
-//
-//			// ✅ Clean the name (trim spaces)
-//			recruiterNames.add(recruiterName != null ? recruiterName.trim() : "Unknown");
-//		}
-//
-//		// ✅ Update requirement model with recruiter names
-//		requirement.setRecruiterName(new LinkedHashSet<>(recruiterNames)); // Use Set<String> if necessary
-//
-//		// ✅ Initialize maps for candidates
-//		Map<String, List<CandidateDto>> submittedCandidates = new LinkedHashMap<>();
-//		Map<String, List<InterviewCandidateDto>> interviewScheduledCandidates = new LinkedHashMap<>();
-//
-//		// ✅ Fetch candidates for each recruiter while maintaining order
-//		for (int i = 0; i < recruiterIds.size(); i++) {
-//			String recruiterId = recruiterIds.get(i);
-//			String recruiterName = recruiterNames.get(i);
-//
-//			// Fetch and map submitted candidates
-//			List<Tuple> assignedCandidatesList = requirementsDao.findCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
-//			List<CandidateDto> assignedCandidateDtos = mapCandidates(assignedCandidatesList, recruiterName);
-//			submittedCandidates.put(recruiterName, assignedCandidateDtos);
-//
-//			// Fetch and map interview-scheduled candidates
-//			List<Tuple> interviewCandidatesList = requirementsDao.findInterviewScheduledCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
-//			List<InterviewCandidateDto> interviewCandidateDtos = mapInterviewCandidates(interviewCandidatesList, recruiterName);
-//			interviewScheduledCandidates.put(recruiterName, interviewCandidateDtos);
-//		}
-//
-//		// ✅ Convert requirement model to DTO using ModelMapper
-//		ModelMapper modelMapper = new ModelMapper();
-//		RequirementsinfoDto requirementDto = modelMapper.map(requirement, RequirementsinfoDto.class);
-//
-//		// ✅ Return the final response DTO
-//		return new ExtendedRequirementsDto(requirementDto, submittedCandidates, interviewScheduledCandidates);
-//	}
+	public List<EmployeeCandidateDTO> getEmployeeStats() {
+		List<Tuple> results = requirementsDao.getEmployeeCandidateStats();
+
+		return results.stream().map(tuple -> new EmployeeCandidateDTO(
+				tuple.get("employeeId", String.class),
+				tuple.get("employeeName", String.class),
+				tuple.get("employeeEmail", String.class),
+				tuple.get("role", String.class),
+				convertToInt(tuple.get("numberOfSubmissions")),
+				convertToInt(tuple.get("numberOfInterviews")),
+				convertToInt(tuple.get("numberOfPlacements"))
+		)).collect(Collectors.toList());
+	}
+
+	private int convertToInt(Object value) {
+		if (value instanceof BigDecimal) {
+			return ((BigDecimal) value).intValue();
+		} else if (value instanceof Number) {
+			return ((Number) value).intValue();
+		} else {
+			return 0; // Default to 0 if null or unknown type
+		}
+	}
+	// Fetch both Submitted Candidates and Scheduled Interviews in one call
+	public CandidateResponseDTO getCandidateData(String userId) {
+		List<SubmittedCandidateDTO> submittedCandidates = requirementsDao.findSubmittedCandidatesByUserId(userId);
+		List<InterviewScheduledDTO> scheduledInterviews = requirementsDao.findScheduledInterviewsByUserId(userId);
+		List<JobDetailsDTO> jobDetails = requirementsDao.findJobDetailsByUserId(userId);  // Add this line
+
+		return new CandidateResponseDTO(submittedCandidates, scheduledInterviews, jobDetails);  // Pass jobDetails into the constructor
+	}
+
 
 }
