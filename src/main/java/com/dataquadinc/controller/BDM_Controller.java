@@ -1,6 +1,7 @@
 package com.dataquadinc.controller;
 
 import com.dataquadinc.dto.BDM_Dto;
+import com.dataquadinc.dto.BdmClientDetailsDTO;
 import com.dataquadinc.dto.ResponseBean;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
@@ -168,11 +169,8 @@ public class BDM_Controller {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
-
-
-
-
-
-
-
+    @GetMapping("/bdm/details/{userId}")
+    public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
+        return service.getBdmClientDetails(userId);
+    }
 }
