@@ -1,6 +1,6 @@
 package com.dataquadinc.dto;
 
-public interface InterviewScheduledDTO {
+public interface PlacementDetailsDTO {
     String getCandidateId();
     String getFullName();
     String getCandidateEmailId();
@@ -10,5 +10,7 @@ public interface InterviewScheduledDTO {
     String getInterviewStatus();
     String getInterviewLevel();
     String getInterviewDateTime();
+    String getJobId();
+    String getJobTitle();
     String getClientName();
 }

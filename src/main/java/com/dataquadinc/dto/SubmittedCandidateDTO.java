@@ -10,4 +10,5 @@ public interface SubmittedCandidateDTO {
     String getOverallFeedback();
     String getJobId();
     String getJobTitle();
+    String getClientName();
 }
