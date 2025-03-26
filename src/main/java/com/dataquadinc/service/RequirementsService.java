@@ -662,11 +662,14 @@ public class RequirementsService {
 				tuple.get("employeeName", String.class),
 				tuple.get("employeeEmail", String.class),
 				tuple.get("role", String.class),
+				convertToInt(tuple.get("numberOfClients")),  // Add number of clients
+				convertToInt(tuple.get("numberOfRequirements")), // Add number of requirements
 				convertToInt(tuple.get("numberOfSubmissions")),
 				convertToInt(tuple.get("numberOfInterviews")),
 				convertToInt(tuple.get("numberOfPlacements"))
 		)).collect(Collectors.toList());
 	}
+
 
 	private int convertToInt(Object value) {
 		if (value instanceof BigDecimal) {

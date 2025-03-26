@@ -38,7 +38,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/requirements")
 //@CrossOrigin("*")
-public class RequirementsController {
+public class 	RequirementsController {
 
 	@Autowired
 	private RequirementsService service;

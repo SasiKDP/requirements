@@ -142,38 +142,59 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 """, nativeQuery = true)
     List<Tuple> findAllPlacementsByClientName(@Param("clientName") String clientName);
 
-    // ✅ Fetch employee candidate statistics for all employees (including those with no submissions)
     @Query(value = """
-                SELECT 
-                    u.user_id AS employeeId,
-                    u.user_name AS employeeName,
-                    u.email AS employeeEmail,
-                    r.name AS role,
-                    COALESCE(COUNT(c.candidate_id), 0) AS numberOfSubmissions,
-                    COALESCE(SUM(CASE 
-                        WHEN c.interview_status = 'Scheduled' OR c.interview_date_time IS NOT NULL 
-                        THEN 1 ELSE 0 
-                    END), 0) AS numberOfInterviews,
-                    COALESCE(SUM(
-                        CASE 
-                            WHEN c.interview_status = 'Placed' THEN 1  -- Non-JSON case
-                            ELSE 0 
-                        END
-                    ), 0) +
-                    COALESCE(SUM(
-                        CASE 
+    SELECT 
+        u.user_id AS employeeId,
+        u.user_name AS employeeName,
+        u.email AS employeeEmail,
+        r.name AS role,
+        
+        -- Subquery to count distinct submissions
+        COALESCE((SELECT COUNT(DISTINCT c.candidate_id) 
+                  FROM candidates_prod c 
+                  WHERE c.user_id = u.user_id), 0) AS numberOfSubmissions,
+
+        -- Subquery to count distinct interviews (we check interview status directly)
+        COALESCE((SELECT SUM(CASE 
+                            WHEN c.interview_status = 'Scheduled' OR c.interview_date_time IS NOT NULL 
+                            THEN 1 ELSE 0 
+                        END) 
+                  FROM candidates_prod c 
+                  WHERE c.user_id = u.user_id), 0) AS numberOfInterviews,
+
+        -- Subquery to count distinct placements
+        COALESCE((SELECT SUM(CASE 
+                            WHEN c.interview_status = 'Placed' THEN 1 ELSE 0 
+                        END) 
+                  FROM candidates_prod c 
+                  WHERE c.user_id = u.user_id), 0) +
+        COALESCE((SELECT SUM(CASE 
                             WHEN JSON_VALID(c.interview_status) = 1  
                             AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL 
                             THEN 1 ELSE 0 
-                        END
-                    ), 0) AS numberOfPlacements -- Use a single alias
-                FROM user_details_prod u
-                JOIN user_roles_prod ur ON u.user_id = ur.user_id
-                JOIN roles_prod r ON ur.role_id = r.id
-                LEFT JOIN candidates_prod c ON c.user_id = u.user_id
-                WHERE r.name IN ('Employee', 'Teamlead')
-                GROUP BY u.user_id, u.user_name, u.email, r.name
-            """, nativeQuery = true)
+                        END) 
+                  FROM candidates_prod c 
+                  WHERE c.user_id = u.user_id), 0) AS numberOfPlacements,
+        
+        -- Subquery to count distinct clients based on job_id and client_name
+        COALESCE((SELECT COUNT(DISTINCT req.client_name) 
+                  FROM requirements_model_prod req 
+                  JOIN job_recruiters_prod jrp ON req.job_id = jrp.job_id
+                  WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfClients,
+
+        -- Subquery to count distinct job_ids based on recruiter_id
+        COALESCE((SELECT COUNT(DISTINCT req.job_id) 
+                  FROM requirements_model_prod req 
+                  JOIN job_recruiters_prod jrp ON req.job_id = jrp.job_id
+                  WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfRequirements
+
+    FROM user_details_prod u
+    JOIN user_roles_prod ur ON u.user_id = ur.user_id
+    JOIN roles_prod r ON ur.role_id = r.id
+    
+    WHERE r.name IN ('Employee', 'Teamlead')
+    
+""", nativeQuery = true)
     List<Tuple> getEmployeeCandidateStats();
 
 
@@ -197,22 +218,38 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<SubmittedCandidateDTO> findSubmittedCandidatesByUserId(@Param("userId") String userId);
 
     @Query(value = """
-        SELECT 
-            c.candidate_id AS candidateId,
-            c.full_name AS fullName,
-            c.candidate_email_id AS candidateEmailId,
-            c.contact_number AS contactNumber,
-            c.qualification AS qualification,
-            c.skills AS skills,
-            c.interview_status AS interviewStatus,
-            c.interview_level AS interviewLevel,
-            c.interview_date_time AS interviewDateTime
-        FROM candidates_prod c
-        JOIN user_details_prod u ON c.user_id = u.user_id
+        SELECT c.candidate_id, 
+               c.full_name, 
+               c.candidate_email_id AS candidateEmailId, 
+               c.contact_number, 
+               c.qualification, 
+               c.skills, 
+               -- ✅ Extract the latest status from JSON or direct string
+               CASE 
+                   WHEN JSON_VALID(c.interview_status) 
+                   THEN JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) 
+                   ELSE c.interview_status 
+               END AS interviewStatus,
+               c.interview_level AS interviewLevel,
+               c.interview_date_time AS interviewDateTime,
+               r.job_id AS jobId,
+               r.job_title AS jobTitle,
+               b.client_name AS clientName
+        FROM (
+            SELECT candidate_id, full_name, candidate_email_id, contact_number, qualification, 
+                   skills, interview_status, interview_level, interview_date_time, job_id, 
+                   ROW_NUMBER() OVER (PARTITION BY candidate_id ORDER BY interview_date_time DESC) AS rn 
+            FROM candidates_prod 
+            WHERE user_id = :userId  -- ✅ Filter by userId
+        ) c
         JOIN requirements_model_prod r ON c.job_id = r.job_id
-        WHERE u.user_id = :userId
-          AND c.interview_status = 'Scheduled'
-          AND c.interview_date_time IS NOT NULL
+        LEFT JOIN bdm_client_prod b ON r.client_name = b.client_name
+        WHERE (
+                b.client_name IS NOT NULL  -- ✅ Ensure client name is not null
+              )
+          AND c.rn = 1  -- ✅ Fetch only the latest interview status per candidate
+          AND c.interview_status = 'Scheduled'  -- ✅ Only "Scheduled" interviews
+          AND c.interview_date_time IS NOT NULL  -- ✅ Ensure interviews are scheduled (with date/time)
     """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByUserId(@Param("userId") String userId);
 
@@ -227,9 +264,4 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         WHERE u.user_id = :userId
     """, nativeQuery = true)
     List<JobDetailsDTO> findJobDetailsByUserId(@Param("userId") String userId);
-
-
-
-
-
 }
