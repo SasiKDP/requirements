@@ -1,44 +1,66 @@
 package com.dataquadinc.dto;
 
 import java.util.List;
+import java.util.Map;
 
 public class CandidateResponseDTO {
-
-    private List<SubmittedCandidateDTO> submittedCandidates;
-    private List<InterviewScheduledDTO> scheduledInterviews;
-    private List<JobDetailsDTO> jobDetails;  // Add a new field for job details
+    private Map<String, List<SubmittedCandidateDTO>> submittedCandidates;
+    private Map<String, List<InterviewScheduledDTO>> scheduledInterviews;
+    private Map<String, List<PlacementDetailsDTO>> placements;
+    private Map<String, List<JobDetailsDTO>> jobDetails;
+    private Map<String, ClientDetailsDTO> clientDetails; // New field for client details
 
     // Constructor
-    public CandidateResponseDTO(List<SubmittedCandidateDTO> submittedCandidates,
-                                List<InterviewScheduledDTO> scheduledInterviews,
-                                List<JobDetailsDTO> jobDetails) {
+    public CandidateResponseDTO(Map<String, List<SubmittedCandidateDTO>> submittedCandidates,
+                                Map<String, List<InterviewScheduledDTO>> scheduledInterviews,
+                                Map<String, List<PlacementDetailsDTO>> placements,
+                                Map<String, List<JobDetailsDTO>> jobDetails,
+                                Map<String, ClientDetailsDTO> clientDetails) {
         this.submittedCandidates = submittedCandidates;
         this.scheduledInterviews = scheduledInterviews;
-        this.jobDetails = jobDetails;  // Initialize jobDetails
+        this.placements = placements;
+        this.jobDetails = jobDetails;
+        this.clientDetails = clientDetails;
     }
 
-    // Getters and Setters
-    public List<SubmittedCandidateDTO> getSubmittedCandidates() {
+    public Map<String, List<SubmittedCandidateDTO>> getSubmittedCandidates() {
         return submittedCandidates;
     }
 
-    public void setSubmittedCandidates(List<SubmittedCandidateDTO> submittedCandidates) {
+    public void setSubmittedCandidates(Map<String, List<SubmittedCandidateDTO>> submittedCandidates) {
         this.submittedCandidates = submittedCandidates;
     }
 
-    public List<InterviewScheduledDTO> getScheduledInterviews() {
+    public Map<String, List<InterviewScheduledDTO>> getScheduledInterviews() {
         return scheduledInterviews;
     }
 
-    public void setScheduledInterviews(List<InterviewScheduledDTO> scheduledInterviews) {
+    public void setScheduledInterviews(Map<String, List<InterviewScheduledDTO>> scheduledInterviews) {
         this.scheduledInterviews = scheduledInterviews;
     }
 
-    public List<JobDetailsDTO> getJobDetails() {
+    public Map<String, List<PlacementDetailsDTO>> getPlacements() {
+        return placements;
+    }
+
+    public void setPlacements(Map<String, List<PlacementDetailsDTO>> placements) {
+        this.placements = placements;
+    }
+
+    public Map<String, List<JobDetailsDTO>> getJobDetails() {
         return jobDetails;
     }
 
-    public void setJobDetails(List<JobDetailsDTO> jobDetails) {
+    public void setJobDetails(Map<String, List<JobDetailsDTO>> jobDetails) {
         this.jobDetails = jobDetails;
     }
+
+    public Map<String, ClientDetailsDTO> getClientDetails() {
+        return clientDetails;
+    }
+
+    public void setClientDetails(Map<String, ClientDetailsDTO> clientDetails) {
+        this.clientDetails = clientDetails;
+    }
+// Getters & Setters
 }
