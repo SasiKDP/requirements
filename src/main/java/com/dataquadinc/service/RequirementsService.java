@@ -3,6 +3,7 @@ package com.dataquadinc.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -10,6 +11,7 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import com.dataquadinc.dto.*;
 import com.dataquadinc.exceptions.*;
@@ -653,41 +655,100 @@ public class RequirementsService {
 			return null;
 		}
 	}
-
 	public List<EmployeeCandidateDTO> getEmployeeStats() {
 		List<Tuple> results = requirementsDao.getEmployeeCandidateStats();
 
+		// Proceed with the rest of the mapping
 		return results.stream().map(tuple -> new EmployeeCandidateDTO(
 				tuple.get("employeeId", String.class),
 				tuple.get("employeeName", String.class),
 				tuple.get("employeeEmail", String.class),
 				tuple.get("role", String.class),
-				convertToInt(tuple.get("numberOfClients")),  // Add number of clients
-				convertToInt(tuple.get("numberOfRequirements")), // Add number of requirements
+				convertToInt(tuple.get("numberOfClients")), // Ensure correct conversion
+				convertToInt(tuple.get("numberOfRequirements")),
 				convertToInt(tuple.get("numberOfSubmissions")),
 				convertToInt(tuple.get("numberOfInterviews")),
 				convertToInt(tuple.get("numberOfPlacements"))
+
 		)).collect(Collectors.toList());
 	}
 
-
 	private int convertToInt(Object value) {
-		if (value instanceof BigDecimal) {
-			return ((BigDecimal) value).intValue();
+		if (value instanceof BigInteger) {
+			return ((BigInteger) value).intValue(); // MySQL COUNT() returns BigInteger
+		} else if (value instanceof BigDecimal) {
+			return ((BigDecimal) value).intValue(); // Handles numeric decimal cases
 		} else if (value instanceof Number) {
-			return ((Number) value).intValue();
+			return ((Number) value).intValue(); // Fallback for any numeric types
 		} else {
 			return 0; // Default to 0 if null or unknown type
 		}
 	}
+
 	// Fetch both Submitted Candidates and Scheduled Interviews in one call
 	public CandidateResponseDTO getCandidateData(String userId) {
 		List<SubmittedCandidateDTO> submittedCandidates = requirementsDao.findSubmittedCandidatesByUserId(userId);
 		List<InterviewScheduledDTO> scheduledInterviews = requirementsDao.findScheduledInterviewsByUserId(userId);
-		List<JobDetailsDTO> jobDetails = requirementsDao.findJobDetailsByUserId(userId);  // Add this line
+		List<JobDetailsDTO> jobDetails = requirementsDao.findJobDetailsByUserId(userId);
+		List<PlacementDetailsDTO> placementDetails = requirementsDao.findPlacementCandidatesByUserId(userId);
+		List<ClientDetailsDTO> clientDetails = requirementsDao.findClientDetailsByUserId(userId); // Fetch client details
 
-		return new CandidateResponseDTO(submittedCandidates, scheduledInterviews, jobDetails);  // Pass jobDetails into the constructor
+		// Extract unique client names (normalize to lowercase)
+		Set<String> allClients = new HashSet<>();
+
+		submittedCandidates.forEach(candidate -> allClients.add(normalizeClientName(candidate.getClientName())));
+		scheduledInterviews.forEach(interview -> allClients.add(normalizeClientName(interview.getClientName())));
+		placementDetails.forEach(placement -> allClients.add(normalizeClientName(placement.getClientName())));
+		jobDetails.forEach(job -> allClients.add(normalizeClientName(job.getClientName())));
+		clientDetails.forEach(client -> allClients.add(normalizeClientName(client.getClientName())));
+
+		// Group data dynamically by normalized client name
+		Map<String, List<SubmittedCandidateDTO>> groupedSubmissions = submittedCandidates.stream()
+				.collect(Collectors.groupingBy(dto -> normalizeClientName(dto.getClientName()), LinkedHashMap::new, Collectors.toList()));
+
+		Map<String, List<InterviewScheduledDTO>> groupedInterviews = scheduledInterviews.stream()
+				.collect(Collectors.groupingBy(dto -> normalizeClientName(dto.getClientName()), LinkedHashMap::new, Collectors.toList()));
+
+		Map<String, List<PlacementDetailsDTO>> groupedPlacements = placementDetails.stream()
+				.collect(Collectors.groupingBy(dto -> normalizeClientName(dto.getClientName()), LinkedHashMap::new, Collectors.toList()));
+
+		Map<String, List<JobDetailsDTO>> groupedJobDetails = jobDetails.stream()
+				.collect(Collectors.groupingBy(dto -> normalizeClientName(dto.getClientName()), LinkedHashMap::new, Collectors.toList()));
+
+		// Convert List<ClientDetailsDTO> to a Map
+		Map<String, ClientDetailsDTO> groupedClientDetails = clientDetails.stream()
+				.collect(Collectors.toMap(
+						client -> normalizeClientName(client.getClientName()),
+						client -> client,
+						(existing, replacement) -> existing, // Keep the first instance in case of duplicates
+						LinkedHashMap::new
+				));
+
+		// Ensure all clients exist in maps, even if empty
+		allClients.forEach(client -> {
+			groupedSubmissions.putIfAbsent(client, new ArrayList<>());
+			groupedInterviews.putIfAbsent(client, new ArrayList<>());
+			groupedPlacements.putIfAbsent(client, new ArrayList<>());
+			groupedJobDetails.putIfAbsent(client, new ArrayList<>());
+
+			// Since ClientDetailsDTO is an interface, we create an anonymous implementation with null values
+			groupedClientDetails.putIfAbsent(client, new ClientDetailsDTO() {
+				@Override public String getClientName() { return client; }
+				@Override public String getClientId() { return null; }
+				@Override public String getClientAddress() { return null; }
+				@Override public String getOnBoardedBy() { return null; }
+				@Override public String getClientSpocName() { return null; }
+				@Override public String getClientSpocMobileNumber() { return null; }
+			});
+		});
+
+		return new CandidateResponseDTO(groupedSubmissions, groupedInterviews, groupedPlacements, groupedJobDetails, groupedClientDetails);
 	}
 
+	// Utility method to normalize client names (convert null to "Unknown" and Uppercase)
+	private String normalizeClientName(String clientName) {
+
+		return Optional.ofNullable(clientName).orElse("Unknown").trim().toUpperCase();
+	}
 
 }

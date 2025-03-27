@@ -3,9 +3,7 @@ package com.dataquadinc.repository;
 import java.util.List;
 import java.util.Optional;
 
-import com.dataquadinc.dto.InterviewScheduledDTO;
-import com.dataquadinc.dto.JobDetailsDTO;
-import com.dataquadinc.dto.SubmittedCandidateDTO;
+import com.dataquadinc.dto.*;
 import jakarta.persistence.Tuple;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -142,126 +140,175 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 """, nativeQuery = true)
     List<Tuple> findAllPlacementsByClientName(@Param("clientName") String clientName);
 
+    // ✅ Fetch employee candidate statistics for all employees (including those with no submissions)
     @Query(value = """
     SELECT 
         u.user_id AS employeeId,
         u.user_name AS employeeName,
         u.email AS employeeEmail,
         r.name AS role,
-        
-        -- Subquery to count distinct submissions
-        COALESCE((SELECT COUNT(DISTINCT c.candidate_id) 
-                  FROM candidates_prod c 
-                  WHERE c.user_id = u.user_id), 0) AS numberOfSubmissions,
 
-        -- Subquery to count distinct interviews (we check interview status directly)
-        COALESCE((SELECT SUM(CASE 
-                            WHEN c.interview_status = 'Scheduled' OR c.interview_date_time IS NOT NULL 
-                            THEN 1 ELSE 0 
-                        END) 
-                  FROM candidates_prod c 
-                  WHERE c.user_id = u.user_id), 0) AS numberOfInterviews,
+        -- Candidate-related counts
+        COALESCE(COUNT(DISTINCT c.candidate_id), 0) AS numberOfSubmissions,
+        COALESCE(SUM(CASE 
+            WHEN c.interview_status = 'Scheduled' OR c.interview_date_time IS NOT NULL 
+            THEN 1 ELSE 0 
+        END), 0) AS numberOfInterviews,
+        COALESCE(SUM(
+            CASE 
+                WHEN c.interview_status = 'Placed' THEN 1  
+                ELSE 0 
+            END
+        ), 0) +
+        COALESCE(SUM(
+            CASE 
+                WHEN JSON_VALID(c.interview_status) = 1  
+                AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL 
+                THEN 1 ELSE 0 
+            END
+        ), 0) AS numberOfPlacements,
 
-        -- Subquery to count distinct placements
-        COALESCE((SELECT SUM(CASE 
-                            WHEN c.interview_status = 'Placed' THEN 1 ELSE 0 
-                        END) 
-                  FROM candidates_prod c 
-                  WHERE c.user_id = u.user_id), 0) +
-        COALESCE((SELECT SUM(CASE 
-                            WHEN JSON_VALID(c.interview_status) = 1  
-                            AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL 
-                            THEN 1 ELSE 0 
-                        END) 
-                  FROM candidates_prod c 
-                  WHERE c.user_id = u.user_id), 0) AS numberOfPlacements,
-        
-        -- Subquery to count distinct clients based on job_id and client_name
-        COALESCE((SELECT COUNT(DISTINCT req.client_name) 
-                  FROM requirements_model_prod req 
-                  JOIN job_recruiters_prod jrp ON req.job_id = jrp.job_id
-                  WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfClients,
+        -- Number of unique clients per employee
+        (SELECT COUNT(DISTINCT rmp.client_name)
+         FROM `dataquad-prod`.job_recruiters_prod jr 
+         JOIN `dataquad-prod`.requirements_model_prod rmp ON jr.job_id = rmp.job_id
+         WHERE jr.recruiter_id = u.user_id
+        ) AS numberOfClients,
 
-        -- Subquery to count distinct job_ids based on recruiter_id
-        COALESCE((SELECT COUNT(DISTINCT req.job_id) 
-                  FROM requirements_model_prod req 
-                  JOIN job_recruiters_prod jrp ON req.job_id = jrp.job_id
-                  WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfRequirements
+        -- Number of unique job requirements per employee
+        (SELECT COUNT(DISTINCT rmp.job_id)
+         FROM `dataquad-prod`.job_recruiters_prod jr 
+         JOIN `dataquad-prod`.requirements_model_prod rmp ON jr.job_id = rmp.job_id
+         WHERE jr.recruiter_id = u.user_id
+        ) AS numberOfRequirements
 
-    FROM user_details_prod u
-    JOIN user_roles_prod ur ON u.user_id = ur.user_id
-    JOIN roles_prod r ON ur.role_id = r.id
-    
+    FROM `dataquad-prod`.user_details_prod u
+    JOIN `dataquad-prod`.user_roles_prod ur ON u.user_id = ur.user_id
+    JOIN `dataquad-prod`.roles_prod r ON ur.role_id = r.id
+    LEFT JOIN `dataquad-prod`.candidates_prod c ON c.user_id = u.user_id  
+
     WHERE r.name IN ('Employee', 'Teamlead')
-    
+    GROUP BY u.user_id, u.user_name, u.email, r.name
 """, nativeQuery = true)
     List<Tuple> getEmployeeCandidateStats();
 
 
-
     @Query(value = """
-        SELECT 
-            c.candidate_id AS candidateId,
-            c.full_name AS fullName,
-            c.candidate_email_id AS candidateEmailId,
-            c.contact_number AS contactNumber,
-            c.qualification AS qualification,
-            c.skills AS skills,
-            c.overall_feedback AS overallFeedback,
-            r.job_id AS jobId,
-            r.job_title AS jobTitle
-        FROM candidates_prod c
-        JOIN user_details_prod u ON c.user_id = u.user_id
-        JOIN requirements_model_prod r ON c.job_id = r.job_id
-        WHERE u.user_id = :userId
-    """, nativeQuery = true)
+    SELECT 
+        c.candidate_id AS candidateId,
+        c.full_name AS fullName,
+        c.candidate_email_id AS candidateEmailId,
+        c.contact_number AS contactNumber,
+        c.qualification AS qualification,
+        c.skills AS skills,
+        c.overall_feedback AS overallFeedback,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        r.client_name AS clientName  -- Fetch client name
+    FROM candidates_prod c
+    JOIN user_details_prod u ON c.user_id = u.user_id
+    JOIN requirements_model_prod r ON c.job_id = r.job_id
+    WHERE u.user_id = :userId
+""", nativeQuery = true)
     List<SubmittedCandidateDTO> findSubmittedCandidatesByUserId(@Param("userId") String userId);
 
+
     @Query(value = """
-        SELECT c.candidate_id, 
-               c.full_name, 
-               c.candidate_email_id AS candidateEmailId, 
-               c.contact_number, 
-               c.qualification, 
-               c.skills, 
-               -- ✅ Extract the latest status from JSON or direct string
-               CASE 
-                   WHEN JSON_VALID(c.interview_status) 
-                   THEN JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) 
-                   ELSE c.interview_status 
-               END AS interviewStatus,
-               c.interview_level AS interviewLevel,
-               c.interview_date_time AS interviewDateTime,
-               r.job_id AS jobId,
-               r.job_title AS jobTitle,
-               b.client_name AS clientName
-        FROM (
-            SELECT candidate_id, full_name, candidate_email_id, contact_number, qualification, 
-                   skills, interview_status, interview_level, interview_date_time, job_id, 
-                   ROW_NUMBER() OVER (PARTITION BY candidate_id ORDER BY interview_date_time DESC) AS rn 
-            FROM candidates_prod 
-            WHERE user_id = :userId  -- ✅ Filter by userId
-        ) c
-        JOIN requirements_model_prod r ON c.job_id = r.job_id
-        LEFT JOIN bdm_client_prod b ON r.client_name = b.client_name
-        WHERE (
-                b.client_name IS NOT NULL  -- ✅ Ensure client name is not null
-              )
-          AND c.rn = 1  -- ✅ Fetch only the latest interview status per candidate
-          AND c.interview_status = 'Scheduled'  -- ✅ Only "Scheduled" interviews
-          AND c.interview_date_time IS NOT NULL  -- ✅ Ensure interviews are scheduled (with date/time)
-    """, nativeQuery = true)
+    SELECT 
+        c.candidate_id AS candidateId,
+        c.full_name AS fullName,
+        c.candidate_email_id AS candidateEmailId,
+        c.contact_number AS contactNumber,
+        c.qualification AS qualification,
+        c.skills AS skills,
+        CASE 
+            WHEN JSON_VALID(c.interview_status) = 1 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) 
+            ELSE c.interview_status 
+        END AS interviewStatus,
+        c.interview_level AS interviewLevel,
+        c.interview_date_time AS interviewDateTime,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        r.client_name AS clientName  
+    FROM candidates_prod c
+    JOIN user_details_prod u ON c.user_id = u.user_id
+    JOIN requirements_model_prod r ON c.job_id = r.job_id
+    WHERE u.user_id = :userId
+      AND c.interview_date_time IS NOT NULL
+      AND (
+          c.interview_status = 'Scheduled'  
+          OR (
+              JSON_VALID(c.interview_status) = 1  
+              AND JSON_SEARCH(c.interview_status, 'one', 'Scheduled', NULL, '$[*].status') IS NOT NULL
+          )
+      )
+""", nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByUserId(@Param("userId") String userId);
 
     @Query(value = """
         SELECT 
-            TRIM(r.job_id) AS jobId,  -- Trim job_id to remove leading/trailing spaces
+            r.job_id AS jobId,  -- Job ID
             TRIM(r.job_title) AS jobTitle,  -- Trim job_title
-            TRIM(r.client_name) AS clientName  -- Trim client_name
+            TRIM(r.client_name) AS clientName,  -- Trim client_name
+           TRIM(BOTH '\\"' FROM r.assigned_by) AS assignedBy,
+            r.status AS status,  -- Status
+            r.no_of_positions AS noOfPositions,  -- Number of positions
+            r.qualification AS qualification,  -- Qualification
+            r.job_type AS jobType,  -- Job Type
+            r.job_mode AS jobMode,  -- Job Mode
+            r.requirement_added_time_stamp AS postedDate  -- Posted Date
         FROM requirements_model_prod r
         JOIN job_recruiters_prod jr ON r.job_id = jr.job_id
         JOIN user_details_prod u ON jr.recruiter_id = u.user_id
         WHERE u.user_id = :userId
     """, nativeQuery = true)
     List<JobDetailsDTO> findJobDetailsByUserId(@Param("userId") String userId);
+
+    @Query(value = """
+    SELECT 
+        c.candidate_id AS candidateId,
+        c.full_name AS fullName,
+        c.candidate_email_id AS candidateEmailId,
+        c.contact_number AS contactNumber,
+        c.qualification AS qualification,
+        c.skills AS skills,
+        CASE 
+            WHEN JSON_VALID(c.interview_status) 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) 
+            ELSE c.interview_status 
+        END AS interviewStatus,  -- Safely extract status
+        c.interview_level AS interviewLevel,
+        c.interview_date_time AS interviewDateTime,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        r.client_name AS clientName
+    FROM candidates_prod c
+    JOIN user_details_prod u ON c.user_id = u.user_id
+    JOIN requirements_model_prod r ON c.job_id = r.job_id
+    WHERE u.user_id = :userId
+      AND (
+          (JSON_VALID(c.interview_status) AND JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) = 'Placed')
+          OR c.interview_status = 'Placed'
+      )
+""", nativeQuery = true)
+    List<PlacementDetailsDTO> findPlacementCandidatesByUserId(@Param("userId") String userId);
+
+    @Query(value = """
+    SELECT 
+        b.id AS clientId,  
+        b.client_name AS clientName,  
+        b.client_address AS clientAddress,  
+        b.on_boarded_by AS onBoardedBy,  
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_name, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocName,  
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_mobile_number, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocMobileNumber
+    FROM bdm_client_prod b
+    JOIN requirements_model_prod r ON LOWER(b.client_name) = LOWER(r.client_name)  
+    JOIN job_recruiters_prod jr ON r.job_id = jr.job_id  
+    JOIN user_details_prod u ON jr.recruiter_id = u.user_id  
+    WHERE u.user_id = :userId
+""", nativeQuery = true)
+    List<ClientDetailsDTO> findClientDetailsByUserId(@Param("userId") String userId);
+
+
 }
