@@ -147,50 +147,59 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         u.user_name AS employeeName,
         u.email AS employeeEmail,
         r.name AS role,
+        
+        -- Subquery to count distinct submissions
+        COALESCE((SELECT COUNT(DISTINCT c.candidate_id) 
+                  FROM candidates_prod c 
+                  WHERE c.user_id = u.user_id), 0) AS numberOfSubmissions,
 
-        -- Candidate-related counts
-        COALESCE(COUNT(DISTINCT c.candidate_id), 0) AS numberOfSubmissions,
-        COALESCE(SUM(CASE 
-            WHEN c.interview_status = 'Scheduled' OR c.interview_date_time IS NOT NULL 
-            THEN 1 ELSE 0 
-        END), 0) AS numberOfInterviews,
-        COALESCE(SUM(
-            CASE 
-                WHEN c.interview_status = 'Placed' THEN 1  
-                ELSE 0 
-            END
-        ), 0) +
-        COALESCE(SUM(
-            CASE 
-                WHEN JSON_VALID(c.interview_status) = 1  
-                AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL 
-                THEN 1 ELSE 0 
-            END
-        ), 0) AS numberOfPlacements,
+        -- Subquery to count distinct interviews (we check interview status directly)
+        COALESCE((SELECT SUM(CASE 
+                            WHEN c.interview_status = 'Scheduled' OR c.interview_date_time IS NOT NULL 
+                            THEN 1 ELSE 0 
+                        END) 
+                  FROM candidates_prod c 
+                  WHERE c.user_id = u.user_id), 0) AS numberOfInterviews,
 
-        -- Number of unique clients per employee
-        (SELECT COUNT(DISTINCT rmp.client_name)
-         FROM `dataquad-prod`.job_recruiters_prod jr 
-         JOIN `dataquad-prod`.requirements_model_prod rmp ON jr.job_id = rmp.job_id
-         WHERE jr.recruiter_id = u.user_id
-        ) AS numberOfClients,
+        -- Subquery to count distinct placements
+        COALESCE((SELECT SUM(CASE 
+                            WHEN c.interview_status = 'Placed' THEN 1 ELSE 0 
+                        END) 
+                  FROM candidates_prod c 
+                  WHERE c.user_id = u.user_id), 0) +
+        COALESCE((SELECT SUM(CASE 
+                            WHEN JSON_VALID(c.interview_status) = 1  
+                            AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL 
+                            THEN 1 ELSE 0 
+                        END) 
+                  FROM candidates_prod c 
+                  WHERE c.user_id = u.user_id), 0) AS numberOfPlacements,
+        
+        -- Subquery to count distinct clients based on job_id and client_name
+        COALESCE((SELECT COUNT(DISTINCT req.client_name) 
+                  FROM requirements_model_prod req 
+                  JOIN job_recruiters_prod jrp ON req.job_id = jrp.job_id
+                  WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfClients,
 
-        -- Number of unique job requirements per employee
-        (SELECT COUNT(DISTINCT rmp.job_id)
-         FROM `dataquad-prod`.job_recruiters_prod jr 
-         JOIN `dataquad-prod`.requirements_model_prod rmp ON jr.job_id = rmp.job_id
-         WHERE jr.recruiter_id = u.user_id
-        ) AS numberOfRequirements
+        -- Subquery to count distinct job_ids based on recruiter_id
+        COALESCE((SELECT COUNT(DISTINCT req.job_id) 
+                  FROM requirements_model_prod req 
+                  JOIN job_recruiters_prod jrp ON req.job_id = jrp.job_id
+                  WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfRequirements
 
-    FROM `dataquad-prod`.user_details_prod u
-    JOIN `dataquad-prod`.user_roles_prod ur ON u.user_id = ur.user_id
-    JOIN `dataquad-prod`.roles_prod r ON ur.role_id = r.id
-    LEFT JOIN `dataquad-prod`.candidates_prod c ON c.user_id = u.user_id  
-
+    FROM user_details_prod u
+    JOIN user_roles_prod ur ON u.user_id = ur.user_id
+    JOIN roles_prod r ON ur.role_id = r.id
+    
     WHERE r.name IN ('Employee', 'Teamlead')
-    GROUP BY u.user_id, u.user_name, u.email, r.name
+    
 """, nativeQuery = true)
     List<Tuple> getEmployeeCandidateStats();
+
+
+
+
+
 
 
     @Query(value = """
@@ -236,13 +245,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     JOIN requirements_model_prod r ON c.job_id = r.job_id
     WHERE u.user_id = :userId
       AND c.interview_date_time IS NOT NULL
-      AND (
-          c.interview_status = 'Scheduled'  
-          OR (
-              JSON_VALID(c.interview_status) = 1  
-              AND JSON_SEARCH(c.interview_status, 'one', 'Scheduled', NULL, '$[*].status') IS NOT NULL
-          )
-      )
+      AND r.client_name IS NOT NULL
 """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByUserId(@Param("userId") String userId);
 
