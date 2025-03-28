@@ -154,12 +154,20 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                   WHERE c.user_id = u.user_id), 0) AS numberOfSubmissions,
 
         -- Subquery to count distinct interviews (we check interview status directly)
-        COALESCE((SELECT SUM(CASE 
-                            WHEN c.interview_status = 'Scheduled' OR c.interview_date_time IS NOT NULL 
-                            THEN 1 ELSE 0 
-                        END) 
-                  FROM candidates_prod c 
-                  WHERE c.user_id = u.user_id), 0) AS numberOfInterviews,
+        COALESCE(
+                        (SELECT SUM(CASE\s
+                            WHEN c.interview_status = 'Scheduled'\s
+                                 OR c.interview_date_time IS NOT NULL
+                                 AND r.client_name IS NOT NULL
+                                 AND c.job_id = r.job_id
+                            THEN 1 ELSE 0\s
+                        END)\s
+                        FROM candidates_prod c
+                        JOIN requirements_model_prod r ON c.job_id = r.job_id
+                        JOIN bdm_client_prod bc ON r.client_name = bc.client_name
+                        WHERE c.user_id = u.user_id),
+                    0) AS numberOfInterviews
+            
 
         -- Subquery to count distinct placements
         COALESCE((SELECT SUM(CASE 
@@ -189,8 +197,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 
     FROM user_details_prod u
     JOIN user_roles_prod ur ON u.user_id = ur.user_id
-    JOIN roles_prod r ON ur.role_id = r.id
-    
+    JOIN roles_prod r ON ur.role_id = r.id   
     WHERE r.name IN ('Employee', 'Teamlead')
     
 """, nativeQuery = true)
