@@ -166,7 +166,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                         JOIN requirements_model_prod r ON c.job_id = r.job_id
                         JOIN bdm_client_prod bc ON r.client_name = bc.client_name
                         WHERE c.user_id = u.user_id),
-                    0) AS numberOfInterviews
+                    0) AS numberOfInterviews,
             
 
         -- Subquery to count distinct placements
