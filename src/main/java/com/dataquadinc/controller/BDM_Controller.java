@@ -35,7 +35,7 @@ import java.util.zip.ZipOutputStream;
         "https://mymulya.com",
         "http://localhost:3000",
         "http://192.168.0.135:8080",
-        "http://192.168.0.135:80","http://182.18.177.16:444"
+        "http://192.168.0.135:80","http://182.18.177.16:443","https://mymulya.com:443","http://mymulya.com:443","http://localhost/"
 })
 @RestController
 @RequestMapping("/requirements")
