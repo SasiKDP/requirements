@@ -64,6 +64,27 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     """, nativeQuery = true)
     List<Tuple> findJobsByBdmUserId(@Param("userId") String userId);
 
+    @Query(value = """
+    SELECT u.user_name AS recruiter_name, 
+           r.client_name, 
+           r.job_id, 
+           r.job_title, 
+           r.assigned_by, 
+           r.location, 
+           r.notice_period
+    FROM requirements_model_prod r
+    JOIN job_recruiters_prod jr 
+        ON r.job_id = jr.job_id
+    JOIN user_details_prod u 
+        ON jr.recruiter_id = u.user_id
+    JOIN bdm_client_prod b 
+        ON TRIM(UPPER(r.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin
+    WHERE TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(:clientName)) COLLATE utf8mb4_bin
+    AND r.job_id IS NOT NULL
+""", nativeQuery = true)
+    List<Tuple> findRequirementsByClientName(@Param("clientName") String clientName);
+
+
     // Fetch all submissions for a client across ALL job IDs
     @Query(value = """
         SELECT c.candidate_id, c.full_name, c.candidate_email_id AS candidateEmailId, 
@@ -252,7 +273,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     JOIN requirements_model_prod r ON c.job_id = r.job_id
     WHERE u.user_id = :userId
       AND c.interview_date_time IS NOT NULL
-      AND r.client_name IS NOT NULL
+      AND c.client_name IS NOT NULL
 """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByUserId(@Param("userId") String userId);
 
@@ -319,6 +340,27 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     WHERE u.user_id = :userId
 """, nativeQuery = true)
     List<ClientDetailsDTO> findClientDetailsByUserId(@Param("userId") String userId);
+
+    @Query(value = """
+        SELECT 
+            u.user_id AS employeeId,
+            u.user_name AS employeeName,                
+            r.name AS role,
+            u.email AS employeeEmail,
+            u.designation AS designation,
+            DATE_FORMAT(u.joining_date, '%Y-%m-%d') AS joiningDate, 
+            u.gender AS gender, 
+            DATE_FORMAT(u.dob, '%Y-%m-%d') AS dob, 
+            u.phone_number AS phoneNumber, 
+            u.personalemail AS personalEmail, 
+            u.status AS status
+        FROM user_details_prod u
+        JOIN user_roles_prod ur ON u.user_id = ur.user_id
+        JOIN roles_prod r ON ur.role_id = r.id
+        WHERE r.name IN ('Employee', 'Teamlead')
+        AND u.user_id = :userId  -- Add this line to filter by user_id
+    """, nativeQuery = true)
+    List<Tuple> getEmployeeDetailsByUserId(@Param("userId") String userId);
 
 
 }

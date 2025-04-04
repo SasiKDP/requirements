@@ -95,4 +95,3 @@ public class EmployeeCandidateDTO {
         this.numberOfPlacements = numberOfPlacements;
     }
 }
-
