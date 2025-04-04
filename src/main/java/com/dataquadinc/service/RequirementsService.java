@@ -5,13 +5,11 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import com.dataquadinc.dto.*;
 import com.dataquadinc.exceptions.*;
@@ -35,7 +33,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class RequirementsService {
 	private static final Logger logger = LoggerFactory.getLogger(RequirementsService.class);
-
 
 
 	@Autowired
@@ -134,11 +131,11 @@ public class RequirementsService {
 		// Remove all quotes, brackets, and whitespace
 		return recruiterId.replaceAll("[\"\\[\\]\\s]", "");
 	}
+
 	public String getRecruiterEmail(String recruiterId) {
 		Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(recruiterId);
 		return userTuple != null ? userTuple.get(0, String.class) : null;
 	}
-
 
 
 	private byte[] saveJobDescriptionFileAsBlob(MultipartFile jobDescriptionFile, String jobId) throws IOException {
@@ -162,7 +159,6 @@ public class RequirementsService {
 
 		return jobDescriptionBytes;  // Return the byte array if needed
 	}
-
 
 
 	// Update the sendEmailsToRecruiters method to handle comma-separated string
@@ -228,6 +224,7 @@ public class RequirementsService {
 			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage(), e);
 		}
 	}
+
 	// Update constructEmailBody method to use recruiterName instead of fetching separately
 	private String constructEmailBody(RequirementsModel model, String recruiterName) {
 		return "Dear " + recruiterName + ",\n\n" +
@@ -244,9 +241,6 @@ public class RequirementsService {
 				"Best regards,\n" +
 				"Dataquad";
 	}
-
-
-
 
 
 	public String processJobDescriptionFile(MultipartFile jobDescriptionFile) throws IOException {
@@ -307,7 +301,6 @@ public class RequirementsService {
 	}
 
 
-
 	public Object getRequirementsDetails() {
 		List<RequirementsDto> dtoList = requirementsDao.findAll().stream()
 				.map(requirement -> {
@@ -346,7 +339,6 @@ public class RequirementsService {
 			return dtoList;
 		}
 	}
-
 
 
 	public RequirementsDto getRequirementDetailsById(String jobId) {
@@ -390,9 +382,6 @@ public class RequirementsService {
 	}
 
 
-
-
-
 	@Transactional
 	public void statusUpdate(StatusDto status) {
 		RequirementsModel requirement = requirementsDao.findById(status.getJobId()).orElseThrow(
@@ -431,7 +420,8 @@ public class RequirementsService {
 
 			// Update the existing requirement with the new details from the DTO
 			if (requirementsDto.getJobTitle() != null) existingRequirement.setJobTitle(requirementsDto.getJobTitle());
-			if (requirementsDto.getClientName() != null) existingRequirement.setClientName(requirementsDto.getClientName());
+			if (requirementsDto.getClientName() != null)
+				existingRequirement.setClientName(requirementsDto.getClientName());
 
 			// Handle job description: either text or file
 			if (requirementsDto.getJobDescription() != null && !requirementsDto.getJobDescription().isEmpty()) {
@@ -519,6 +509,7 @@ public class RequirementsService {
 			throw new RuntimeException("Error fetching recruiter username", e);
 		}
 	}
+
 	public List<RecruiterInfoDto> getRecruitersForJob(String jobId) {
 		// Get the requirement with the given job ID
 		RequirementsModel requirement = requirementsDao.findById(jobId)
@@ -589,6 +580,7 @@ public class RequirementsService {
 		// Return DTO with recruiter details and candidate groups
 		return new RecruiterDetailsDTO(recruiters, submittedCandidates, interviewScheduledCandidates);
 	}
+
 	/**
 	 * Maps Tuple data to CandidateDto objects, including recruiter name.
 	 */
@@ -655,6 +647,7 @@ public class RequirementsService {
 			return null;
 		}
 	}
+
 	public List<EmployeeCandidateDTO> getEmployeeStats() {
 		List<Tuple> results = requirementsDao.getEmployeeCandidateStats();
 
@@ -685,70 +678,148 @@ public class RequirementsService {
 		}
 	}
 
-	// Fetch both Submitted Candidates and Scheduled Interviews in one call
+
+	// Fetch both Submitted Candidates, Scheduled Interviews, and Employee Details in one call
 	public CandidateResponseDTO getCandidateData(String userId) {
+		// Fetching the various required details
 		List<SubmittedCandidateDTO> submittedCandidates = requirementsDao.findSubmittedCandidatesByUserId(userId);
 		List<InterviewScheduledDTO> scheduledInterviews = requirementsDao.findScheduledInterviewsByUserId(userId);
 		List<JobDetailsDTO> jobDetails = requirementsDao.findJobDetailsByUserId(userId);
 		List<PlacementDetailsDTO> placementDetails = requirementsDao.findPlacementCandidatesByUserId(userId);
 		List<ClientDetailsDTO> clientDetails = requirementsDao.findClientDetailsByUserId(userId); // Fetch client details
+		List<Tuple> employeeDetailsTuples = requirementsDao.getEmployeeDetailsByUserId(userId); // Fetch employee details
 
-		// Extract unique client names (normalize to lowercase)
-		Set<String> allClients = new HashSet<>();
-
-		submittedCandidates.forEach(candidate -> allClients.add(normalizeClientName(candidate.getClientName())));
-		scheduledInterviews.forEach(interview -> allClients.add(normalizeClientName(interview.getClientName())));
-		placementDetails.forEach(placement -> allClients.add(normalizeClientName(placement.getClientName())));
-		jobDetails.forEach(job -> allClients.add(normalizeClientName(job.getClientName())));
-		clientDetails.forEach(client -> allClients.add(normalizeClientName(client.getClientName())));
-
-		// Group data dynamically by normalized client name
-		Map<String, List<SubmittedCandidateDTO>> groupedSubmissions = submittedCandidates.stream()
-				.collect(Collectors.groupingBy(dto -> normalizeClientName(dto.getClientName()), LinkedHashMap::new, Collectors.toList()));
-
-		Map<String, List<InterviewScheduledDTO>> groupedInterviews = scheduledInterviews.stream()
-				.collect(Collectors.groupingBy(dto -> normalizeClientName(dto.getClientName()), LinkedHashMap::new, Collectors.toList()));
-
-		Map<String, List<PlacementDetailsDTO>> groupedPlacements = placementDetails.stream()
-				.collect(Collectors.groupingBy(dto -> normalizeClientName(dto.getClientName()), LinkedHashMap::new, Collectors.toList()));
-
-		Map<String, List<JobDetailsDTO>> groupedJobDetails = jobDetails.stream()
-				.collect(Collectors.groupingBy(dto -> normalizeClientName(dto.getClientName()), LinkedHashMap::new, Collectors.toList()));
+		// Group data dynamically (no need to group employee details by client name)
+		Map<String, List<SubmittedCandidateDTO>> groupedSubmissions = groupByClientName(submittedCandidates);
+		Map<String, List<InterviewScheduledDTO>> groupedInterviews = groupByClientName(scheduledInterviews);
+		Map<String, List<PlacementDetailsDTO>> groupedPlacements = groupByClientName(placementDetails);
+		Map<String, List<JobDetailsDTO>> groupedJobDetails = groupByClientName(jobDetails);
 
 		// Convert List<ClientDetailsDTO> to a Map
-		Map<String, ClientDetailsDTO> groupedClientDetails = clientDetails.stream()
-				.collect(Collectors.toMap(
-						client -> normalizeClientName(client.getClientName()),
-						client -> client,
-						(existing, replacement) -> existing, // Keep the first instance in case of duplicates
-						LinkedHashMap::new
-				));
+		Map<String, List<ClientDetailsDTO>> groupedClientDetails = groupByClientName(clientDetails);
 
-		// Ensure all clients exist in maps, even if empty
+		// Convert List<Tuple> to List<EmployeeDetailsDTO>
+		List<EmployeeDetailsDTO> employeeDetails = mapEmployeeDetailsTuples(employeeDetailsTuples);
+
+		// Directly return the employeeDetails list in the CandidateResponseDTO constructor
+		return new CandidateResponseDTO(groupedSubmissions, groupedInterviews, groupedPlacements,
+				groupedJobDetails, groupedClientDetails, employeeDetails);
+	}
+
+	// Helper method to add client names to the set (avoids duplicate code)
+	private <T> void addClientNamesToSet(List<T> list, Set<String> allClients) {
+		list.forEach(item -> {
+			String clientName = (item instanceof ClientDetailsDTO) ? ((ClientDetailsDTO) item).getClientName() :
+					(item instanceof SubmittedCandidateDTO) ? ((SubmittedCandidateDTO) item).getClientName() :
+							(item instanceof InterviewScheduledDTO) ? ((InterviewScheduledDTO) item).getClientName() :
+									(item instanceof PlacementDetailsDTO) ? ((PlacementDetailsDTO) item).getClientName() :
+											(item instanceof JobDetailsDTO) ? ((JobDetailsDTO) item).getClientName() : "";
+			allClients.add(normalizeClientName(clientName));
+		});
+	}
+
+	// Generic method to group a list by normalized client name
+	private <T> Map<String, List<T>> groupByClientName(List<T> list) {
+		return list.stream()
+				.collect(Collectors.groupingBy(item -> normalizeClientName(getClientName(item)),
+						LinkedHashMap::new, Collectors.toList()));
+	}
+
+	// Generic method to retrieve client name from various DTO types
+	private <T> String getClientName(T item) {
+		if (item instanceof ClientDetailsDTO) {
+			return ((ClientDetailsDTO) item).getClientName();
+		} else if (item instanceof SubmittedCandidateDTO) {
+			return ((SubmittedCandidateDTO) item).getClientName();
+		} else if (item instanceof InterviewScheduledDTO) {
+			return ((InterviewScheduledDTO) item).getClientName();
+		} else if (item instanceof PlacementDetailsDTO) {
+			return ((PlacementDetailsDTO) item).getClientName();
+		} else if (item instanceof JobDetailsDTO) {
+			return ((JobDetailsDTO) item).getClientName();
+		} else {
+			return "";
+		}
+	}
+
+	// Ensure all clients are present in the maps
+	private void ensureClientPresenceInMaps(Set<String> allClients, Map<String, List<SubmittedCandidateDTO>> groupedSubmissions,
+											Map<String, List<InterviewScheduledDTO>> groupedInterviews, Map<String, List<PlacementDetailsDTO>> groupedPlacements,
+											Map<String, List<JobDetailsDTO>> groupedJobDetails, Map<String, List<Tuple>> groupedEmployeeDetails,
+											Map<String, List<ClientDetailsDTO>> groupedClientDetails) {
 		allClients.forEach(client -> {
 			groupedSubmissions.putIfAbsent(client, new ArrayList<>());
 			groupedInterviews.putIfAbsent(client, new ArrayList<>());
 			groupedPlacements.putIfAbsent(client, new ArrayList<>());
 			groupedJobDetails.putIfAbsent(client, new ArrayList<>());
+			groupedEmployeeDetails.putIfAbsent(client, new ArrayList<>());
 
-			// Since ClientDetailsDTO is an interface, we create an anonymous implementation with null values
-			groupedClientDetails.putIfAbsent(client, new ClientDetailsDTO() {
-				@Override public String getClientName() { return client; }
-				@Override public String getClientId() { return null; }
-				@Override public String getClientAddress() { return null; }
-				@Override public String getOnBoardedBy() { return null; }
-				@Override public String getClientSpocName() { return null; }
-				@Override public String getClientSpocMobileNumber() { return null; }
-			});
+			// Ensure ClientDetailsDTO exists, even if empty
+			groupedClientDetails.putIfAbsent(client, Collections.singletonList(new ClientDetailsDTO() {
+				@Override
+				public String getClientName() {
+					return client;
+				}
+
+				@Override
+				public String getClientId() {
+					return null;
+				}
+
+				@Override
+				public String getClientAddress() {
+					return null;
+				}
+
+				@Override
+				public String getOnBoardedBy() {
+					return null;
+				}
+
+				@Override
+				public String getClientSpocName() {
+					return null;
+				}
+
+				@Override
+				public String getClientSpocMobileNumber() {
+					return null;
+				}
+			}));
+
+			// Ensure employee details exist, even if empty
+			groupedEmployeeDetails.putIfAbsent(client, new ArrayList<>());
 		});
-
-		return new CandidateResponseDTO(groupedSubmissions, groupedInterviews, groupedPlacements, groupedJobDetails, groupedClientDetails);
 	}
 
-	// Utility method to normalize client names (convert null to "Unknown" and Uppercase)
+	// Helper method to normalize the client name (simple toLowerCase as an example)
 	private String normalizeClientName(String clientName) {
-
-		return Optional.ofNullable(clientName).orElse("Unknown").trim().toUpperCase();
+		return clientName != null ? clientName.toLowerCase() : "";
 	}
 
+
+	// Method to map Tuple to EmployeeDetailsDTO
+	// Helper method to convert List<Tuple> to List<EmployeeDetailsDTO>
+	private List<EmployeeDetailsDTO> mapEmployeeDetailsTuples(List<Tuple> employeeDetailsTuples) {
+		List<EmployeeDetailsDTO> employeeDetails = new ArrayList<>();
+
+		for (Tuple tuple : employeeDetailsTuples) {
+			EmployeeDetailsDTO dto = new EmployeeDetailsDTO(
+					tuple.get("employeeId", String.class),
+					tuple.get("employeeName", String.class),
+					tuple.get("role", String.class),
+					tuple.get("employeeEmail", String.class),
+					tuple.get("designation", String.class),
+                    LocalDate.parse(tuple.get("joiningDate", String.class)), // Assuming it's a String, you can convert it to LocalDate if needed
+					tuple.get("gender", String.class),
+                    LocalDate.parse(tuple.get("dob", String.class)), // Assuming it's a String, you can convert it to LocalDate if needed
+					tuple.get("phoneNumber", String.class),
+					tuple.get("personalEmail", String.class),
+					tuple.get("status", String.class)
+			);
+			employeeDetails.add(dto);
+		}
+
+		return employeeDetails;
+	}
 }
