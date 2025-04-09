@@ -1,6 +1,7 @@
 package com.dataquadinc.controller;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -19,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -34,12 +36,14 @@ import org.springframework.web.bind.annotation.RestController;
 import com.dataquadinc.service.RequirementsService;
 import org.springframework.web.multipart.MultipartFile;
 
+
 @CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000",
 		"http://192.168.0.135:8080","http://192.168.0.135:80","http://182.18.177.16:443","https:mymulya.com:443","http://mymulya.com:443","http://localhost/"})
+
 @RestController
 @RequestMapping("/requirements")
 //@CrossOrigin("*")
-public class 	RequirementsController {
+public class RequirementsController {
 
 	@Autowired
 	private RequirementsService service;
@@ -263,6 +267,36 @@ public class 	RequirementsController {
 
 		return new ResponseEntity<>(requirements, HttpStatus.OK);
 	}
+
+	@GetMapping("/filterByDate")
+	public ResponseEntity<?> getRequirementsByDateRange(
+			@RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		List<RequirementsDto> requirements = service.getRequirementsByDateRange(startDate, endDate);
+
+		if (requirements == null || requirements.isEmpty()) {
+			logger.warn("⚠️ No requirements found between {} and {}", startDate, endDate);
+			return new ResponseEntity<>(new ErrorResponse(
+					HttpStatus.NOT_FOUND.value(),
+					"No requirements found between " + startDate + " and " + endDate,
+					LocalDateTime.now()), HttpStatus.NOT_FOUND);
+		}
+
+		for (RequirementsDto dto : requirements) {
+			Set<String> cleanedNames = dto.getRecruiterName().stream()
+					.map(name -> name.replaceAll("[\\[\\]\"]", ""))
+					.collect(Collectors.toSet());
+			dto.setRecruiterName(cleanedNames);
+		}
+
+		// ✅ This log will now appear last
+		ResponseEntity<?> response = new ResponseEntity<>(requirements, HttpStatus.OK);
+		logger.info("✅ Fetched {} requirements between {} and {}", requirements.size(), startDate, endDate);
+		return response;
+	}
+
+
 
 
 

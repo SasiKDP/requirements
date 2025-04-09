@@ -8,6 +8,7 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -302,17 +303,20 @@ public class RequirementsService {
 
 
 	public Object getRequirementsDetails() {
-		List<RequirementsDto> dtoList = requirementsDao.findAll().stream()
+		// Fetch all requirements from the database
+		List<RequirementsModel> requirementsList = requirementsDao.findAll();
+
+		// List to hold the DTOs
+		List<RequirementsDto> dtoList = requirementsList.stream()
 				.map(requirement -> {
-					// Directly map the model to DTO
 					RequirementsDto dto = new RequirementsDto();
 
-					// Manually set the properties of RequirementsDto from RequirementsModel
+					// Set the basic requirement data
 					dto.setJobId(requirement.getJobId());
 					dto.setJobTitle(requirement.getJobTitle());
 					dto.setClientName(requirement.getClientName());
 					dto.setJobDescription(requirement.getJobDescription());
-					dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());  // Ensure jobDescriptionBlob is mapped
+					dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());
 					dto.setJobType(requirement.getJobType());
 					dto.setLocation(requirement.getLocation());
 					dto.setJobMode(requirement.getJobMode());
@@ -328,6 +332,13 @@ public class RequirementsService {
 					dto.setRecruiterName(requirement.getRecruiterName());
 					dto.setAssignedBy(requirement.getAssignedBy());
 
+					// Get the jobId for the current requirement
+					String jobId = requirement.getJobId();  // Assuming jobId is a String
+
+					// Fetch individual stats using the DAO methods for the current jobId
+					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
+					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId)); // Pass clientName here
+
 					return dto;
 				})
 				.collect(Collectors.toList());
@@ -339,6 +350,66 @@ public class RequirementsService {
 			return dtoList;
 		}
 	}
+
+
+	public List<RequirementsDto> getRequirementsByDateRange(LocalDate startDate, LocalDate endDate) {
+		// 💥 First check: Date range should not exceed 31 days
+		if (ChronoUnit.DAYS.between(startDate, endDate) > 31) {
+			throw new DateRangeValidationException("Date range must not exceed one month.");
+		}
+
+		// 💥 Second check: End date must not be before start date
+		if (endDate.isBefore(startDate)) {
+			throw new DateRangeValidationException("End date cannot be before start date.");
+		}
+
+		// 💥 Third check: Start date must be within the last 1 month
+		LocalDate oneMonthAgo = LocalDate.now().minusMonths(1);
+		if (startDate.isBefore(oneMonthAgo)) {
+			throw new DateRangeValidationException("Start date must be within the last 1 month.");
+		}
+
+		List<RequirementsModel> requirements = requirementsDao.findByRequirementAddedTimeStampBetween(startDate, endDate);
+
+		if (requirements.isEmpty()) {
+			throw new RequirementNotFoundException("No requirements found between " + startDate + " and " + endDate);
+		}
+
+		// ✅ Add logger here since this block is guaranteed to have results
+		Logger logger = LoggerFactory.getLogger(RequirementsService.class);
+		logger.info("✅ Fetched {} requirements between {} and {}", requirements.size(), startDate, endDate);
+
+		return requirements.stream().map(requirement -> {
+			RequirementsDto dto = new RequirementsDto();
+			dto.setJobId(requirement.getJobId());
+			dto.setJobTitle(requirement.getJobTitle());
+			dto.setClientName(requirement.getClientName());
+			dto.setJobDescription(requirement.getJobDescription());
+			dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());
+			dto.setJobType(requirement.getJobType());
+			dto.setLocation(requirement.getLocation());
+			dto.setJobMode(requirement.getJobMode());
+			dto.setExperienceRequired(requirement.getExperienceRequired());
+			dto.setNoticePeriod(requirement.getNoticePeriod());
+			dto.setRelevantExperience(requirement.getRelevantExperience());
+			dto.setQualification(requirement.getQualification());
+			dto.setSalaryPackage(requirement.getSalaryPackage());
+			dto.setNoOfPositions(requirement.getNoOfPositions());
+			dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
+			dto.setRecruiterIds(requirement.getRecruiterIds());
+			dto.setStatus(requirement.getStatus());
+			dto.setRecruiterName(requirement.getRecruiterName());
+			dto.setAssignedBy(requirement.getAssignedBy());
+
+			// Stats
+			String jobId = requirement.getJobId();
+			dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
+			dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
+
+			return dto;
+		}).collect(Collectors.toList());
+	}
+
 
 
 	public RequirementsDto getRequirementDetailsById(String jobId) {

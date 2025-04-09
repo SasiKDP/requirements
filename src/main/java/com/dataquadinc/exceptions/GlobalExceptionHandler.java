@@ -1,6 +1,8 @@
 package com.dataquadinc.exceptions;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.dataquadinc.dto.ResponseBean;
 import org.springframework.http.HttpStatus;
@@ -50,5 +52,12 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ResponseBean> handleClientAlreadyExists(ClientAlreadyExistsException ex) {
 		return ResponseEntity.status(HttpStatus.CONFLICT)
 				.body(ResponseBean.errorResponse("Client already exists", ex.getMessage()));
+	}
+
+	@ExceptionHandler(DateRangeValidationException.class)
+	public ResponseEntity<Map<String, String>> handleDateRangeValidationException(DateRangeValidationException ex) {
+		Map<String, String> error = new HashMap<>();
+		error.put("error", ex.getMessage());
+		return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
 	}
 }
