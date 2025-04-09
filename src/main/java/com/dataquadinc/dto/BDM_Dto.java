@@ -1,8 +1,8 @@
-
 package com.dataquadinc.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -18,7 +18,11 @@ public class BDM_Dto {
     private int netPayment;
     private double gst;
     private List<String> supportingCustomers;
+    @Pattern(regexp = "^(https?:\\/\\/)?([\\w.-]+)+(:\\d+)?(\\/.*)?$",
+            message = "Invalid website URL format")
     private String clientWebsiteUrl;
+    @Pattern(regexp = "^(https?:\\/\\/)?([\\w.-]+)+(:\\d+)?(\\/.*)?$",
+            message = "Invalid LinkedIn URL format")
     private String clientLinkedInUrl;
     private List<String> clientSpocName;
     private List<String> clientSpocEmailid;

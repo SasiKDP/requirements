@@ -4,24 +4,30 @@ import java.util.List;
 import java.util.Map;
 
 public class CandidateResponseDTO {
+    // Updated to directly hold a List<EmployeeDetailsDTO> instead of Map
+    private List<EmployeeDetailsDTO> employeeDetails;
     private Map<String, List<SubmittedCandidateDTO>> submittedCandidates;
     private Map<String, List<InterviewScheduledDTO>> scheduledInterviews;
     private Map<String, List<PlacementDetailsDTO>> placements;
     private Map<String, List<JobDetailsDTO>> jobDetails;
-    private Map<String, ClientDetailsDTO> clientDetails; // New field for client details
+    private Map<String, List<ClientDetailsDTO>> clientDetails;
 
-    // Constructor
+    // Updated constructor to accept List<EmployeeDetailsDTO>
     public CandidateResponseDTO(Map<String, List<SubmittedCandidateDTO>> submittedCandidates,
                                 Map<String, List<InterviewScheduledDTO>> scheduledInterviews,
                                 Map<String, List<PlacementDetailsDTO>> placements,
                                 Map<String, List<JobDetailsDTO>> jobDetails,
-                                Map<String, ClientDetailsDTO> clientDetails) {
+                                Map<String, List<ClientDetailsDTO>> clientDetails,
+                                List<EmployeeDetailsDTO> employeeDetails) {  // Changed to List<EmployeeDetailsDTO>
         this.submittedCandidates = submittedCandidates;
         this.scheduledInterviews = scheduledInterviews;
         this.placements = placements;
         this.jobDetails = jobDetails;
         this.clientDetails = clientDetails;
+        this.employeeDetails = employeeDetails; // Now directly accepting a list of EmployeeDetailsDTO
     }
+
+    // Getters and Setters
 
     public Map<String, List<SubmittedCandidateDTO>> getSubmittedCandidates() {
         return submittedCandidates;
@@ -55,12 +61,19 @@ public class CandidateResponseDTO {
         this.jobDetails = jobDetails;
     }
 
-    public Map<String, ClientDetailsDTO> getClientDetails() {
+    public Map<String, List<ClientDetailsDTO>> getClientDetails() {
         return clientDetails;
     }
 
-    public void setClientDetails(Map<String, ClientDetailsDTO> clientDetails) {
+    public void setClientDetails(Map<String, List<ClientDetailsDTO>> clientDetails) {
         this.clientDetails = clientDetails;
     }
-// Getters & Setters
+
+    public List<EmployeeDetailsDTO> getEmployeeDetails() {
+        return employeeDetails;
+    }
+
+    public void setEmployeeDetails(List<EmployeeDetailsDTO> employeeDetails) {
+        this.employeeDetails = employeeDetails;
+    }
 }

@@ -1,4 +1,3 @@
-
 package com.dataquadinc.controller;
 
 import java.io.IOException;
@@ -35,11 +34,12 @@ import org.springframework.web.bind.annotation.RestController;
 import com.dataquadinc.service.RequirementsService;
 import org.springframework.web.multipart.MultipartFile;
 
-@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000", "http://192.168.0.135:3000"})
+@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000",
+		"http://192.168.0.135:80/","http://192.168.0.135/","http://182.18.177.16:443","http://mymulya.com:443","http://localhost/","http://182.18.177.16/"})
 @RestController
 @RequestMapping("/requirements")
 //@CrossOrigin("*")
-public class RequirementsController {
+public class 	RequirementsController {
 
 	@Autowired
 	private RequirementsService service;
@@ -246,14 +246,14 @@ public class RequirementsController {
 
 	@GetMapping("/getAssignments")
 	public ResponseEntity<?> getRequirements() {
-		List<AssignedRequirementsDto> requirements = (List<AssignedRequirementsDto>) service.getRequirementsDetails();
+		List<RequirementsDto> requirements = (List<RequirementsDto>) service.getRequirementsDetails();
 
 		if (requirements == null || requirements.isEmpty()) {
 			return new ResponseEntity<>(new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now()), HttpStatus.NOT_FOUND);
 		}
 
 		// Clean up recruiterName field
-		for (AssignedRequirementsDto dto : requirements) {
+		for (RequirementsDto dto : requirements) {
 			Set<String> cleanedNames = dto.getRecruiterName().stream()
 					.map(name -> name.replaceAll("[\\[\\]\"]", "")) // Remove brackets and extra quotes
 					.collect(Collectors.toSet());
@@ -512,20 +512,17 @@ public class RequirementsController {
 			return ResponseEntity.notFound().build();
 		}
 	}
-//	@GetMapping("/full-details/{jobId}")
-//	public ExtendedRequirementsDto getFullRequirementDetails(@PathVariable String jobId) {
-//		return service.getFullRequirementDetails(jobId);
-//	}
-@GetMapping("/stats")
-public ResponseEntity<List<EmployeeCandidateDTO>> getEmployeeStats() {
-	List<EmployeeCandidateDTO> stats = service.getEmployeeStats();
-	return ResponseEntity.ok(stats);
-}
+	@GetMapping("/stats")
+	public ResponseEntity<List<EmployeeCandidateDTO>> getEmployeeStats() {
+		List<EmployeeCandidateDTO> stats = service.getEmployeeStats();
+		return ResponseEntity.ok(stats);
+	}
 
 	// Fetch both Submitted Candidates and Scheduled Interviews in one API call
 	@GetMapping("/list/{userId}")
 	public CandidateResponseDTO getCandidateData(@PathVariable String userId) {
 		return service.getCandidateData(userId);
 	}
+
 
 }
