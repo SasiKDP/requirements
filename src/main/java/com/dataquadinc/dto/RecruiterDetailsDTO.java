@@ -1,6 +1,7 @@
 package com.dataquadinc.dto;
 
 import lombok.Data;
+
 import java.util.List;
 import java.util.Map;
 
@@ -38,15 +39,5 @@ public class RecruiterDetailsDTO {
 
     public void setInterview_Scheduled_Candidates(Map<String, List<InterviewCandidateDto>> interview_Scheduled_Candidates) {
         this.interview_Scheduled_Candidates = interview_Scheduled_Candidates;
-    }
-
-    // Method to get submitted candidates for a specific recruiter
-    public List<CandidateDto> getSubmittedCandidates(String recruiterName) {
-        return submitted_Candidates.get(recruiterName);
-    }
-
-    // Method to get interview scheduled candidates for a specific recruiter
-    public List<InterviewCandidateDto> getInterviewScheduledCandidates(String recruiterName) {
-        return interview_Scheduled_Candidates.get(recruiterName);
     }
 }

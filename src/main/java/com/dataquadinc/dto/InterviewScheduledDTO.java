@@ -1,5 +1,7 @@
 package com.dataquadinc.dto;
 
+import java.time.LocalDateTime;
+
 public interface InterviewScheduledDTO {
     String getCandidateId();
     String getFullName();
@@ -9,6 +11,8 @@ public interface InterviewScheduledDTO {
     String getSkills();
     String getInterviewStatus();
     String getInterviewLevel();
-    String getInterviewDateTime();
-    String getClientName();
+    LocalDateTime getInterviewDateTime();
+    String getJobId();
+    String getJobTitle();
+    String getClientName(); // Add this field
 }

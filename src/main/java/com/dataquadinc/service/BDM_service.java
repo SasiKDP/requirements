@@ -232,9 +232,34 @@ public class BDM_service {
             placements.put(client.getClientName(), getPlacements(client.getClientName()));
         }
 
+        // 6️⃣ Fetch Requirements for each client (This section is now after client details)
+        Map<String, List<RequirementDto>> requirements = new HashMap<>();
+        for (BdmClientDto client : clientDetails) {
+            requirements.put(client.getClientName(), getRequirements(client.getClientName()));
+        }
+
         // Return DTO with all details
-        return new BdmClientDetailsDTO(bdmDetails, clientDetails, submissions, interviews, placements);
+        return new BdmClientDetailsDTO(bdmDetails, clientDetails, submissions, interviews, placements, requirements);
     }
+
+    private List<RequirementDto> getRequirements(String clientName) {
+        // Fetch the requirement data for the given client from the database
+        List<Tuple> requirementTuples = requirementsDao.findRequirementsByClientName(clientName);
+
+        // Convert the Tuple data into RequirementDto objects
+        return requirementTuples.stream()
+                .map(tuple -> new RequirementDto(
+                        tuple.get("recruiter_name", String.class), // Ensure alias matches the query result
+                        tuple.get("client_name", String.class),
+                        tuple.get("job_id", String.class),
+                        tuple.get("job_title", String.class),
+                        tuple.get("assigned_by", String.class),
+                        tuple.get("location", String.class),
+                        tuple.get("notice_period", String.class)
+                ))
+                .collect(Collectors.toList());
+    }
+
 
     private List<BdmDetailsDto> getBdmDetails(String userId) {
         List<Tuple> bdmTuples = requirementsDao.findBdmEmployeeByUserId(userId);

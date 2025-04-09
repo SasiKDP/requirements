@@ -6,24 +6,16 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static org.aspectj.weaver.NameMangler.PREFIX;
 
 @Entity
 @Data
 
 @Table(name = "requirements_model")
 public class RequirementsModel {
-
 
     @Id
     private String jobId;
