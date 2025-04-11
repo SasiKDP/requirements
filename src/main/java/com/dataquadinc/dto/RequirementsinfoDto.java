@@ -1,9 +1,5 @@
 package com.dataquadinc.dto;
 
-import java.time.LocalDateTime;
-import java.util.Random;
-import java.util.Set;
-
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.validation.constraints.NotNull;
@@ -12,6 +8,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDateTime;
+import java.util.Random;
+import java.util.Set;
 
 @Data
 @NoArgsConstructor
@@ -67,15 +67,15 @@ public class RequirementsinfoDto {
 
         @PrePersist
         public void prePersist() {
-            if (this.jobId == null || this.jobId.isEmpty()) {
-                generateJobId();
-            }
+                if (this.jobId == null || this.jobId.isEmpty()) {
+                        generateJobId();
+                }
         }
 
         private void generateJobId() {
-            Random random = new Random();
-            int randomNumber = 1000 + random.nextInt(9000);
-            this.jobId = "JOB" + randomNumber;
+                Random random = new Random();
+                int randomNumber = 1000 + random.nextInt(9000);
+                this.jobId = "JOB" + randomNumber;
         }
 }
 

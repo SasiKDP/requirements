@@ -2,7 +2,10 @@ package com.dataquadinc.service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -84,15 +87,25 @@ public class RequirementsService {
 			model.setJobDescriptionBlob(null);  // Ensure the file-based description is null
 		}
 
-		// If a file for the job description is uploaded, save it as BLOB and set the text-based description to null
+		// If a file for the job description is uploaded, process the file using processJobDescriptionFile
 		if (requirementsDto.getJobDescriptionFile() != null && !requirementsDto.getJobDescriptionFile().isEmpty()) {
-			byte[] jobDescriptionBytes = saveJobDescriptionFileAsBlob(requirementsDto.getJobDescriptionFile(),
-					requirementsDto.getJobId());
-			model.setJobDescriptionBlob(jobDescriptionBytes);  // Set the BLOB field
-			model.setJobDescription(null);  // Ensure the text-based description is null
+			// Use processJobDescriptionFile to extract text or convert image to Base64
+			String processedJobDescription = processJobDescriptionFile(requirementsDto.getJobDescriptionFile());
+
+			// If it's text-based, set it as the job description
+			model.setJobDescription(processedJobDescription);
+
+			// If it's a Base64 image, store it as a BLOB (in case you need to handle images differently)
+			if (processedJobDescription.startsWith("data:image")) { // This means it is an image in Base64 format
+				byte[] jobDescriptionBytes = Base64.getDecoder().decode(processedJobDescription.split(",")[1]);
+				model.setJobDescriptionBlob(jobDescriptionBytes);
+			} else {
+				model.setJobDescriptionBlob(null);  // Ensure BLOB is null if text is extracted
+			}
 		}
 
 
+		// If jobId is not set, let @PrePersist handle the generation
 		// If jobId is not set, let @PrePersist handle the generation
 		if (model.getJobId() == null || model.getJobId().isEmpty()) {
 			model.setStatus("In Progress");
@@ -118,11 +131,11 @@ public class RequirementsService {
 		// Remove all quotes, brackets, and whitespace
 		return recruiterId.replaceAll("[\"\\[\\]\\s]", "");
 	}
+
 	public String getRecruiterEmail(String recruiterId) {
 		Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(recruiterId);
 		return userTuple != null ? userTuple.get(0, String.class) : null;
 	}
-
 
 
 	private byte[] saveJobDescriptionFileAsBlob(MultipartFile jobDescriptionFile, String jobId) throws IOException {
@@ -146,7 +159,6 @@ public class RequirementsService {
 
 		return jobDescriptionBytes;  // Return the byte array if needed
 	}
-
 
 
 	// Update the sendEmailsToRecruiters method to handle comma-separated string
@@ -212,21 +224,23 @@ public class RequirementsService {
 			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage(), e);
 		}
 	}
+
 	// Update constructEmailBody method to use recruiterName instead of fetching separately
 	private String constructEmailBody(RequirementsModel model, String recruiterName) {
 		return "Dear " + recruiterName + ",\n\n" +
-				"I hope this message finds you well. \n\n" +
-				"You have been assigned a new job requirement, and the details are outlined below:  \n\n" +
-				"**Job Title:** " + model.getJobTitle() + "\n" +
-				"**Client:** " + model.getClientName() + "\n" +
-				"**Location:** " + model.getLocation() + "\n" +
-				"**Job Type:** " + model.getJobType() + "\n" +
-				"**Experience Required:** " + model.getExperienceRequired() + " years\n\n" +
-				"Please take a moment to review the details and proceed with the necessary actions. Additional information can be accessed via your dashboard.\n\n" +
-				"If you have any questions or require further clarification, feel free to reach out.\n\n" +
-				"Best Regards,\nDataquad";
+				"I hope you are doing well.\n\n" +
+				"You have been assigned a new job requirement. Please find the details below:\n\n" +
+				"▶ Job Title: " + model.getJobTitle() + "\n" +
+				"▶ Client: " + model.getClientName() + "\n" +
+				"▶ Location: " + model.getLocation() + "\n" +
+				"▶ Job Type: " + model.getJobType() + "\n" +
+				"▶ Experience Required: " + model.getExperienceRequired() + " years\n" +
+				"▶ Assigned By: " + model.getAssignedBy() + "\n\n" +
+				"Please review the details and proceed with the necessary actions. Additional information is available on your dashboard.\n\n" +
+				"If you have any questions or need further clarification, feel free to reach out.\n\n" +
+				"Best regards,\n" +
+				"Dataquad";
 	}
-
 
 
 	public String processJobDescriptionFile(MultipartFile jobDescriptionFile) throws IOException {
@@ -287,7 +301,6 @@ public class RequirementsService {
 	}
 
 
-
 	public Object getRequirementsDetails() {
 		List<RequirementsDto> dtoList = requirementsDao.findAll().stream()
 				.map(requirement -> {
@@ -313,6 +326,7 @@ public class RequirementsService {
 					dto.setRecruiterIds(requirement.getRecruiterIds());
 					dto.setStatus(requirement.getStatus());
 					dto.setRecruiterName(requirement.getRecruiterName());
+					dto.setAssignedBy(requirement.getAssignedBy());
 
 					return dto;
 				})
@@ -325,7 +339,6 @@ public class RequirementsService {
 			return dtoList;
 		}
 	}
-
 
 
 	public RequirementsDto getRequirementDetailsById(String jobId) {
@@ -369,9 +382,6 @@ public class RequirementsService {
 	}
 
 
-
-
-
 	@Transactional
 	public void statusUpdate(StatusDto status) {
 		RequirementsModel requirement = requirementsDao.findById(status.getJobId()).orElseThrow(
@@ -383,14 +393,20 @@ public class RequirementsService {
 
 	public List<RecruiterRequirementsDto> getJobsAssignedToRecruiter(String recruiterId) {
 		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterId(recruiterId);
+
 		if (jobsByRecruiterId.isEmpty()) {
 			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter : " + recruiterId);
-		} else {
-			return jobsByRecruiterId.stream()
-					.map(recruiter -> modelMapper.map(recruiter, RecruiterRequirementsDto.class))
-					.collect(Collectors.toList());
 		}
+
+		return jobsByRecruiterId.stream()
+				.map(job -> {
+					RecruiterRequirementsDto dto = modelMapper.map(job, RecruiterRequirementsDto.class);
+					dto.setAssignedBy(job.getAssignedBy()); // Ensure assignedBy is mapped
+					return dto;
+				})
+				.collect(Collectors.toList());
 	}
+
 
 	@Transactional
 	public ResponseBean updateRequirementDetails(RequirementsDto requirementsDto) {
@@ -404,7 +420,8 @@ public class RequirementsService {
 
 			// Update the existing requirement with the new details from the DTO
 			if (requirementsDto.getJobTitle() != null) existingRequirement.setJobTitle(requirementsDto.getJobTitle());
-			if (requirementsDto.getClientName() != null) existingRequirement.setClientName(requirementsDto.getClientName());
+			if (requirementsDto.getClientName() != null)
+				existingRequirement.setClientName(requirementsDto.getClientName());
 
 			// Handle job description: either text or file
 			if (requirementsDto.getJobDescription() != null && !requirementsDto.getJobDescription().isEmpty()) {
@@ -437,6 +454,9 @@ public class RequirementsService {
 			existingRequirement.setNoOfPositions(requirementsDto.getNoOfPositions());
 			existingRequirement.setRecruiterIds(requirementsDto.getRecruiterIds());
 			existingRequirement.setRecruiterName(requirementsDto.getRecruiterName());
+			existingRequirement.setAssignedBy(requirementsDto.getAssignedBy());
+			if (requirementsDto.getStatus() != null) existingRequirement.setStatus(requirementsDto.getStatus());
+
 
 			// Save the updated requirement to the database
 			requirementsDao.save(existingRequirement);
@@ -473,18 +493,57 @@ public class RequirementsService {
 		String cleanedRecruiterId = recruiterId.trim().replace("\"", "");
 
 		try {
+			logger.info("Fetching recruiter for ID: {}", cleanedRecruiterId);
+
 			Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
 
 			if (userTuple != null) {
-				return userTuple.get(1, String.class); // Fetching username from tuple
+				logger.info("Tuple found: {}", userTuple);
+				return userTuple.get("user_name", String.class);
 			} else {
-				System.out.println("No recruiter found with ID: " + recruiterId);
-				return null; // Or throw an exception if necessary
+				logger.warn("No recruiter found with ID: {}", cleanedRecruiterId);
+				return null;
 			}
 		} catch (Exception e) {
-			System.out.println("Error fetching recruiter username: " + e.getMessage());
-			throw new RuntimeException("Error fetching recruiter username: " + e.getMessage());
+			logger.error("Error fetching recruiter username", e);
+			throw new RuntimeException("Error fetching recruiter username", e);
 		}
+	}
+
+	public List<RecruiterInfoDto> getRecruitersForJob(String jobId) {
+		// Get the requirement with the given job ID
+		RequirementsModel requirement = requirementsDao.findById(jobId)
+				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id: " + jobId));
+
+		// Log raw recruiter IDs
+		System.out.println("Raw Recruiter IDs: " + requirement.getRecruiterIds());
+
+		// Extract recruiter IDs properly
+		Set<String> recruiterIds = requirement.getRecruiterIds().stream()
+				.map(String::trim)  // Trim any spaces
+				.filter(id -> !id.isEmpty())  // Remove empty strings
+				.collect(Collectors.toSet());
+
+		// Log cleaned recruiter IDs
+		System.out.println("Cleaned Recruiter IDs: " + recruiterIds);
+
+		// Fetch recruiter details for each recruiter ID
+		List<RecruiterInfoDto> recruiters = new ArrayList<>();
+		for (String recruiterId : recruiterIds) {
+			Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(recruiterId);
+
+			// Log recruiter fetching status
+			System.out.println("Recruiter ID: " + recruiterId + ", Found in DB: " + (userTuple != null));
+
+			if (userTuple != null) {
+				String recruiterName = userTuple.get(1, String.class);  // Assuming username is at index 1
+				recruiters.add(new RecruiterInfoDto(recruiterId, recruiterName));
+			} else {
+				System.err.println("Recruiter not found in DB for ID: " + recruiterId);
+			}
+		}
+
+		return recruiters;
 	}
 
 	public RecruiterDetailsDTO getRecruiterDetailsByJobId(String jobId) {
@@ -495,145 +554,272 @@ public class RequirementsService {
 			throw new RequirementNotFoundException("Requirement Not Found with Id: " + jobId);
 		}
 
-		RequirementsModel req = requirement.get();
-
-		// Assuming recruiterIds and recruiterNames are stored in the model as List<String>
-		List<String> recruiterIds = new ArrayList<>(req.getRecruiterIds());
-		List<String> recruiterNames = new ArrayList<>(req.getRecruiterName());
-
-		if (recruiterIds.size() != recruiterNames.size()) {
-			throw new IllegalStateException("Mismatch between recruiter IDs and recruiter names.");
-		}
-
-		// Clean the recruiter names by trimming unwanted characters (if any)
-		for (int i = 0; i < recruiterNames.size(); i++) {
-			recruiterNames.set(i, recruiterNames.get(i).replaceAll("[\"\\[\\]]", "").trim());
-		}
-
-		// Ensure the correct mapping for recruiter IDs and names
-		Map<String, String> recruiterMap = new HashMap<>();
-		for (int i = 0; i < recruiterIds.size(); i++) {
-			recruiterMap.put(recruiterIds.get(i), recruiterNames.get(i));
-		}
-
-		// Create a list of recruiters
-		List<RecruiterInfoDto> recruiters = new ArrayList<>();
-		for (String recruiterId : recruiterIds) {
-			recruiters.add(new RecruiterInfoDto(recruiterId, recruiterMap.get(recruiterId)));
-		}
+		// Get recruiters using the new query method
+		List<RecruiterInfoDto> recruiters = getRecruitersForJob(jobId);
 
 		// Initialize maps for submitted and interview scheduled candidates
-		Map<String, List<CandidateDto>> submittedCandidates = new HashMap<>();
-		Map<String, List<InterviewCandidateDto>> interviewScheduledCandidates = new HashMap<>();
-
-		// Loop over recruiters and fetch their candidates
-		for (RecruiterInfoDto recruiter : recruiters) {
-			String recruiterId = recruiter.getRecruiterId();
-
-			// Fetch the list of assigned candidates for this recruiter
-			List<Tuple> assignedCandidatesList = requirementsDao.findCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
-			List<CandidateDto> assignedCandidateDtos = mapCandidates(assignedCandidatesList);
-			submittedCandidates.put(recruiterId, assignedCandidateDtos);
-
-			// Fetch interview-scheduled candidates for this recruiter
-			List<Tuple> interviewCandidatesList = requirementsDao.findInterviewScheduledCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
-			List<InterviewCandidateDto> interviewCandidateDtos = mapInterviewCandidates(interviewCandidatesList);
-			interviewScheduledCandidates.put(recruiterId, interviewCandidateDtos);
-		}
-
-		// Return DTO with the recruiter details and candidate groups
-		return new RecruiterDetailsDTO(recruiters, submittedCandidates, interviewScheduledCandidates);
-	}
-
-
-	private List<CandidateDto> mapCandidates(List<Tuple> candidatesList) {
-		return candidatesList.stream().map(candidate -> new CandidateDto(
-				candidate.get("candidate_id", String.class), // Candidate ID
-				candidate.get("full_name", String.class), // Candidate Name (Previously mapped wrongly)
-				candidate.get("candidate_email_id", String.class), // Candidate Email
-				candidate.get("interview_status", String.class) // Interview Status
-		)).collect(Collectors.toList());
-	}
-
-	private List<InterviewCandidateDto> mapInterviewCandidates(List<Tuple> interviewCandidatesList) {
-		return interviewCandidatesList.stream().map(candidate -> {
-			Timestamp interviewTimestamp = candidate.get("interview_date_time", Timestamp.class); // ✅ Fetch as Timestamp
-			String interviewDateTime = interviewTimestamp != null
-					? interviewTimestamp.toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) // ✅ Convert to String
-					: null; // Handle null case
-
-			return new InterviewCandidateDto(
-					candidate.get("candidate_id", String.class),
-					candidate.get("full_name", String.class),
-					candidate.get("candidate_email_id", String.class),
-					candidate.get("interview_status", String.class),
-					candidate.get("interview_level", String.class),
-					interviewDateTime // ✅ Use formatted date-time string
-			);
-		}).collect(Collectors.toList());
-	}
-	private List<RecruiterInfoDto> getRecruitersByRequirement(RequirementsModel requirement) {
-		List<String> recruiterIds = new ArrayList<>(requirement.getRecruiterIds());
-		List<String> recruiterNames = new ArrayList<>(requirement.getRecruiterName());
-
-		if (recruiterIds.size() != recruiterNames.size()) {
-			throw new IllegalStateException("Mismatch between recruiter IDs and recruiter names.");
-		}
-
-		// ✅ Enhanced Cleanup Logic
-		recruiterNames = recruiterNames.stream()
-				.map(name -> name.replaceAll("[\\[\\]\"]", "").trim())  // Remove brackets & quotes
-				.map(name -> name.replaceAll("\\s*,\\s*", ","))         // Trim spaces around commas
-				.collect(Collectors.toList());
-
-		// ✅ Create RecruiterInfoDto list
-		List<RecruiterInfoDto> recruiters = new ArrayList<>();
-		for (int i = 0; i < recruiterIds.size(); i++) {
-			recruiters.add(new RecruiterInfoDto(recruiterIds.get(i), recruiterNames.get(i)));
-		}
-
-		return recruiters;
-	}
-
-	public ExtendedRequirementsDto getFullRequirementDetails(String jobId) {
-		// Fetch the requirement details from the database
-		RequirementsModel requirement = requirementsDao.findById(jobId)
-				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id: " + jobId));
-
-		// ✅ Clean recruiter names before processing and convert to Set
-		Set<String> recruiterNames = requirement.getRecruiterName().stream()
-				.map(name -> name.replaceAll("[\\[\\]\"]", "").trim())  // Remove unwanted characters
-				.collect(Collectors.toSet());  // Convert to Set
-
-		requirement.setRecruiterName(recruiterNames); // Update the cleaned names in requirement
-
-		// Extract recruiter details
-		List<RecruiterInfoDto> recruiters = getRecruitersByRequirement(requirement);
-
-		// Initialize maps for candidates
 		Map<String, List<CandidateDto>> submittedCandidates = new HashMap<>();
 		Map<String, List<InterviewCandidateDto>> interviewScheduledCandidates = new HashMap<>();
 
 		// Fetch candidates for each recruiter
 		for (RecruiterInfoDto recruiter : recruiters) {
 			String recruiterId = recruiter.getRecruiterId();
+			String recruiterName = recruiter.getRecruiterName();
 
 			// Fetch submitted candidates
 			List<Tuple> assignedCandidatesList = requirementsDao.findCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
-			List<CandidateDto> assignedCandidateDtos = mapCandidates(assignedCandidatesList);
-			submittedCandidates.put(recruiterId, assignedCandidateDtos);
+			List<CandidateDto> assignedCandidateDtos = mapCandidates(assignedCandidatesList, recruiterName);
+			submittedCandidates.put(recruiterName, assignedCandidateDtos);
 
-			// Fetch interview-scheduled candidates
+			// Fetch interview scheduled candidates
 			List<Tuple> interviewCandidatesList = requirementsDao.findInterviewScheduledCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
-			List<InterviewCandidateDto> interviewCandidateDtos = mapInterviewCandidates(interviewCandidatesList);
-			interviewScheduledCandidates.put(recruiterId, interviewCandidateDtos);
+			List<InterviewCandidateDto> interviewCandidateDtos = mapInterviewCandidates(interviewCandidatesList, recruiterName);
+			interviewScheduledCandidates.put(recruiterName, interviewCandidateDtos);
 		}
 
-		// ✅ Clean recruiter names before converting to DTO
-		ModelMapper modelMapper = new ModelMapper();
-		RequirementsinfoDto requirementDto = modelMapper.map(requirement, RequirementsinfoDto.class);
-
-		return new ExtendedRequirementsDto(requirementDto, submittedCandidates, interviewScheduledCandidates);
+		// Return DTO with recruiter details and candidate groups
+		return new RecruiterDetailsDTO(recruiters, submittedCandidates, interviewScheduledCandidates);
 	}
 
+	/**
+	 * Maps Tuple data to CandidateDto objects, including recruiter name.
+	 */
+	private List<CandidateDto> mapCandidates(List<Tuple> candidatesList, String recruiterName) {
+		return candidatesList.stream()
+				.map(candidate -> {
+					try {
+						return new CandidateDto(
+								getTupleValue(candidate, "candidate_id"),
+								getTupleValue(candidate, "full_name"),
+								getTupleValue(candidate, "candidate_email_id"),
+								getTupleValue(candidate, "interview_status"),
+								getTupleValue(candidate, "contact_number"),
+								getTupleValue(candidate, "qualification"),
+								getTupleValue(candidate, "skills"),
+								getTupleValue(candidate, "overall_feedback")// Include recruiter name
+						);
+					} catch (Exception e) {
+						System.err.println("Error mapping candidate: " + candidate + " | Exception: " + e.getMessage());
+						return null;
+					}
+				})
+				.filter(Objects::nonNull) // Remove any null entries
+				.collect(Collectors.toList());
+	}
+
+	/**
+	 * Maps Tuple data to InterviewCandidateDto objects, including recruiter name.
+	 */
+	private List<InterviewCandidateDto> mapInterviewCandidates(List<Tuple> candidatesList, String recruiterName) {
+		return candidatesList.stream()
+				.map(candidate -> {
+					try {
+						Timestamp interviewTimestamp = candidate.get("interview_date_time", Timestamp.class);
+						String interviewDateTime = interviewTimestamp != null
+								? interviewTimestamp.toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+								: null;
+
+						return new InterviewCandidateDto(
+								getTupleValue(candidate, "candidate_id"),
+								getTupleValue(candidate, "full_name"),
+								getTupleValue(candidate, "candidate_email_id"),
+								getTupleValue(candidate, "interview_status"),
+								getTupleValue(candidate, "interview_level"),
+								interviewDateTime// ✅ Use formatted date-time string//
+						);
+					} catch (Exception e) {
+						System.err.println("Error mapping interview candidate: " + candidate + " | Exception: " + e.getMessage());
+						return null;
+					}
+				})
+				.filter(Objects::nonNull)
+				.collect(Collectors.toList());
+	}
+
+	/**
+	 * Safely retrieves values from Tuple, handling null cases.
+	 */
+	private String getTupleValue(Tuple tuple, String columnName) {
+		try {
+			return tuple.get(columnName, String.class);
+		} catch (Exception e) {
+			System.err.println("Error fetching column: " + columnName + " | Exception: " + e.getMessage());
+			return null;
+		}
+	}
+
+	public List<EmployeeCandidateDTO> getEmployeeStats() {
+		List<Tuple> results = requirementsDao.getEmployeeCandidateStats();
+
+		// Proceed with the rest of the mapping
+		return results.stream().map(tuple -> new EmployeeCandidateDTO(
+				tuple.get("employeeId", String.class),
+				tuple.get("employeeName", String.class),
+				tuple.get("employeeEmail", String.class),
+				tuple.get("role", String.class),
+				convertToInt(tuple.get("numberOfClients")), // Ensure correct conversion
+				convertToInt(tuple.get("numberOfRequirements")),
+				convertToInt(tuple.get("numberOfSubmissions")),
+				convertToInt(tuple.get("numberOfInterviews")),
+				convertToInt(tuple.get("numberOfPlacements"))
+
+		)).collect(Collectors.toList());
+	}
+
+	private int convertToInt(Object value) {
+		if (value instanceof BigInteger) {
+			return ((BigInteger) value).intValue(); // MySQL COUNT() returns BigInteger
+		} else if (value instanceof BigDecimal) {
+			return ((BigDecimal) value).intValue(); // Handles numeric decimal cases
+		} else if (value instanceof Number) {
+			return ((Number) value).intValue(); // Fallback for any numeric types
+		} else {
+			return 0; // Default to 0 if null or unknown type
+		}
+	}
+
+
+	// Fetch both Submitted Candidates, Scheduled Interviews, and Employee Details in one call
+	public CandidateResponseDTO getCandidateData(String userId) {
+		// Fetching the various required details
+		List<SubmittedCandidateDTO> submittedCandidates = requirementsDao.findSubmittedCandidatesByUserId(userId);
+		List<InterviewScheduledDTO> scheduledInterviews = requirementsDao.findScheduledInterviewsByUserId(userId);
+		List<JobDetailsDTO> jobDetails = requirementsDao.findJobDetailsByUserId(userId);
+		List<PlacementDetailsDTO> placementDetails = requirementsDao.findPlacementCandidatesByUserId(userId);
+		List<ClientDetailsDTO> clientDetails = requirementsDao.findClientDetailsByUserId(userId); // Fetch client details
+		List<Tuple> employeeDetailsTuples = requirementsDao.getEmployeeDetailsByUserId(userId); // Fetch employee details
+
+		// Group data dynamically (no need to group employee details by client name)
+		Map<String, List<SubmittedCandidateDTO>> groupedSubmissions = groupByClientName(submittedCandidates);
+		Map<String, List<InterviewScheduledDTO>> groupedInterviews = groupByClientName(scheduledInterviews);
+		Map<String, List<PlacementDetailsDTO>> groupedPlacements = groupByClientName(placementDetails);
+		Map<String, List<JobDetailsDTO>> groupedJobDetails = groupByClientName(jobDetails);
+
+		// Convert List<ClientDetailsDTO> to a Map
+		Map<String, List<ClientDetailsDTO>> groupedClientDetails = groupByClientName(clientDetails);
+
+		// Convert List<Tuple> to List<EmployeeDetailsDTO>
+		List<EmployeeDetailsDTO> employeeDetails = mapEmployeeDetailsTuples(employeeDetailsTuples);
+
+		// Directly return the employeeDetails list in the CandidateResponseDTO constructor
+		return new CandidateResponseDTO(groupedSubmissions, groupedInterviews, groupedPlacements,
+				groupedJobDetails, groupedClientDetails, employeeDetails);
+	}
+
+	// Helper method to add client names to the set (avoids duplicate code)
+	private <T> void addClientNamesToSet(List<T> list, Set<String> allClients) {
+		list.forEach(item -> {
+			String clientName = (item instanceof ClientDetailsDTO) ? ((ClientDetailsDTO) item).getClientName() :
+					(item instanceof SubmittedCandidateDTO) ? ((SubmittedCandidateDTO) item).getClientName() :
+							(item instanceof InterviewScheduledDTO) ? ((InterviewScheduledDTO) item).getClientName() :
+									(item instanceof PlacementDetailsDTO) ? ((PlacementDetailsDTO) item).getClientName() :
+											(item instanceof JobDetailsDTO) ? ((JobDetailsDTO) item).getClientName() : "";
+			allClients.add(normalizeClientName(clientName));
+		});
+	}
+
+	// Generic method to group a list by normalized client name
+	private <T> Map<String, List<T>> groupByClientName(List<T> list) {
+		return list.stream()
+				.collect(Collectors.groupingBy(item -> normalizeClientName(getClientName(item)),
+						LinkedHashMap::new, Collectors.toList()));
+	}
+
+	// Generic method to retrieve client name from various DTO types
+	private <T> String getClientName(T item) {
+		if (item instanceof ClientDetailsDTO) {
+			return ((ClientDetailsDTO) item).getClientName();
+		} else if (item instanceof SubmittedCandidateDTO) {
+			return ((SubmittedCandidateDTO) item).getClientName();
+		} else if (item instanceof InterviewScheduledDTO) {
+			return ((InterviewScheduledDTO) item).getClientName();
+		} else if (item instanceof PlacementDetailsDTO) {
+			return ((PlacementDetailsDTO) item).getClientName();
+		} else if (item instanceof JobDetailsDTO) {
+			return ((JobDetailsDTO) item).getClientName();
+		} else {
+			return "";
+		}
+	}
+
+	// Ensure all clients are present in the maps
+	private void ensureClientPresenceInMaps(Set<String> allClients, Map<String, List<SubmittedCandidateDTO>> groupedSubmissions,
+											Map<String, List<InterviewScheduledDTO>> groupedInterviews, Map<String, List<PlacementDetailsDTO>> groupedPlacements,
+											Map<String, List<JobDetailsDTO>> groupedJobDetails, Map<String, List<Tuple>> groupedEmployeeDetails,
+											Map<String, List<ClientDetailsDTO>> groupedClientDetails) {
+		allClients.forEach(client -> {
+			groupedSubmissions.putIfAbsent(client, new ArrayList<>());
+			groupedInterviews.putIfAbsent(client, new ArrayList<>());
+			groupedPlacements.putIfAbsent(client, new ArrayList<>());
+			groupedJobDetails.putIfAbsent(client, new ArrayList<>());
+			groupedEmployeeDetails.putIfAbsent(client, new ArrayList<>());
+
+			// Ensure ClientDetailsDTO exists, even if empty
+			groupedClientDetails.putIfAbsent(client, Collections.singletonList(new ClientDetailsDTO() {
+				@Override
+				public String getClientName() {
+					return client;
+				}
+
+				@Override
+				public String getClientId() {
+					return null;
+				}
+
+				@Override
+				public String getClientAddress() {
+					return null;
+				}
+
+				@Override
+				public String getOnBoardedBy() {
+					return null;
+				}
+
+				@Override
+				public String getClientSpocName() {
+					return null;
+				}
+
+				@Override
+				public String getClientSpocMobileNumber() {
+					return null;
+				}
+			}));
+
+			// Ensure employee details exist, even if empty
+			groupedEmployeeDetails.putIfAbsent(client, new ArrayList<>());
+		});
+	}
+
+	// Helper method to normalize the client name (simple toLowerCase as an example)
+	private String normalizeClientName(String clientName) {
+		return clientName != null ? clientName.toLowerCase() : "";
+	}
+
+
+	// Method to map Tuple to EmployeeDetailsDTO
+	// Helper method to convert List<Tuple> to List<EmployeeDetailsDTO>
+	private List<EmployeeDetailsDTO> mapEmployeeDetailsTuples(List<Tuple> employeeDetailsTuples) {
+		List<EmployeeDetailsDTO> employeeDetails = new ArrayList<>();
+
+		for (Tuple tuple : employeeDetailsTuples) {
+			EmployeeDetailsDTO dto = new EmployeeDetailsDTO(
+					tuple.get("employeeId", String.class),
+					tuple.get("employeeName", String.class),
+					tuple.get("role", String.class),
+					tuple.get("employeeEmail", String.class),
+					tuple.get("designation", String.class),
+					LocalDate.parse(tuple.get("joiningDate", String.class)), // Assuming it's a String, you can convert it to LocalDate if needed
+					tuple.get("gender", String.class),
+					LocalDate.parse(tuple.get("dob", String.class)), // Assuming it's a String, you can convert it to LocalDate if needed
+					tuple.get("phoneNumber", String.class),
+					tuple.get("personalEmail", String.class),
+					tuple.get("status", String.class)
+			);
+			employeeDetails.add(dto);
+		}
+
+		return employeeDetails;
+	}
 }

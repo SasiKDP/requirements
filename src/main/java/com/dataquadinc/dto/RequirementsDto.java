@@ -1,3 +1,4 @@
+
 package com.dataquadinc.dto;
 
 import java.time.LocalDateTime;
@@ -85,6 +86,7 @@ public class RequirementsDto
 	private String status;
 	@JsonFormat(without = JsonFormat.Feature.WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED)
 	private Set<String> recruiterName;
+	private String assignedBy;
 
 
 //	private String recruiterId;   // Add recruiterId field
@@ -256,5 +258,13 @@ public class RequirementsDto
 
 	public void setNoOfPositions(int noOfPositions) {
 		this.noOfPositions = noOfPositions;
+	}
+
+	public String getAssignedBy() {
+		return assignedBy;
+	}
+
+	public void setAssignedBy(String assignedBy) {
+		this.assignedBy = assignedBy;
 	}
 }

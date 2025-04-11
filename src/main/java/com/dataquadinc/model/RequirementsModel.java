@@ -6,17 +6,10 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import static org.aspectj.weaver.NameMangler.PREFIX;
 
 @Entity
 @Data
@@ -82,15 +75,8 @@ public class RequirementsModel {
 
     private String status;
     private Set<String> recruiterName;
+    private String assignedBy;
 
-    // Setter for recruiterName to handle stringified list format properly
-    public void setRecruiterName(String recruiterNameJson) {
-        if (recruiterNameJson != null && !recruiterNameJson.isEmpty()) {
-            // Clean the stringified list if necessary
-            recruiterNameJson = recruiterNameJson.replaceAll("[\\[\\]\"]", "");  // Removes brackets and quotes
-            this.recruiterName = Set.of(recruiterNameJson.split(","));
-        }
-    }
 
     public byte[] getJobDescriptionBlob() {
         return jobDescriptionBlob;
@@ -135,7 +121,6 @@ public class RequirementsModel {
         }
     }
 
-
     private void generateJobId() {
         try {
             // Use EntityManager through EntityManagerFactory instead of field injection
@@ -166,6 +151,7 @@ public class RequirementsModel {
             throw new RuntimeException("Error generating job ID", e);
         }
     }
+
 
     public String getStatus() {
         return status;
@@ -301,4 +287,11 @@ public class RequirementsModel {
         }
     }
 
+    public String getAssignedBy() {
+        return assignedBy;
+    }
+
+    public void setAssignedBy(String assignedBy) {
+        this.assignedBy = assignedBy;
+    }
 }

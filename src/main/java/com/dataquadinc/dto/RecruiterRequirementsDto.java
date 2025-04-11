@@ -19,7 +19,7 @@ public class RecruiterRequirementsDto {
 
 	private String jobDescription;
 
-	private byte[] jobDescriptionBlob;  // Add the jobDescriptionBlob field as byte array
+//	private byte[] jobDescriptionBlob;  // Add the jobDescriptionBlob field as byte array
 
 	private String jobType;
 
@@ -37,10 +37,11 @@ public class RecruiterRequirementsDto {
 
 	private String salaryPackage;
 
-	private int noOfPositions;
+	private int  noOfPositions;
 
 	private LocalDateTime requirementAddedTimeStamp;
 
 	private String status;
+	private String assignedBy;
 
 }
