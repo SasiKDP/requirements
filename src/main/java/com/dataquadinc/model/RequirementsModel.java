@@ -58,7 +58,7 @@ public class RequirementsModel {
     private int noOfPositions;
 
     @Lob
-    @Column(name = "job_description_blob")
+    @Column(name = "job_description_blob", columnDefinition = "MEDIUMBLOB")
     private byte[] jobDescriptionBlob;
 
     private LocalDateTime requirementAddedTimeStamp;
