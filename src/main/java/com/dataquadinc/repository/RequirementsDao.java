@@ -329,8 +329,8 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 
     @Query(value = """
     SELECT COUNT(DISTINCT c.candidate_id)
-    FROM candidates_prod c
-    JOIN requirements_model_prod req ON c.job_id = req.job_id
+    FROM candidates c
+    JOIN requirements_model req ON c.job_id = req.job_id
     WHERE c.job_id = :jobId
 """, nativeQuery = true)
     Integer getNumberOfSubmissionsByJobId(@Param("jobId") String jobId);
@@ -342,8 +342,8 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                              AND req.job_id = :jobId
                         THEN 1 ELSE 0 
                         END), 0)
-    FROM candidates_prod c
-    JOIN requirements_model_prod req ON c.job_id = req.job_id
+    FROM candidates c
+    JOIN requirements_model req ON c.job_id = req.job_id
     WHERE req.job_id = :jobId
 """, nativeQuery = true)
     Integer getNumberOfInterviewsByJobId(@Param("jobId") String jobId);
