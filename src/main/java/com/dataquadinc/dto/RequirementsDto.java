@@ -87,7 +87,25 @@ public class RequirementsDto
 	private Set<String> recruiterName;
 	private String assignedBy;
 
+	// New fields for submissions and interviews
+	private Integer numberOfSubmissions;
+	private Integer numberOfInterviews;
 
+	public Integer getNumberOfSubmissions() {
+		return numberOfSubmissions;
+	}
+
+	public void setNumberOfSubmissions(Integer numberOfSubmissions) {
+		this.numberOfSubmissions = numberOfSubmissions;
+	}
+
+	public Integer getNumberOfInterviews() {
+		return numberOfInterviews;
+	}
+
+	public void setNumberOfInterviews(Integer numberOfInterviews) {
+		this.numberOfInterviews = numberOfInterviews;
+	}
 //	private String recruiterId;   // Add recruiterId field
 //	private String recruiterEmail;
 

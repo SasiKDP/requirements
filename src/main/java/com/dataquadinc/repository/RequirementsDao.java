@@ -1,5 +1,7 @@
 package com.dataquadinc.repository;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -361,6 +363,34 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         AND u.user_id = :userId  -- Add this line to filter by user_id
     """, nativeQuery = true)
     List<Tuple> getEmployeeDetailsByUserId(@Param("userId") String userId);
+
+    @Query(value = """
+    SELECT COUNT(DISTINCT c.candidate_id)
+    FROM candidates_prod c
+    JOIN requirements_model_prod req ON c.job_id = req.job_id
+    WHERE c.job_id = :jobId
+""", nativeQuery = true)
+    Integer getNumberOfSubmissionsByJobId(@Param("jobId") String jobId);
+
+
+    @Query(value = """
+    SELECT COALESCE(SUM(CASE 
+                        WHEN c.interview_date_time IS NOT NULL
+                             AND req.job_id = :jobId
+                        THEN 1 ELSE 0 
+                        END), 0)
+    FROM candidates_prod c
+    JOIN requirements_model_prod req ON c.job_id = req.job_id
+    WHERE req.job_id = :jobId
+""", nativeQuery = true)
+    Integer getNumberOfInterviewsByJobId(@Param("jobId") String jobId);
+
+    // RequirementsDao.java
+    @Query("SELECT r FROM RequirementsModel r WHERE DATE(r.requirementAddedTimeStamp) BETWEEN :startDate AND :endDate")
+    List<RequirementsModel> findByRequirementAddedTimeStampBetween(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 
 
 }
