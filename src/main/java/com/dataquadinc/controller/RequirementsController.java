@@ -542,11 +542,14 @@ public class 	RequirementsController {
 			return ResponseEntity.notFound().build();
 		}
 	}
+
+
 	@GetMapping("/stats")
-	public ResponseEntity<List<EmployeeCandidateDTO>> getEmployeeStats() {
-		List<EmployeeCandidateDTO> stats = service.getEmployeeStats();
+	public ResponseEntity<CandidateStatsResponse> getCandidateStats() {
+		CandidateStatsResponse stats = service.getCandidateStats();
 		return ResponseEntity.ok(stats);
 	}
+
 
 	// Fetch both Submitted Candidates and Scheduled Interviews in one API call
 	@GetMapping("/list/{userId}")
