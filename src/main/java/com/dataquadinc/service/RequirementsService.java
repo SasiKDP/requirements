@@ -302,11 +302,10 @@ public class RequirementsService {
 	}
 
 
-	public Object getRequirementsDetails(String recruiterId) {
-		// Fetch all active (non-closed) requirements for the recruiter
-		List<RequirementsModel> requirementsList = requirementsDao.findAllActiveRequirementsByRecruiter(recruiterId);
+	public Object getRequirementsDetails() {
+		// Fetch only non-closed requirements using a native query
+		List<RequirementsModel> requirementsList = requirementsDao.findAllActiveRequirements();
 
-		// List to hold the DTOs
 		List<RequirementsDto> dtoList = requirementsList.stream()
 				.map(requirement -> {
 					RequirementsDto dto = new RequirementsDto();
