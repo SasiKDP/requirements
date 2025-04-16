@@ -556,6 +556,10 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             @Param("endDate") LocalDate endDate
     );
 
+    @Query(value = "SELECT * FROM requirements_model_prod WHERE status <> 'Closed'", nativeQuery = true)
+    List<RequirementsModel> findAllActiveRequirements();
+
+
 
     @Query(value = """
     SELECT 
