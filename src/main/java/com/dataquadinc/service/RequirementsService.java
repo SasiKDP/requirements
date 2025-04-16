@@ -719,23 +719,48 @@ public class RequirementsService {
 		}
 	}
 
-	public List<EmployeeCandidateDTO> getEmployeeStats() {
-		List<Tuple> results = requirementsDao.getEmployeeCandidateStats();
+	public CandidateStatsResponse getCandidateStats() {
+		List<EmployeeCandidateDTO> employeeDtoList = new ArrayList<>();
+		List<TeamleadCandidateDTO> teamleadDtoList = new ArrayList<>();
 
-		// Proceed with the rest of the mapping
-		return results.stream().map(tuple -> new EmployeeCandidateDTO(
-				tuple.get("employeeId", String.class),
-				tuple.get("employeeName", String.class),
-				tuple.get("employeeEmail", String.class),
-				tuple.get("role", String.class),
-				convertToInt(tuple.get("numberOfClients")), // Ensure correct conversion
-				convertToInt(tuple.get("numberOfRequirements")),
-				convertToInt(tuple.get("numberOfSubmissions")),
-				convertToInt(tuple.get("numberOfInterviews")),
-				convertToInt(tuple.get("numberOfPlacements"))
+		// 👤 Employee Stats
+		List<Tuple> employeeStats = requirementsDao.getEmployeeCandidateStats();
+		employeeDtoList.addAll(employeeStats.stream()
+				.map(tuple -> new EmployeeCandidateDTO(
+						tuple.get("employeeId", String.class),
+						tuple.get("employeeName", String.class),
+						tuple.get("employeeEmail", String.class),
+						"Employee",
+						convertToInt(tuple.get("numberOfClients")),
+						convertToInt(tuple.get("numberOfRequirements")),
+						convertToInt(tuple.get("numberOfSubmissions")),
+						convertToInt(tuple.get("numberOfInterviews")),
+						convertToInt(tuple.get("numberOfPlacements"))
+				))
+				.collect(Collectors.toList()));
 
-		)).collect(Collectors.toList());
+		// 👨‍🏫 Teamlead Stats
+		List<Tuple> teamleadStats = requirementsDao.getTeamleadCandidateStats();
+		teamleadDtoList.addAll(teamleadStats.stream()
+				.map(tuple -> new TeamleadCandidateDTO(
+						tuple.get("employeeId", String.class),
+						tuple.get("employeeName", String.class),
+						tuple.get("employeeEmail", String.class),
+						"Teamlead",
+						convertToInt(tuple.get("numberOfClients")),
+						convertToInt(tuple.get("numberOfRequirements")),
+						convertToInt(tuple.get("selfSubmissions")),
+						convertToInt(tuple.get("selfInterviews")),
+						convertToInt(tuple.get("selfPlacements")),
+						convertToInt(tuple.get("teamSubmissions")),
+						convertToInt(tuple.get("teamInterviews")),
+						convertToInt(tuple.get("teamPlacements"))
+				))
+				.collect(Collectors.toList()));
+
+		return new CandidateStatsResponse(employeeDtoList, teamleadDtoList);
 	}
+
 
 	private int convertToInt(Object value) {
 		if (value instanceof BigInteger) {
