@@ -302,22 +302,18 @@ public class RequirementsService {
 
 
 	public Object getRequirementsDetails() {
-		// Fetch all requirements from the database
-		List<RequirementsModel> requirementsList = requirementsDao.findAll();
+		// Fetch only non-closed requirements using a native query
+		List<RequirementsModel> requirementsList = requirementsDao.findAllActiveRequirements();
 
-		// List to hold the DTOs
 		List<RequirementsDto> dtoList = requirementsList.stream()
-
 				.map(requirement -> {
-					// Directly map the model to DTO
 					RequirementsDto dto = new RequirementsDto();
 
-					// Manually set the properties of RequirementsDto from RequirementsModel
 					dto.setJobId(requirement.getJobId());
 					dto.setJobTitle(requirement.getJobTitle());
 					dto.setClientName(requirement.getClientName());
 					dto.setJobDescription(requirement.getJobDescription());
-					dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());  // Ensure jobDescriptionBlob is mapped
+					dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());
 					dto.setJobType(requirement.getJobType());
 					dto.setLocation(requirement.getLocation());
 					dto.setJobMode(requirement.getJobMode());
@@ -332,24 +328,22 @@ public class RequirementsService {
 					dto.setStatus(requirement.getStatus());
 					dto.setRecruiterName(requirement.getRecruiterName());
 					dto.setAssignedBy(requirement.getAssignedBy());
-					// Get the jobId for the current requirement
-					String jobId = requirement.getJobId();  // Assuming jobId is a String
 
-					// Fetch individual stats using the DAO methods for the current jobId
+					String jobId = requirement.getJobId();
 					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
-					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId)); // Pass clientName here
+					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
 
 					return dto;
 				})
 				.collect(Collectors.toList());
 
-		// Return response, if the list is empty, return error response
 		if (dtoList.isEmpty()) {
 			return new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now());
 		} else {
 			return dtoList;
 		}
 	}
+
 
 	public List<RequirementsDto> getRequirementsByDateRange(LocalDate startDate, LocalDate endDate) {
 //		// 💥 First check: Date range should not exceed 31 days
