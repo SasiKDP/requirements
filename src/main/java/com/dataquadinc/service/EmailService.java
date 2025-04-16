@@ -1,5 +1,6 @@
 package com.dataquadinc.service;
 
+import com.dataquadinc.dto.RequirementsDto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -20,5 +21,11 @@ public class EmailService {
         message.setFrom("datamatrrrix@gmail.com"); // your email
 
         javaMailSender.send(message);
+    }
+
+    public void sendClosedStatusEmail(RequirementsDto existingRequirement) {
+    }
+
+    public void sendHoldStatusEmail(RequirementsDto existingRequirement) {
     }
 }

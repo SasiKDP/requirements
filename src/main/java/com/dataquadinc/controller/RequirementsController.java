@@ -1,6 +1,7 @@
 package com.dataquadinc.controller;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -19,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -264,6 +266,34 @@ public class 	RequirementsController {
 		return new ResponseEntity<>(requirements, HttpStatus.OK);
 	}
 
+	@GetMapping("/filterByDate")
+	public ResponseEntity<?> getRequirementsByDateRange(
+			@RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		List<RequirementsDto> requirements = service.getRequirementsByDateRange(startDate, endDate);
+
+		if (requirements == null || requirements.isEmpty()) {
+			logger.warn("⚠️ No requirements found between {} and {}", startDate, endDate);
+			return new ResponseEntity<>(new ErrorResponse(
+					HttpStatus.NOT_FOUND.value(),
+					"No requirements found between " + startDate + " and " + endDate,
+					LocalDateTime.now()), HttpStatus.NOT_FOUND);
+		}
+
+		for (RequirementsDto dto : requirements) {
+			Set<String> cleanedNames = dto.getRecruiterName().stream()
+					.map(name -> name.replaceAll("[\\[\\]\"]", ""))
+					.collect(Collectors.toSet());
+			dto.setRecruiterName(cleanedNames);
+		}
+
+		// ✅ This log will now appear last
+		ResponseEntity<?> response = new ResponseEntity<>(requirements, HttpStatus.OK);
+		logger.info("✅ Fetched {} requirements between {} and {}", requirements.size(), startDate, endDate);
+		return response;
+	}
+
 
 
 	@GetMapping("/get/{jobId}")
@@ -363,13 +393,18 @@ public class 	RequirementsController {
 
 	@GetMapping("/recruiter/{recruiterId}")
 	public ResponseEntity<List<RecruiterRequirementsDto>> getJobsByRecruiter(@PathVariable String recruiterId) {
-		return new ResponseEntity<>(service.getJobsAssignedToRecruiter(recruiterId),HttpStatus.OK);
+		// Ensure that recruiterId is being passed correctly
+		List<RecruiterRequirementsDto> jobs = service.getJobsAssignedToRecruiter(recruiterId);
+		return new ResponseEntity<>(jobs, HttpStatus.OK);
 	}
+
 	@PutMapping("/updateRequirement/{jobId}")
 	public ResponseEntity<ResponseBean> updateRequirement(
 			@PathVariable String jobId,
 			@RequestParam("jobTitle") String jobTitle,
 			@RequestParam("clientName") String clientName,
+
+
 			@RequestParam(value = "jobDescription", required = false) String jobDescription,
 			@RequestParam(value = "jobDescriptionFile", required = false) MultipartFile jobDescriptionFile,
 			@RequestParam("jobType") String jobType,

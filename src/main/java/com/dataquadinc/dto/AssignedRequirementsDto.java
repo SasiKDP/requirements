@@ -52,6 +52,7 @@ public class AssignedRequirementsDto {
     private Set<String> recruiterIds;
 
     private String status;
+
     private Set<String> recruiterName;
 
     // Removed jobDescriptionFile and jobDescriptionBlob

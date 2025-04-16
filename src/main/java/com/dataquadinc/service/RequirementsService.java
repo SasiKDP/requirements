@@ -36,6 +36,7 @@ public class RequirementsService {
 
 
 	@Autowired
+
 	private RequirementsDao requirementsDao;
 
 	@Autowired
@@ -43,6 +44,7 @@ public class RequirementsService {
 
 	@Autowired
 	private EmailService emailService;
+
 
 
 	@Transactional
@@ -302,17 +304,18 @@ public class RequirementsService {
 
 
 	public Object getRequirementsDetails() {
-		List<RequirementsDto> dtoList = requirementsDao.findAll().stream()
+		// Fetch only non-closed requirements using a native query
+		List<RequirementsModel> requirementsList = requirementsDao.findAllActiveRequirements();
+
+		List<RequirementsDto> dtoList = requirementsList.stream()
 				.map(requirement -> {
-					// Directly map the model to DTO
 					RequirementsDto dto = new RequirementsDto();
 
-					// Manually set the properties of RequirementsDto from RequirementsModel
 					dto.setJobId(requirement.getJobId());
 					dto.setJobTitle(requirement.getJobTitle());
 					dto.setClientName(requirement.getClientName());
 					dto.setJobDescription(requirement.getJobDescription());
-					dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());  // Ensure jobDescriptionBlob is mapped
+					dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());
 					dto.setJobType(requirement.getJobType());
 					dto.setLocation(requirement.getLocation());
 					dto.setJobMode(requirement.getJobMode());
@@ -328,17 +331,81 @@ public class RequirementsService {
 					dto.setRecruiterName(requirement.getRecruiterName());
 					dto.setAssignedBy(requirement.getAssignedBy());
 
+					String jobId = requirement.getJobId();
+					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
+					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
+
 					return dto;
 				})
 				.collect(Collectors.toList());
 
-		// Return response, if the list is empty, return error response
 		if (dtoList.isEmpty()) {
 			return new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now());
 		} else {
 			return dtoList;
 		}
 	}
+
+
+	public List<RequirementsDto> getRequirementsByDateRange(LocalDate startDate, LocalDate endDate) {
+//		// 💥 First check: Date range should not exceed 31 days
+//		if (ChronoUnit.DAYS.between(startDate, endDate) > 31) {
+//			throw new DateRangeValidationException("Date range must not exceed one month.");
+//		}
+
+		// 💥 Second check: End date must not be before start date
+		if (endDate.isBefore(startDate)) {
+			throw new DateRangeValidationException("End date cannot be before start date.");
+		}
+
+		// 💥 Third check: Start date must be within the last 1 month
+		LocalDate oneMonthAgo = LocalDate.now().minusMonths(1);
+		if (startDate.isBefore(oneMonthAgo)) {
+			throw new DateRangeValidationException("Start date must be within the last 1 month.");
+		}
+
+		List<RequirementsModel> requirements = requirementsDao.findByRequirementAddedTimeStampBetween(startDate, endDate);
+
+		if (requirements.isEmpty()) {
+			throw new RequirementNotFoundException("No requirements found between " + startDate + " and " + endDate);
+		}
+
+		// ✅ Add logger here since this block is guaranteed to have results
+		Logger logger = LoggerFactory.getLogger(RequirementsService.class);
+		logger.info("✅ Fetched {} requirements between {} and {}", requirements.size(), startDate, endDate);
+
+		return requirements.stream().map(requirement -> {
+			RequirementsDto dto = new RequirementsDto();
+			dto.setJobId(requirement.getJobId());
+			dto.setJobTitle(requirement.getJobTitle());
+			dto.setClientName(requirement.getClientName());
+			dto.setJobDescription(requirement.getJobDescription());
+			dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());
+			dto.setJobType(requirement.getJobType());
+			dto.setLocation(requirement.getLocation());
+			dto.setJobMode(requirement.getJobMode());
+			dto.setExperienceRequired(requirement.getExperienceRequired());
+			dto.setNoticePeriod(requirement.getNoticePeriod());
+			dto.setRelevantExperience(requirement.getRelevantExperience());
+			dto.setQualification(requirement.getQualification());
+			dto.setSalaryPackage(requirement.getSalaryPackage());
+			dto.setNoOfPositions(requirement.getNoOfPositions());
+			dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
+			dto.setRecruiterIds(requirement.getRecruiterIds());
+			dto.setStatus(requirement.getStatus());
+			dto.setRecruiterName(requirement.getRecruiterName());
+			dto.setAssignedBy(requirement.getAssignedBy());
+
+			// Stats
+			String jobId = requirement.getJobId();
+			dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
+			dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
+
+			return dto;
+		}).collect(Collectors.toList());
+	}
+
+
 
 
 	public RequirementsDto getRequirementDetailsById(String jobId) {
@@ -392,16 +459,35 @@ public class RequirementsService {
 	}
 
 	public List<RecruiterRequirementsDto> getJobsAssignedToRecruiter(String recruiterId) {
+		// Validate the recruiterId
+		if (recruiterId == null || recruiterId.trim().isEmpty()) {
+			throw new IllegalArgumentException("Recruiter ID cannot be null or empty");
+		}
+
+		// Log the recruiterId to ensure it's correct
+		System.out.println("Fetching jobs for recruiterId: " + recruiterId);
+
+		// Retrieve jobs assigned to the recruiter
 		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterId(recruiterId);
 
-		if (jobsByRecruiterId.isEmpty()) {
+		// Log the jobs retrieved to check the list
+		System.out.println("Jobs retrieved: " + jobsByRecruiterId);
+
+		// Check if jobs are found
+		if (jobsByRecruiterId == null || jobsByRecruiterId.isEmpty()) {
 			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter : " + recruiterId);
 		}
 
+		// Map the RequirementsModel list to RecruiterRequirementsDto list
 		return jobsByRecruiterId.stream()
 				.map(job -> {
 					RecruiterRequirementsDto dto = modelMapper.map(job, RecruiterRequirementsDto.class);
-					dto.setAssignedBy(job.getAssignedBy()); // Ensure assignedBy is mapped
+
+					// Ensure the 'assignedBy' field is set correctly
+					if (job.getAssignedBy() != null) {
+						dto.setAssignedBy(job.getAssignedBy());
+					}
+
 					return dto;
 				})
 				.collect(Collectors.toList());
@@ -473,7 +559,9 @@ public class RequirementsService {
 			logger.error("Error updating requirement", e);
 			return new ResponseBean(false, "Error updating requirement", "Internal Server Error", null);
 		}
+
 	}
+
 
 
 	@Transactional
