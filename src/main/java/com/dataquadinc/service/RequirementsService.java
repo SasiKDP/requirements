@@ -771,42 +771,47 @@ public class RequirementsService {
 
 	// Fetch both Submitted Candidates, Scheduled Interviews, and Employee Details in one call
 	public CandidateResponseDTO getCandidateData(String userId) {
-		// Fetching the various required details
-		List<SubmittedCandidateDTO> submittedCandidates = requirementsDao.findSubmittedCandidatesByUserId(userId);
-		List<InterviewScheduledDTO> scheduledInterviews = requirementsDao.findScheduledInterviewsByUserId(userId);
-		List<JobDetailsDTO> jobDetails = requirementsDao.findJobDetailsByUserId(userId);
-		List<PlacementDetailsDTO> placementDetails = requirementsDao.findPlacementCandidatesByUserId(userId);
-		List<ClientDetailsDTO> clientDetails = requirementsDao.findClientDetailsByUserId(userId); // Fetch client details
-		List<Tuple> employeeDetailsTuples = requirementsDao.getEmployeeDetailsByUserId(userId); // Fetch employee details
+		// Fetch role and username
+		Tuple roleInfo = requirementsDao.getUserRoleAndUsername(userId);
+		String role = roleInfo.get("role", String.class);
+		String username = roleInfo.get("userName", String.class);
 
-		// Group data dynamically (no need to group employee details by client name)
+		List<SubmittedCandidateDTO> submittedCandidates;
+		List<InterviewScheduledDTO> scheduledInterviews;
+		List<JobDetailsDTO> jobDetails;
+		List<PlacementDetailsDTO> placementDetails;
+		List<ClientDetailsDTO> clientDetails;
+		List<Tuple> employeeDetailsTuples;
+
+		if ("Teamlead".equalsIgnoreCase(role)) {
+			submittedCandidates = requirementsDao.findSubmittedCandidatesByAssignedBy(username);
+			scheduledInterviews = requirementsDao.findScheduledInterviewsByAssignedBy(username);
+			jobDetails = requirementsDao.findJobDetailsByAssignedBy(username);
+			placementDetails = requirementsDao.findPlacementCandidatesByAssignedBy(username);
+			clientDetails = requirementsDao.findClientDetailsByAssignedBy(username);
+			employeeDetailsTuples = requirementsDao.getTeamleadDetailsByUserId(userId); // if different query needed
+		} else {
+			submittedCandidates = requirementsDao.findSubmittedCandidatesByUserId(userId);
+			scheduledInterviews = requirementsDao.findScheduledInterviewsByUserId(userId);
+			jobDetails = requirementsDao.findJobDetailsByUserId(userId);
+			placementDetails = requirementsDao.findPlacementCandidatesByUserId(userId);
+			clientDetails = requirementsDao.findClientDetailsByUserId(userId);
+			employeeDetailsTuples = requirementsDao.getEmployeeDetailsByUserId(userId);
+		}
+
 		Map<String, List<SubmittedCandidateDTO>> groupedSubmissions = groupByClientName(submittedCandidates);
 		Map<String, List<InterviewScheduledDTO>> groupedInterviews = groupByClientName(scheduledInterviews);
 		Map<String, List<PlacementDetailsDTO>> groupedPlacements = groupByClientName(placementDetails);
 		Map<String, List<JobDetailsDTO>> groupedJobDetails = groupByClientName(jobDetails);
-
-		// Convert List<ClientDetailsDTO> to a Map
 		Map<String, List<ClientDetailsDTO>> groupedClientDetails = groupByClientName(clientDetails);
-
-		// Convert List<Tuple> to List<EmployeeDetailsDTO>
 		List<EmployeeDetailsDTO> employeeDetails = mapEmployeeDetailsTuples(employeeDetailsTuples);
 
-		// Directly return the employeeDetails list in the CandidateResponseDTO constructor
-		return new CandidateResponseDTO(groupedSubmissions, groupedInterviews, groupedPlacements,
-				groupedJobDetails, groupedClientDetails, employeeDetails);
+		return new CandidateResponseDTO(
+				groupedSubmissions, groupedInterviews, groupedPlacements,
+				groupedJobDetails, groupedClientDetails, employeeDetails
+		);
 	}
 
-	// Helper method to add client names to the set (avoids duplicate code)
-	private <T> void addClientNamesToSet(List<T> list, Set<String> allClients) {
-		list.forEach(item -> {
-			String clientName = (item instanceof ClientDetailsDTO) ? ((ClientDetailsDTO) item).getClientName() :
-					(item instanceof SubmittedCandidateDTO) ? ((SubmittedCandidateDTO) item).getClientName() :
-							(item instanceof InterviewScheduledDTO) ? ((InterviewScheduledDTO) item).getClientName() :
-									(item instanceof PlacementDetailsDTO) ? ((PlacementDetailsDTO) item).getClientName() :
-											(item instanceof JobDetailsDTO) ? ((JobDetailsDTO) item).getClientName() : "";
-			allClients.add(normalizeClientName(clientName));
-		});
-	}
 
 	// Generic method to group a list by normalized client name
 	private <T> Map<String, List<T>> groupByClientName(List<T> list) {
@@ -832,56 +837,6 @@ public class RequirementsService {
 		}
 	}
 
-	// Ensure all clients are present in the maps
-	private void ensureClientPresenceInMaps(Set<String> allClients, Map<String, List<SubmittedCandidateDTO>> groupedSubmissions,
-											Map<String, List<InterviewScheduledDTO>> groupedInterviews, Map<String, List<PlacementDetailsDTO>> groupedPlacements,
-											Map<String, List<JobDetailsDTO>> groupedJobDetails, Map<String, List<Tuple>> groupedEmployeeDetails,
-											Map<String, List<ClientDetailsDTO>> groupedClientDetails) {
-		allClients.forEach(client -> {
-			groupedSubmissions.putIfAbsent(client, new ArrayList<>());
-			groupedInterviews.putIfAbsent(client, new ArrayList<>());
-			groupedPlacements.putIfAbsent(client, new ArrayList<>());
-			groupedJobDetails.putIfAbsent(client, new ArrayList<>());
-			groupedEmployeeDetails.putIfAbsent(client, new ArrayList<>());
-
-			// Ensure ClientDetailsDTO exists, even if empty
-			groupedClientDetails.putIfAbsent(client, Collections.singletonList(new ClientDetailsDTO() {
-				@Override
-				public String getClientName() {
-					return client;
-				}
-
-				@Override
-				public String getClientId() {
-					return null;
-				}
-
-				@Override
-				public String getClientAddress() {
-					return null;
-				}
-
-				@Override
-				public String getOnBoardedBy() {
-					return null;
-				}
-
-				@Override
-				public String getClientSpocName() {
-					return null;
-				}
-
-				@Override
-				public String getClientSpocMobileNumber() {
-					return null;
-				}
-			}));
-
-			// Ensure employee details exist, even if empty
-			groupedEmployeeDetails.putIfAbsent(client, new ArrayList<>());
-		});
-	}
-
 	// Helper method to normalize the client name (simple toLowerCase as an example)
 	private String normalizeClientName(String clientName) {
 		return clientName != null ? clientName.toLowerCase() : "";
@@ -894,22 +849,35 @@ public class RequirementsService {
 		List<EmployeeDetailsDTO> employeeDetails = new ArrayList<>();
 
 		for (Tuple tuple : employeeDetailsTuples) {
+			String joiningDateStr = tuple.get("joiningDate", String.class);
+			String dobStr = tuple.get("dob", String.class);
+
+			// Parsing date strings into LocalDate if not null or empty
+			LocalDate joiningDate = joiningDateStr != null && !joiningDateStr.isEmpty() ? LocalDate.parse(joiningDateStr) : null;
+			LocalDate dob = dobStr != null && !dobStr.isEmpty() ? LocalDate.parse(dobStr) : null;
+
 			EmployeeDetailsDTO dto = new EmployeeDetailsDTO(
 					tuple.get("employeeId", String.class),
 					tuple.get("employeeName", String.class),
 					tuple.get("role", String.class),
 					tuple.get("employeeEmail", String.class),
 					tuple.get("designation", String.class),
-                    LocalDate.parse(tuple.get("joiningDate", String.class)), // Assuming it's a String, you can convert it to LocalDate if needed
+					joiningDate,  // use correct type
 					tuple.get("gender", String.class),
-                    LocalDate.parse(tuple.get("dob", String.class)), // Assuming it's a String, you can convert it to LocalDate if needed
+					dob,           // use correct type
 					tuple.get("phoneNumber", String.class),
 					tuple.get("personalEmail", String.class),
 					tuple.get("status", String.class)
 			);
 			employeeDetails.add(dto);
 		}
-
 		return employeeDetails;
 	}
+
+
+	// helper method to check if alias exists in tuple
+	private boolean hasAlias(Tuple tuple, String alias) {
+		return tuple.getElements().stream().anyMatch(e -> alias.equalsIgnoreCase(e.getAlias()));
+	}
+
 }
