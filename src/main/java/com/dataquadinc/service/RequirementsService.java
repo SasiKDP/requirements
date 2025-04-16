@@ -302,16 +302,15 @@ public class RequirementsService {
 	}
 
 
-	public Object getRequirementsDetails() {
-		// Fetch all requirements from the database
-		List<RequirementsModel> requirementsList = requirementsDao.findAll();
+	public Object getRequirementsDetails(String recruiterId) {
+		// Fetch all active (non-closed) requirements for the recruiter
+		List<RequirementsModel> requirementsList = requirementsDao.findAllActiveRequirementsByRecruiter(recruiterId);
 
 		// List to hold the DTOs
 		List<RequirementsDto> dtoList = requirementsList.stream()
 				.map(requirement -> {
 					RequirementsDto dto = new RequirementsDto();
 
-					// Set the basic requirement data
 					dto.setJobId(requirement.getJobId());
 					dto.setJobTitle(requirement.getJobTitle());
 					dto.setClientName(requirement.getClientName());
@@ -332,18 +331,14 @@ public class RequirementsService {
 					dto.setRecruiterName(requirement.getRecruiterName());
 					dto.setAssignedBy(requirement.getAssignedBy());
 
-					// Get the jobId for the current requirement
-					String jobId = requirement.getJobId();  // Assuming jobId is a String
-
-					// Fetch individual stats using the DAO methods for the current jobId
+					String jobId = requirement.getJobId();
 					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
-					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId)); // Pass clientName here
+					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
 
 					return dto;
 				})
 				.collect(Collectors.toList());
 
-		// Return response, if the list is empty, return error response
 		if (dtoList.isEmpty()) {
 			return new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now());
 		} else {

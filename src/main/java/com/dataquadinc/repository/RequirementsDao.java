@@ -454,4 +454,6 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     );
 
 
+    @Query(value = "SELECT * FROM requirements_model WHERE status <> 'Closed'", nativeQuery = true)
+    List<RequirementsModel> findAllActiveRequirements();
 }
