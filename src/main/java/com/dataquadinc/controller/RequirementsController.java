@@ -583,6 +583,8 @@ public class RequirementsController {
 	public CandidateResponseDTO getCandidateData(@PathVariable String userId) {
 		return service.getCandidateData(userId);
 	}
+
+
 	@GetMapping("/assignedby/{name}")
 	public List<RequirementsModel> getRequirementsByAssignedBy(@PathVariable String name) {
 		// Fetch the list of requirements filtered by the assignedBy value
