@@ -3,9 +3,7 @@ package com.dataquadinc.controller;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import com.dataquadinc.dto.*;
@@ -400,7 +398,7 @@ public class RequirementsController {
 		return new ResponseEntity<>(service.getJobsAssignedToRecruiter(recruiterId),HttpStatus.OK);
 	}
 	@PutMapping("/updateRequirement/{jobId}")
-	public ResponseEntity<ResponseBean> updateRequirement(
+	public ResponseEntity<Map<String, Object>> updateRequirement(
 			@PathVariable String jobId,
 			@RequestParam("jobTitle") String jobTitle,
 			@RequestParam("clientName") String clientName,
@@ -418,124 +416,108 @@ public class RequirementsController {
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
 			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
-			@RequestParam("assignedBy") String assignedBy // Added assignedBy parameter
+			@RequestParam("assignedBy") String assignedBy
 	) throws IOException {
 		try {
-			// Validate that only one of jobDescription or jobDescriptionFile is provided
-			if ((jobDescription != null && !jobDescription.isEmpty()) &&
-					(jobDescriptionFile != null && !jobDescriptionFile.isEmpty())) {
-				return ResponseEntity.badRequest()
-						.body(ResponseBean.errorResponse("You can either provide a job description text or upload a job description file, but not both.", "Bad Request"));
-			}
-
+			logger.info("Received request to update requirement with jobId: {}", jobId);
 			// Fetch the existing requirement
 			RequirementsDto existingRequirement = service.getRequirementDetailsById(jobId);
 			if (existingRequirement == null) {
-				return ResponseEntity.status(HttpStatus.NOT_FOUND)
-						.body(ResponseBean.errorResponse("Requirement not found for the provided jobId", "Not Found"));
+				logger.warn("Both jobDescription and jobDescriptionFile provided. Only one should be given.");
+				return ResponseEntity.badRequest().body(Map.of("error", "Provide either jobDescription or jobDescriptionFile, not both."));
 			}
+			logger.info("Updating fields for requirement with jobId: {}", jobId);
 
-			// Debugging: Check the current status
-			System.out.println("Existing status before update: " + existingRequirement.getStatus());
-
-			// Set or nullify fields that are not being updated
-			if (jobTitle != null && !jobTitle.isEmpty()) existingRequirement.setJobTitle(jobTitle);
-			else existingRequirement.setJobTitle(null);
-
-			// Check and update the status
-			if (status != null && !status.isEmpty()) {
-				existingRequirement.setStatus(status);
-				System.out.println("Updated status to: " + status); // Debugging: Log updated status
-			} else {
-				existingRequirement.setStatus(null);
-			}
-
-			// Handle clientName and other fields similarly
-			if (clientName != null && !clientName.isEmpty()) existingRequirement.setClientName(clientName);
-			else existingRequirement.setClientName(null);
-
-			// Logic to set job description and BLOB
-			String finalJobDescription = null;
-			byte[] jobDescriptionBlob = null;
-
-			// If jobDescriptionFile is provided, process the file and set the BLOB
+			existingRequirement.setJobTitle(jobTitle);
+			existingRequirement.setClientName(clientName);
+			existingRequirement.setStatus(status);
+			existingRequirement.setJobType(jobType);
+			existingRequirement.setLocation(location);
+			existingRequirement.setJobMode(jobMode);
+			existingRequirement.setExperienceRequired(experienceRequired);
+			existingRequirement.setNoticePeriod(noticePeriod);
+			existingRequirement.setRelevantExperience(relevantExperience);
+			existingRequirement.setQualification(qualification);
+			existingRequirement.setSalaryPackage(salaryPackage);
+			existingRequirement.setNoOfPositions(noOfPositions);
+			existingRequirement.setRecruiterIds(recruiterIds);
+			existingRequirement.setRecruiterName(recruiterName);
+			existingRequirement.setAssignedBy(assignedBy);
 			if (jobDescriptionFile != null && !jobDescriptionFile.isEmpty()) {
-				jobDescriptionBlob = jobDescriptionFile.getBytes(); // Save the file as a BLOB
-				finalJobDescription = null; // Use the file (no text)
+				logger.info("Setting jobDescriptionBlob from file for jobId: {}", jobId);
+				existingRequirement.setJobDescription(null);
+				existingRequirement.setJobDescriptionBlob(jobDescriptionFile.getBytes());
+			} else {
+				logger.info("Setting jobDescription text for jobId: {}", jobId);
+				existingRequirement.setJobDescription(jobDescription);
+				existingRequirement.setJobDescriptionBlob(null);
 			}
-			// If jobDescription (text) is provided, use it and set the BLOB to null
-			else if (jobDescription != null && !jobDescription.isEmpty()) {
-				finalJobDescription = jobDescription;
-				jobDescriptionBlob = null; // Use the text (no file)
+
+			service.updateRequirementDetails(existingRequirement);
+			logger.info("Requirement updated successfully for jobId: {}", jobId);
+
+			String subject = "";
+			String body = "";
+
+			if (status.equalsIgnoreCase("closed")) {
+				subject = "📌 Requirement Closed - " + jobTitle + " (Job ID: " + jobId + ")";
+				body = String.format(
+						"Dear Recruiter,\n\n" +
+								"We would like to inform you that the following requirement has been formally marked as **CLOSED**:\n\n" +
+								"• Job Title   : %s\n" +
+								"• Client Name : %s\n" +
+								"• Job ID      : %s\n" +
+								"• Location    : %s\n\n" +
+								"Kindly update your records accordingly and stop any further processing for this role.\n\n" +
+								"We appreciate your continued efforts and collaboration.\n\n" +
+								"Warm regards,\n" +
+								"Dataquad Team",
+						jobTitle, clientName, jobId, location
+				);
+				logger.info("Prepared email content for CLOSED status");
+			} else if (status.equalsIgnoreCase("hold")) {
+				subject = "⏸️ Requirement On Hold - " + jobTitle + " (Job ID: " + jobId + ")";
+				body = String.format(
+						"Dear Recruiter,\n\n" +
+								"Please be informed that the below requirement is currently placed **ON HOLD**:\n\n" +
+								"• Job Title   : %s\n" +
+								"• Client Name : %s\n" +
+								"• Job ID      : %s\n" +
+								"• Location    : %s\n\n" +
+								"Kindly hold off on submitting any further candidates for this role until we notify you of any updates.\n" +
+								"If you have any questions or need clarification, please feel free to reach out to the BDM or the Admin team.\n\n" +
+								"Thank you for your cooperation.\n\n" +
+								"Warm regards,\n" +
+								"Dataquad Team",
+						jobTitle, clientName, jobId, location
+				);
+				logger.info("Prepared email content for HOLD status");
 			}
 
-			// Set the job description (from file or text)
-			existingRequirement.setJobDescription(finalJobDescription);
-			existingRequirement.setJobDescriptionBlob(jobDescriptionBlob); // Set the BLOB (or null)
+				if ((status.equalsIgnoreCase("closed") || status.equalsIgnoreCase("hold")) && recruiterName != null) {
+					for (String email : recruiterName) {
+						emailService.sendEmail(email, subject, body);
+						logger.info("Email sent to: {}", email);
+					}
+				}
+				Map<String, Object> response = new LinkedHashMap<>();
+				response.put("jobId", jobId);
+				response.put("updatedStatus", status.toLowerCase());
+				response.put("assignedRecruiters", recruiterIds);
+				response.put("message", "Status updated and email notifications sent successfully.");
+				logger.info("Returning successful update response for jobId: {}", jobId);
+				return ResponseEntity.ok(response);
 
-			// Set the other fields and nullify any fields that are not being updated
-			if (jobType != null && !jobType.isEmpty()) existingRequirement.setJobType(jobType);
-			else existingRequirement.setJobType(null);
+			} catch(Exception e){
+				logger.error("Error updating requirement with jobId: {}: {}", jobId, e.getMessage(), e);
 
-			if (location != null && !location.isEmpty()) existingRequirement.setLocation(location);
-			else existingRequirement.setLocation(null);
-
-			if (jobMode != null && !jobMode.isEmpty()) existingRequirement.setJobMode(jobMode);
-			else existingRequirement.setJobMode(null);
-
-			if (experienceRequired != null && !experienceRequired.isEmpty()) existingRequirement.setExperienceRequired(experienceRequired);
-			else existingRequirement.setExperienceRequired(null);
-
-			if (noticePeriod != null && !noticePeriod.isEmpty()) existingRequirement.setNoticePeriod(noticePeriod);
-			else existingRequirement.setNoticePeriod(null);
-
-			if (relevantExperience != null && !relevantExperience.isEmpty()) existingRequirement.setRelevantExperience(relevantExperience);
-			else existingRequirement.setRelevantExperience(null);
-
-			if (qualification != null && !qualification.isEmpty()) existingRequirement.setQualification(qualification);
-			else existingRequirement.setQualification(null);
-
-			if (salaryPackage != null && !salaryPackage.isEmpty()) existingRequirement.setSalaryPackage(salaryPackage);
-			else existingRequirement.setSalaryPackage(null);
-
-			if (noOfPositions > 0) existingRequirement.setNoOfPositions(noOfPositions);
-			else existingRequirement.setNoOfPositions(0); // If noOfPositions is not updated, set to 0
-
-			if (recruiterIds != null && !recruiterIds.isEmpty()) existingRequirement.setRecruiterIds(recruiterIds);
-			else existingRequirement.setRecruiterIds(null);
-
-			if (recruiterName != null && !recruiterName.isEmpty()) existingRequirement.setRecruiterName(recruiterName);
-			else existingRequirement.setRecruiterName(null);
-
-			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
-			else existingRequirement.setAssignedBy(null);
-
-			// Call the service to update the requirement
-			ResponseBean response = service.updateRequirementDetails(existingRequirement);
-
-			// Debugging: Log the updated status after saving
-			System.out.println("Status after saving: " + existingRequirement.getStatus());
-
-			// Return success response
-			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
-
-		} catch (IllegalArgumentException e) {
-			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"));
+				return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+						.body(Map.of("error", "Unexpected error: " + e.getMessage()));
+			}
 		}
-	}
 
 
-	@DeleteMapping("/deleteRequirement/{jobId}")
-	public ResponseEntity<ResponseBean> deleteRequirement(@PathVariable String jobId) {
-		// Call the service method to delete the requirement by jobId
-		ResponseBean response = service.deleteRequirementDetails(jobId);
 
-		// Return the response entity with the appropriate status code
-		return new ResponseEntity<>(response, HttpStatus.OK);
-	}
 	@GetMapping("/{jobId}")
 	public ResponseEntity<RecruiterDetailsDTO> getRecruiterDetails(@PathVariable String jobId) {
 		RecruiterDetailsDTO recruiterDetails = service.getRecruiterDetailsByJobId(jobId);
