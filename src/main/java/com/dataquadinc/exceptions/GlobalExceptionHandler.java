@@ -64,6 +64,16 @@ public class GlobalExceptionHandler {
 		return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
 	}
 
+	@ExceptionHandler(ResourceNotFoundException.class)
+	public ResponseEntity<Map<String, Object>> handleResourceNotFound(ResourceNotFoundException ex) {
+		Map<String, Object> body = new HashMap<>();
+		body.put("statusCode", HttpStatus.NOT_FOUND.value());
+		body.put("message", ex.getMessage());
+		body.put("timestamp", LocalDateTime.now());
+
+		return new ResponseEntity<>(body, HttpStatus.NOT_FOUND);
+	}
+
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	public ResponseEntity<?> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
 		if (ex.getRequiredType() == LocalDate.class) {

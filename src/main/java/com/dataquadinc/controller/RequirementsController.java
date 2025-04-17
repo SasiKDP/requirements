@@ -3,6 +3,7 @@ package com.dataquadinc.controller;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -581,6 +582,29 @@ public class RequirementsController {
 	@GetMapping("/list/{userId}")
 	public CandidateResponseDTO getCandidateData(@PathVariable String userId) {
 		return service.getCandidateData(userId);
+	}
+	@GetMapping("/assignedby/{name}")
+	public List<RequirementsModel> getRequirementsByAssignedBy(@PathVariable String name) {
+		// Fetch the list of requirements filtered by the assignedBy value
+		List<RequirementsModel> requirements = service.getRequirementsByAssignedBy(name);
+
+		// If no requirements are found, return an empty list
+		if (requirements == null || requirements.isEmpty()) {
+			return new ArrayList<>();
+		}
+
+		// Clean the recruiterName field for each requirement
+		for (RequirementsModel model : requirements) {
+			if (model.getRecruiterName() != null) {
+				Set<String> cleanedNames = model.getRecruiterName().stream()
+						.map(recruiter -> recruiter.replaceAll("[\\[\\]\"]", "").trim()) // Clean each recruiter name
+						.collect(Collectors.toSet());
+
+				model.setRecruiterName(cleanedNames);
+			}
+		}
+
+		return requirements;
 	}
 
 	@GetMapping("/assignedby/{name}/filterByDate")

@@ -913,11 +913,23 @@ public class RequirementsService {
 	}
 
 
+
 	// helper method to check if alias exists in tuple
 	private boolean hasAlias(Tuple tuple, String alias) {
 		return tuple.getElements().stream().anyMatch(e -> alias.equalsIgnoreCase(e.getAlias()));
 	}
 
+	public List<RequirementsModel> getRequirementsByAssignedBy(String name) {
+		List<RequirementsModel> requirements = requirementsDao.findByAssignedByIgnoreCase(name);
+
+		if (requirements.isEmpty()) {
+			logger.warn("No requirements found or '{}' is not a valid user", name);
+			throw new ResourceNotFoundException("No requirements found: '" + name + "' may not be a valid user.");
+		}
+
+		logger.info("Total requirements assigned by '{}': {}", name, requirements.size());
+		return requirements;
+	}
 	public List<RequirementsModel> getRequirementsByAssignedByAndDateRange(String assignedBy, LocalDate startDate, LocalDate endDate) {
 		logger.info("Fetching requirements for '{}' between {} and {}", assignedBy, startDate, endDate);
 
@@ -943,5 +955,4 @@ public class RequirementsService {
 
 		return requirements;
 	}
-
 }
