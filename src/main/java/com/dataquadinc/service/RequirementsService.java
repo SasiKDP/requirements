@@ -752,46 +752,54 @@ public class RequirementsService {
 	}
 
 	public CandidateStatsResponse getCandidateStats() {
-		List<EmployeeCandidateDTO> employeeDtoList = new ArrayList<>();
-		List<TeamleadCandidateDTO> teamleadDtoList = new ArrayList<>();
+		List<UserStatsDTO> userStatsList = new ArrayList<>();
 
 		// 👤 Employee Stats
 		List<Tuple> employeeStats = requirementsDao.getEmployeeCandidateStats();
-		employeeDtoList.addAll(employeeStats.stream()
-				.map(tuple -> new EmployeeCandidateDTO(
-						tuple.get("employeeId", String.class),
-						tuple.get("employeeName", String.class),
-						tuple.get("employeeEmail", String.class),
-						"Employee",
-						convertToInt(tuple.get("numberOfClients")),
-						convertToInt(tuple.get("numberOfRequirements")),
-						convertToInt(tuple.get("numberOfSubmissions")),
-						convertToInt(tuple.get("numberOfInterviews")),
-						convertToInt(tuple.get("numberOfPlacements"))
-				))
-				.collect(Collectors.toList()));
+		userStatsList.addAll(employeeStats.stream()
+				.map(tuple -> {
+					UserStatsDTO dto = new UserStatsDTO();
+					dto.setEmployeeId(tuple.get("employeeId", String.class));
+					dto.setEmployeeName(tuple.get("employeeName", String.class));
+					dto.setEmployeeEmail(tuple.get("employeeEmail", String.class));
+					dto.setRole("Employee");
+
+					dto.setNumberOfClients(convertToInt(tuple.get("numberOfClients")));
+					dto.setNumberOfRequirements(convertToInt(tuple.get("numberOfRequirements")));
+					dto.setNumberOfSubmissions(convertToInt(tuple.get("numberOfSubmissions")));
+					dto.setNumberOfInterviews(convertToInt(tuple.get("numberOfInterviews")));
+					dto.setNumberOfPlacements(convertToInt(tuple.get("numberOfPlacements")));
+
+					return dto;
+				}).collect(Collectors.toList())
+		);
 
 		// 👨‍🏫 Teamlead Stats
 		List<Tuple> teamleadStats = requirementsDao.getTeamleadCandidateStats();
-		teamleadDtoList.addAll(teamleadStats.stream()
-				.map(tuple -> new TeamleadCandidateDTO(
-						tuple.get("employeeId", String.class),
-						tuple.get("employeeName", String.class),
-						tuple.get("employeeEmail", String.class),
-						"Teamlead",
-						convertToInt(tuple.get("numberOfClients")),
-						convertToInt(tuple.get("numberOfRequirements")),
-						convertToInt(tuple.get("selfSubmissions")),
-						convertToInt(tuple.get("selfInterviews")),
-						convertToInt(tuple.get("selfPlacements")),
-						convertToInt(tuple.get("teamSubmissions")),
-						convertToInt(tuple.get("teamInterviews")),
-						convertToInt(tuple.get("teamPlacements"))
-				))
-				.collect(Collectors.toList()));
+		userStatsList.addAll(teamleadStats.stream()
+				.map(tuple -> {
+					UserStatsDTO dto = new UserStatsDTO();
+					dto.setEmployeeId(tuple.get("employeeId", String.class));
+					dto.setEmployeeName(tuple.get("employeeName", String.class));
+					dto.setEmployeeEmail(tuple.get("employeeEmail", String.class));
+					dto.setRole("Teamlead");
 
-		return new CandidateStatsResponse(employeeDtoList, teamleadDtoList);
+					dto.setNumberOfClients(convertToInt(tuple.get("numberOfClients")));
+					dto.setNumberOfRequirements(convertToInt(tuple.get("numberOfRequirements")));
+					dto.setSelfSubmissions(convertToInt(tuple.get("selfSubmissions")));
+					dto.setSelfInterviews(convertToInt(tuple.get("selfInterviews")));
+					dto.setSelfPlacements(convertToInt(tuple.get("selfPlacements")));
+					dto.setTeamSubmissions(convertToInt(tuple.get("teamSubmissions")));
+					dto.setTeamInterviews(convertToInt(tuple.get("teamInterviews")));
+					dto.setTeamPlacements(convertToInt(tuple.get("teamPlacements")));
+
+					return dto;
+				}).collect(Collectors.toList())
+		);
+
+		return new CandidateStatsResponse(userStatsList);
 	}
+
 
 
 	private int convertToInt(Object value) {
