@@ -536,7 +536,7 @@ public class RequirementsService {
 			return new ResponseBean(true, "Updated Successfully", null, null);
 		} catch (Exception e) {
 			logger.error("Error updating requirement", e);
-			return new ResponseBean(true, "Error updating requirement", "Internal Server Error", null);
+			return new ResponseBean(false, "Error updating requirement", "Internal Server Error", null);
 		}
 	}
 
@@ -887,5 +887,16 @@ public class RequirementsService {
 
 		return employeeDetails;
 	}
+	public List<RequirementsModel> getRequirementsByAssignedBy(String name) {
+		List<RequirementsModel> requirements = requirementsDao.findByAssignedByIgnoreCase(name);
 
+		if (requirements.isEmpty()) {
+			logger.warn("No requirements found or '{}' is not a valid user", name);
+			throw new ResourceNotFoundException("No requirements found: '" + name + "' may not be a valid user.");
+		}
+		// Log the count
+		logger.info("Total requirements assigned by '{}': {}", name, requirements.size());
+
+		return requirements;
+	}
 }

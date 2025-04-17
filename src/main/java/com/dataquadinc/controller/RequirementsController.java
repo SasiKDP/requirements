@@ -160,7 +160,7 @@ public class 	RequirementsController {
 			if (jobDescriptionBytes == null || jobDescriptionBytes.length == 0) {
 				logger.error("Job description is missing for job ID: {}", jobId);
 				// Return a ResponseBean with an error message
-				ResponseBean errorResponse = new ResponseBean(true, "Job description is missing for job ID: " + jobId, "No file found", null);
+				ResponseBean errorResponse = new ResponseBean(false, "Job description is missing for job ID: " + jobId, "No file found", null);
 				return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
 			}
 
@@ -207,13 +207,13 @@ public class 	RequirementsController {
 		} catch (RequirementNotFoundException e) {
 			logger.error("Requirement not found: {}", e.getMessage());
 			// Return a ResponseBean with the error message
-			ResponseBean errorResponse = new ResponseBean(true, e.getMessage(), "Not Found", null);
+			ResponseBean errorResponse = new ResponseBean(false, e.getMessage(), "Not Found", null);
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
 
 		} catch (Exception e) {
 			logger.error("Unexpected error while downloading job description for job ID {}: {}", jobId, e.getMessage());
 			// Return a ResponseBean with the error message
-			ResponseBean errorResponse = new ResponseBean(true, "Unexpected error: " + e.getMessage(), "Internal Server Error", null);
+			ResponseBean errorResponse = new ResponseBean(false, "Unexpected error: " + e.getMessage(), "Internal Server Error", null);
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
 		}
 	}
@@ -311,7 +311,6 @@ public class 	RequirementsController {
 
 			// Flag to check if any error occurs before sending emails
 			boolean allEmailsSentSuccessfully = true;
-			List<String> assignedRecruiters = new ArrayList<>();
 
 			// Convert List to Set and clean the recruiter IDs
 			Set<String> cleanedRecruiterIds = recruiterIds.stream()
@@ -326,50 +325,36 @@ public class 	RequirementsController {
 
 					// Fetch the recruiter's email and name (assuming these methods exist in your service)
 					String recruiterEmail = service.getRecruiterEmail(recruiterId);
-					String recruiterName = service.getRecruiterName(recruiterId);
+					String recruiterName = service.getRecruiterName(recruiterId); // This should be available in the service
+
+					// Log recruiter ID and fetched email
+					logger.info("Fetched recruiterId: {} with email: {}", recruiterId, recruiterEmail);
 
 					// Check if the email and name are not null or empty
 					if (recruiterEmail == null || recruiterEmail.isEmpty()) {
 						throw new RecruiterNotFoundException("Email for recruiter " + recruiterId + " not found");
 					}
 
-					// Add recruiter to the list of assigned recruiters
-					assignedRecruiters.add(recruiterId);
+					// Add the recruiter name to the job requirement's recruiterName set
+					requirement.getRecruiterName().add(recruiterName); // Add recruiter name to Set
 
-					// Prepare email subject and body based on the status
-					String subject = "New Job Assignment: " + requirement.getJobTitle() + " (Job ID: " + jobId + ")";
+					System.out.println("Recruiter names before saving: " + requirement.getRecruiterName());
+
+					// Prepare the email subject and body
+					String subject = "New Job Assignment: " + requirement.getJobTitle();
+
 					String body = "Dear " + recruiterName + ",\n\n" +
-							"You have been assigned a new job requirement, and the details are outlined below: \n\n" +
+							"I hope this message finds you well. \n\n" +
+							"You have been assigned a new job requirement, and the details are outlined below:  \n\n" +
 							"Job Title: " + requirement.getJobTitle() + "\n" +
-							"Job ID: " + jobId + "\n" +
 							"Client: " + requirement.getClientName() + "\n" +
 							"Location: " + requirement.getLocation() + "\n" +
 							"Job Type: " + requirement.getJobType() + "\n" +
 							"Experience Required: " + requirement.getExperienceRequired() + " years\n\n" +
-							"Assigned By: " + requirement.getAssignedBy() + "\n\n" +
-							"Please review the details and proceed with the necessary actions.\n\n" +
+							"Assigned By: " + requirement.getAssignedBy() + "\n\n" + // Added Assigned By field
+							"Please take a moment to review the details and proceed with the necessary actions. Additional information can be accessed via your dashboard.\n\n" +
+							"If you have any questions or require further clarification, feel free to reach out.\n\n" +
 							"Best Regards,\nDataquad";
-
-					// Modify subject and body based on job status (Closed or Hold)
-					if ("Closed".equalsIgnoreCase(requirement.getStatus())) {
-						subject = "Job Closed: " + requirement.getJobTitle() + " (Job ID: " + jobId + ")";
-						body = "Dear " + recruiterName + ",\n\n" +
-								"The job requirement with Job ID: " + jobId + " has been closed. Here are the details:\n\n" +
-								"Job Title: " + requirement.getJobTitle() + "\n" +
-								"Client: " + requirement.getClientName() + "\n" +
-								"Location: " + requirement.getLocation() + "\n\n" +
-								"Thank you for your efforts in working on this job.\n\n" +
-								"Best Regards,\nDataquad";
-					} else if ("Hold".equalsIgnoreCase(requirement.getStatus())) {
-						subject = "Job on Hold: " + requirement.getJobTitle() + " (Job ID: " + jobId + ")";
-						body = "Dear " + recruiterName + ",\n\n" +
-								"The job requirement with Job ID: " + jobId + " is currently on hold. Please find the details below:\n\n" +
-								"Job Title: " + requirement.getJobTitle() + "\n" +
-								"Client: " + requirement.getClientName() + "\n" +
-								"Location: " + requirement.getLocation() + "\n\n" +
-								"Please await further instructions regarding this job.\n\n" +
-								"Best Regards,\nDataquad";
-					}
 
 					// Send email to the recruiter
 					emailService.sendEmail(recruiterEmail, subject, body);
@@ -384,11 +369,9 @@ public class 	RequirementsController {
 				}
 			}
 
-			// Prepare the response
-			ResponseBean jobAssignmentResponse = new ResponseBean(true, jobId, requirement.getStatus(), assignedRecruiters);
-
+			// Return success response after attempting to assign recruiters and send emails
 			if (allEmailsSentSuccessfully) {
-				return ResponseEntity.ok(ResponseBean.successResponse("Status updated and email notifications sent successfully.", jobAssignmentResponse));
+				return ResponseEntity.ok(ResponseBean.successResponse("Recruiters assigned and email notifications sent successfully.", null));
 			} else {
 				return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
 						.body(ResponseBean.errorResponse("Some recruiter emails failed to send. Please check the logs for details.", null));
@@ -400,6 +383,8 @@ public class 	RequirementsController {
 			return ResponseEntity.badRequest().body(ResponseBean.errorResponse("Error assigning recruiters: " + e.getMessage(), e.toString()));
 		}
 	}
+
+
 
 	@PutMapping("/updateStatus")
 	public ResponseEntity<Void> updateStatus(@RequestBody StatusDto status) {
@@ -528,8 +513,6 @@ public class 	RequirementsController {
 			// Debugging: Log the updated status after saving
 			System.out.println("Status after saving: " + existingRequirement.getStatus());
 
-
-
 			// Return success response
 			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
 
@@ -572,5 +555,27 @@ public class 	RequirementsController {
 		return service.getCandidateData(userId);
 	}
 
+	@GetMapping("/assignedby/{name}")
+	public List<RequirementsModel> getRequirementsByAssignedBy(@PathVariable String name) {
+		// Fetch the list of requirements filtered by the assignedBy value
+		List<RequirementsModel> requirements = service.getRequirementsByAssignedBy(name);
 
+		// If no requirements are found, return an empty list
+		if (requirements == null || requirements.isEmpty()) {
+			return new ArrayList<>();
+		}
+
+		// Clean the recruiterName field for each requirement
+		for (RequirementsModel model : requirements) {
+			if (model.getRecruiterName() != null) {
+				Set<String> cleanedNames = model.getRecruiterName().stream()
+						.map(recruiter -> recruiter.replaceAll("[\\[\\]\"]", "").trim()) // Clean each recruiter name
+						.collect(Collectors.toSet());
+
+				model.setRecruiterName(cleanedNames);
+			}
+		}
+
+		return requirements;
+	}
 }
