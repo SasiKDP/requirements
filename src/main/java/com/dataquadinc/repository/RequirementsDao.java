@@ -354,4 +354,6 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    List<RequirementsModel> findByAssignedByIgnoreCase(String assignedBy);
 }
