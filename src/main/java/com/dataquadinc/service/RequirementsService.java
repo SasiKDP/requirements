@@ -887,4 +887,12 @@ public class RequirementsService {
 
 		return employeeDetails;
 	}
+	public List<RequirementsModel> getRequirementsByAssignedBy(String name) {
+		List<RequirementsModel> requirements = requirementsDao.findByAssignedByIgnoreCase(name);
+
+		// Log the count
+		logger.info("Total requirements assigned by '{}': {}", name, requirements.size());
+
+		return requirements;
+	}
 }

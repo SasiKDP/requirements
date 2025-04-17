@@ -129,118 +129,118 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<Tuple> findAllInterviewsByClientName(@Param("clientName") String clientName);
 
     @Query(value = """
-    SELECT 
-        idt.candidate_id, 
-        idt.full_name, 
-        idt.candidate_email_id AS candidateEmailId,  
-        r.job_id, 
-        r.job_title, 
-        b.client_name
-    FROM interview_details idt
-    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
-    JOIN requirements_model r ON cs.job_id = r.job_id
-    JOIN bdm_client b ON r.client_name = b.client_name
-    WHERE b.client_name = :clientName
-      AND (
-        (JSON_VALID(idt.interview_status) 
-         AND JSON_SEARCH(idt.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
-        OR UPPER(idt.interview_status) = 'PLACED'
-      )
-""", nativeQuery = true)
+                SELECT 
+                    idt.candidate_id, 
+                    idt.full_name, 
+                    idt.candidate_email_id AS candidateEmailId,  
+                    r.job_id, 
+                    r.job_title, 
+                    b.client_name
+                FROM interview_details idt
+                JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
+                JOIN requirements_model r ON cs.job_id = r.job_id
+                JOIN bdm_client b ON r.client_name = b.client_name
+                WHERE b.client_name = :clientName
+                  AND (
+                    (JSON_VALID(idt.interview_status) 
+                     AND JSON_SEARCH(idt.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
+                    OR UPPER(idt.interview_status) = 'PLACED'
+                  )
+            """, nativeQuery = true)
     List<Tuple> findAllPlacementsByClientName(@Param("clientName") String clientName);
 
 
     @Query(value = """
-    SELECT 
-        u.user_id AS employeeId,
-        u.user_name AS employeeName,
-        u.email AS employeeEmail,
-        r.name AS role,
-        
-        COALESCE((SELECT COUNT(DISTINCT cs.candidate_id) 
-                  FROM candidate_submissions cs
-                  JOIN interview_details idt ON cs.candidate_id = idt.candidate_id
-                  WHERE idt.user_id = u.user_id), 0) AS numberOfSubmissions,
-        
-        COALESCE((SELECT COUNT(*) 
-                  FROM interview_details idt 
-                  JOIN requirements_model r2 ON idt.job_id = r2.job_id 
-                  JOIN bdm_client bc ON r2.client_name = bc.client_name
-                  WHERE idt.user_id = u.user_id 
-                    AND (idt.interview_status = 'Scheduled' 
-                         OR idt.interview_date_time IS NOT NULL)), 0) AS numberOfInterviews,
-        
-        COALESCE((SELECT COUNT(*) 
-                  FROM interview_details idt 
-                  WHERE idt.user_id = u.user_id 
-                    AND (
-                        UPPER(idt.interview_status) = 'PLACED' 
-                        OR (JSON_VALID(idt.interview_status) = 1 
-                            AND JSON_SEARCH(idt.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
-                    )), 0) AS numberOfPlacements,
-        
-        COALESCE((SELECT COUNT(DISTINCT req.client_name) 
-                  FROM requirements_model req 
-                  JOIN job_recruiters jrp ON req.job_id = jrp.job_id
-                  WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfClients,
-        
-        COALESCE((SELECT COUNT(DISTINCT req.job_id) 
-                  FROM requirements_model req 
-                  JOIN job_recruiters jrp ON req.job_id = jrp.job_id
-                  WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfRequirements
-                  
-    FROM user_details u
-    JOIN user_roles ur ON u.user_id = ur.user_id
-    JOIN roles r ON ur.role_id = r.id
-    WHERE r.name IN ('Employee', 'Teamlead')
-""", nativeQuery = true)
+                SELECT 
+                    u.user_id AS employeeId,
+                    u.user_name AS employeeName,
+                    u.email AS employeeEmail,
+                    r.name AS role,
+            
+                    COALESCE((SELECT COUNT(DISTINCT cs.candidate_id) 
+                              FROM candidate_submissions cs
+                              JOIN interview_details idt ON cs.candidate_id = idt.candidate_id
+                              WHERE idt.user_id = u.user_id), 0) AS numberOfSubmissions,
+            
+                    COALESCE((SELECT COUNT(*) 
+                              FROM interview_details idt 
+                              JOIN requirements_model r2 ON idt.job_id = r2.job_id 
+                              JOIN bdm_client bc ON r2.client_name = bc.client_name
+                              WHERE idt.user_id = u.user_id 
+                                AND (idt.interview_status = 'Scheduled' 
+                                     OR idt.interview_date_time IS NOT NULL)), 0) AS numberOfInterviews,
+            
+                    COALESCE((SELECT COUNT(*) 
+                              FROM interview_details idt 
+                              WHERE idt.user_id = u.user_id 
+                                AND (
+                                    UPPER(idt.interview_status) = 'PLACED' 
+                                    OR (JSON_VALID(idt.interview_status) = 1 
+                                        AND JSON_SEARCH(idt.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
+                                )), 0) AS numberOfPlacements,
+            
+                    COALESCE((SELECT COUNT(DISTINCT req.client_name) 
+                              FROM requirements_model req 
+                              JOIN job_recruiters jrp ON req.job_id = jrp.job_id
+                              WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfClients,
+            
+                    COALESCE((SELECT COUNT(DISTINCT req.job_id) 
+                              FROM requirements_model req 
+                              JOIN job_recruiters jrp ON req.job_id = jrp.job_id
+                              WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfRequirements
+            
+                FROM user_details u
+                JOIN user_roles ur ON u.user_id = ur.user_id
+                JOIN roles r ON ur.role_id = r.id
+                WHERE r.name IN ('Employee', 'Teamlead')
+            """, nativeQuery = true)
     List<Tuple> getEmployeeCandidateStats();
 
     @Query(value = """
-    SELECT 
-        idt.candidate_id AS candidateId,
-        idt.full_name AS fullName,
-        idt.candidate_email_id AS candidateEmailId,
-        idt.contact_number AS contactNumber,
-        idt.qualification AS qualification,
-        cs.skills AS skills,
-        idt.overall_feedback AS overallFeedback,
-        r.job_id AS jobId,
-        r.job_title AS jobTitle,
-        r.client_name AS clientName
-    FROM interview_details idt
-    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
-    JOIN requirements_model r ON cs.job_id = r.job_id
-    WHERE idt.user_id = :userId
-""", nativeQuery = true)
+                SELECT 
+                    idt.candidate_id AS candidateId,
+                    idt.full_name AS fullName,
+                    idt.candidate_email_id AS candidateEmailId,
+                    idt.contact_number AS contactNumber,
+                    idt.qualification AS qualification,
+                    cs.skills AS skills,
+                    idt.overall_feedback AS overallFeedback,
+                    r.job_id AS jobId,
+                    r.job_title AS jobTitle,
+                    r.client_name AS clientName
+                FROM interview_details idt
+                JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
+                JOIN requirements_model r ON cs.job_id = r.job_id
+                WHERE idt.user_id = :userId
+            """, nativeQuery = true)
     List<SubmittedCandidateDTO> findSubmittedCandidatesByUserId(@Param("userId") String userId);
 
 
     @Query(value = """
-    SELECT 
-        idt.candidate_id AS candidateId,
-        idt.full_name AS fullName,
-        idt.candidate_email_id AS candidateEmailId,
-        idt.contact_number AS contactNumber,
-        idt.qualification AS qualification,
-        cs.skills AS skills,
-        CASE 
-            WHEN JSON_VALID(idt.interview_status) = 1 
-            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
-            ELSE idt.interview_status 
-        END AS interviewStatus,
-        idt.interview_level AS interviewLevel,
-        idt.interview_date_time AS interviewDateTime,
-        r.job_id AS jobId,
-        r.job_title AS jobTitle,
-        idt.client_name AS clientName
-    FROM interview_details idt
-    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
-    JOIN requirements_model r ON cs.job_id = r.job_id
-    WHERE idt.user_id = :userId
-      AND idt.interview_date_time IS NOT NULL
-      AND idt.client_name IS NOT NULL
-""", nativeQuery = true)
+                SELECT 
+                    idt.candidate_id AS candidateId,
+                    idt.full_name AS fullName,
+                    idt.candidate_email_id AS candidateEmailId,
+                    idt.contact_number AS contactNumber,
+                    idt.qualification AS qualification,
+                    cs.skills AS skills,
+                    CASE 
+                        WHEN JSON_VALID(idt.interview_status) = 1 
+                        THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
+                        ELSE idt.interview_status 
+                    END AS interviewStatus,
+                    idt.interview_level AS interviewLevel,
+                    idt.interview_date_time AS interviewDateTime,
+                    r.job_id AS jobId,
+                    r.job_title AS jobTitle,
+                    idt.client_name AS clientName
+                FROM interview_details idt
+                JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
+                JOIN requirements_model r ON cs.job_id = r.job_id
+                WHERE idt.user_id = :userId
+                  AND idt.interview_date_time IS NOT NULL
+                  AND idt.client_name IS NOT NULL
+            """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByUserId(@Param("userId") String userId);
 
 
@@ -264,34 +264,34 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<JobDetailsDTO> findJobDetailsByUserId(@Param("userId") String userId);
 
     @Query(value = """
-    SELECT 
-        idt.candidate_id AS candidateId,
-        idt.full_name AS fullName,
-        idt.candidate_email_id AS candidateEmailId,
-        idt.contact_number AS contactNumber,
-        idt.qualification AS qualification,
-        cs.skills AS skills,
-        CASE 
-            WHEN JSON_VALID(idt.interview_status) 
-            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
-            ELSE idt.interview_status 
-        END AS interviewStatus,
-        idt.interview_level AS interviewLevel,
-        idt.interview_date_time AS interviewDateTime,
-        r.job_id AS jobId,
-        r.job_title AS jobTitle,
-        idt.client_name AS clientName
-    FROM interview_details idt
-    JOIN user_details u ON idt.user_id = u.user_id
-    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
-    JOIN requirements_model r ON cs.job_id = r.job_id
-    WHERE u.user_id = :userId
-      AND (
-          (JSON_VALID(idt.interview_status) 
-           AND JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) = 'Placed')
-          OR UPPER(idt.interview_status) = 'PLACED'
-      )
-""", nativeQuery = true)
+                SELECT 
+                    idt.candidate_id AS candidateId,
+                    idt.full_name AS fullName,
+                    idt.candidate_email_id AS candidateEmailId,
+                    idt.contact_number AS contactNumber,
+                    idt.qualification AS qualification,
+                    cs.skills AS skills,
+                    CASE 
+                        WHEN JSON_VALID(idt.interview_status) 
+                        THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
+                        ELSE idt.interview_status 
+                    END AS interviewStatus,
+                    idt.interview_level AS interviewLevel,
+                    idt.interview_date_time AS interviewDateTime,
+                    r.job_id AS jobId,
+                    r.job_title AS jobTitle,
+                    idt.client_name AS clientName
+                FROM interview_details idt
+                JOIN user_details u ON idt.user_id = u.user_id
+                JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
+                JOIN requirements_model r ON cs.job_id = r.job_id
+                WHERE u.user_id = :userId
+                  AND (
+                      (JSON_VALID(idt.interview_status) 
+                       AND JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) = 'Placed')
+                      OR UPPER(idt.interview_status) = 'PLACED'
+                  )
+            """, nativeQuery = true)
     List<PlacementDetailsDTO> findPlacementCandidatesByUserId(@Param("userId") String userId);
 
 
@@ -333,24 +333,23 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<Tuple> getEmployeeDetailsByUserId(@Param("userId") String userId);
 
     @Query(value = """
-    SELECT COUNT(DISTINCT cs.candidate_id)
-    FROM candidate_submissions cs
-    JOIN requirements_model req ON cs.job_id = req.job_id
-    WHERE cs.job_id = :jobId
-    """, nativeQuery = true)
+            SELECT COUNT(DISTINCT cs.candidate_id)
+            FROM candidate_submissions cs
+            JOIN requirements_model req ON cs.job_id = req.job_id
+            WHERE cs.job_id = :jobId
+            """, nativeQuery = true)
     Integer getNumberOfSubmissionsByJobId(@Param("jobId") String jobId);
 
 
-
     @Query(value = """
-    SELECT COALESCE(SUM(CASE 
-                          WHEN idt.interview_date_time IS NOT NULL 
-                          THEN 1 ELSE 0 
-                       END), 0)
-    FROM interview_details idt
-    JOIN requirements_model req ON idt.job_id = req.job_id
-    WHERE req.job_id = :jobId
-    """, nativeQuery = true)
+            SELECT COALESCE(SUM(CASE 
+                                  WHEN idt.interview_date_time IS NOT NULL 
+                                  THEN 1 ELSE 0 
+                               END), 0)
+            FROM interview_details idt
+            JOIN requirements_model req ON idt.job_id = req.job_id
+            WHERE req.job_id = :jobId
+            """, nativeQuery = true)
     Integer getNumberOfInterviewsByJobId(@Param("jobId") String jobId);
 
 
@@ -364,8 +363,6 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     @Query(value = "SELECT * FROM requirements_model WHERE status <> 'Closed'", nativeQuery = true)
     List<RequirementsModel> findAllActiveRequirements();
 
+
+    List<RequirementsModel> findByAssignedByIgnoreCase(String assignedBy);
 }
-
-
-
-
