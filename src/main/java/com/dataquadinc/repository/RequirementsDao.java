@@ -364,5 +364,10 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<RequirementsModel> findAllActiveRequirements();
 
 
-    List<RequirementsModel> findByAssignedByIgnoreCase(String assignedBy);
-}
+    @Query(value = "SELECT * FROM requirements_model r " +
+            "WHERE LOWER(r.assigned_by) = LOWER(:assignedBy) " +
+            "AND EXISTS (" +
+            "   SELECT 1 FROM user_details u " +
+            "   WHERE LOWER(u.user_name) = LOWER(:assignedBy)" +
+            ")", nativeQuery = true)
+    List<RequirementsModel> findByAssignedByIgnoreCase(@Param("assignedBy") String assignedBy);}
