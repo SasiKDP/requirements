@@ -171,11 +171,11 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         u.email AS employeeEmail,
         r.name AS role,
         COALESCE((SELECT COUNT(DISTINCT c.candidate_id) 
-                  FROM candidates c 
+                  FROM candidates_prod c 
                   WHERE c.user_id = u.user_id), 0) AS numberOfSubmissions,
         COALESCE((
                     SELECT COUNT(*)
-                    FROM candidates c
+                    FROM candidates_prod c
                     WHERE c.user_id = u.user_id
                       AND c.interview_date_time IS NOT NULL
                 ), 0) AS numberOfInterviews,
@@ -183,29 +183,30 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         COALESCE((SELECT SUM(CASE 
                             WHEN c.interview_status = 'Placed' THEN 1 ELSE 0 
                         END) 
-                  FROM candidates c 
+                  FROM candidates_prod c 
                   WHERE c.user_id = u.user_id), 0) +
         COALESCE((SELECT SUM(CASE 
                             WHEN JSON_VALID(c.interview_status) = 1  
                             AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL 
                             THEN 1 ELSE 0 
                         END) 
-                  FROM candidates c 
+                  FROM candidates_prod c 
                   WHERE c.user_id = u.user_id), 0) AS numberOfPlacements,
         COALESCE((SELECT COUNT(DISTINCT req.client_name) 
-                  FROM requirements_model req 
-                  JOIN job_recruiters jrp ON req.job_id = jrp.job_id
+                  FROM requirements_model_prod req 
+                  JOIN job_recruiters_prod jrp ON req.job_id = jrp.job_id
                   WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfClients,
         COALESCE((SELECT COUNT(DISTINCT req.job_id) 
-                  FROM requirements_model req 
-                  JOIN job_recruiters jrp ON req.job_id = jrp.job_id
+                  FROM requirements_model_prod req 
+                  JOIN job_recruiters_prod jrp ON req.job_id = jrp.job_id
                   WHERE jrp.recruiter_id = u.user_id), 0) AS numberOfRequirements
-    FROM user_details u
-    JOIN user_roles ur ON u.user_id = ur.user_id
-    JOIN roles r ON ur.role_id = r.id
+    FROM user_details_prod u
+    JOIN user_roles_prod ur ON u.user_id = ur.user_id
+    JOIN roles_prod r ON ur.role_id = r.id
     WHERE r.name = 'Employee'
     """, nativeQuery = true)
     List<Tuple> getEmployeeCandidateStats();
+
 
 
 
@@ -226,12 +227,12 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         COALESCE(SUM(CASE WHEN c.user_id = u.user_id THEN 1 ELSE 0 END), 0) AS selfSubmissions,
 
         -- Interviews scheduled (future) by teamlead
-      COALESCE(SUM(CASE
+        COALESCE(SUM(CASE
                              WHEN c.user_id = u.user_id
                               AND c.interview_date_time IS NOT NULL
                               AND c.interview_date_time >= NOW()
                               AND c.job_id IN (
-                                 SELECT job_id FROM requirements_model r2
+                                 SELECT job_id FROM requirements_model_prod r2
                                  WHERE r2.client_name = r.client_name AND r2.assigned_by = u.user_name
                               )
                              THEN 1 ELSE 0
@@ -246,22 +247,22 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         END), 0) AS selfPlacements,
 
         -- Team submissions (recruiters submitting to jobs assigned by teamlead)
-        COALESCE(SUM(CASE\s
-                    WHEN c.user_id != u.user_id\s
+        COALESCE(SUM(CASE
+                    WHEN c.user_id != u.user_id
                     AND c.job_id IN (
-                        SELECT job_id FROM requirements_model r2
+                        SELECT job_id FROM requirements_model_prod r2
                         WHERE r2.client_name = r.client_name AND r2.assigned_by = u.user_name
                     )
-                    THEN 1 ELSE 0\s
+                    THEN 1 ELSE 0
                 END), 0) AS teamSubmissions,
 
         -- Team interviews (future) on teamlead's jobs
        COALESCE(SUM(CASE
-                   WHEN c.user_id IS NOT NULL\s
-                    AND c.user_id != u.user_id\s
-                    AND c.interview_date_time IS NOT NULL\s
+                   WHEN c.user_id IS NOT NULL
+                    AND c.user_id != u.user_id
+                    AND c.interview_date_time IS NOT NULL
                     AND c.job_id IN (
-                       SELECT job_id FROM requirements_model r2
+                       SELECT job_id FROM requirements_model_prod r2
                        WHERE r2.client_name = r.client_name AND r2.assigned_by = u.user_name
                     )
                    THEN 1 ELSE 0
@@ -275,17 +276,18 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             ) THEN 1 ELSE 0 
         END), 0) AS teamPlacements
 
-    FROM user_details u
-    JOIN requirements_model r ON r.assigned_by = u.user_name
-    LEFT JOIN candidates c ON c.job_id = r.job_id
+    FROM user_details_prod u
+    JOIN requirements_model_prod r ON r.assigned_by = u.user_name
+    LEFT JOIN candidates_prod c ON c.job_id = r.job_id
     WHERE EXISTS (
-        SELECT 1 FROM user_roles ur 
-        JOIN roles rl ON ur.role_id = rl.id 
+        SELECT 1 FROM user_roles_prod ur 
+        JOIN roles_prod rl ON ur.role_id = rl.id 
         WHERE ur.user_id = u.user_id AND rl.name = 'Teamlead'
     )
     GROUP BY u.user_id, u.user_name, u.email
     """, nativeQuery = true)
     List<Tuple> getTeamleadCandidateStats();
+
 
 
 
@@ -583,11 +585,6 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<Tuple> getTeamleadDetailsByUserId(@Param("userId") String userId);
 
 
-
-
-
-
-
     @Query(value = """
     SELECT 
         u.user_id AS userId,
@@ -600,4 +597,25 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 """, nativeQuery = true)
     Tuple getUserRoleAndUsername(@Param("userId") String userId);
 
+
+    @Query("SELECT r FROM RequirementsModel r " +
+            "WHERE :recruiterId MEMBER OF r.recruiterIds " +
+            "AND r.requirementAddedTimeStamp BETWEEN :startDate AND :endDate")
+    List<RequirementsModel> findJobsByRecruiterIdAndDateRange(@Param("recruiterId") String recruiterId,
+                                                              @Param("startDate") LocalDateTime startDate,
+                                                              @Param("endDate") LocalDateTime endDate);
+
+    // Native query to validate if the username exists in user_details_prod
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM user_details_prod WHERE user_name = :assignedBy)", nativeQuery = true)
+    Integer existsByUsernameInUserTable(@Param("assignedBy") String assignedBy);
+
+
+    @Query(value = "SELECT * FROM requirements_model_prod " +
+            "WHERE assigned_by = :assignedBy " +
+            "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate", nativeQuery = true)
+    List<RequirementsModel> findJobsAssignedByNameAndDateRange(
+            @Param("assignedBy") String assignedBy,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
 }

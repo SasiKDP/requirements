@@ -9,9 +9,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.dataquadinc.dto.*;
-import com.dataquadinc.exceptions.ErrorResponse;
-import com.dataquadinc.exceptions.RecruiterNotFoundException;
-import com.dataquadinc.exceptions.RequirementNotFoundException;
+import com.dataquadinc.exceptions.*;
 import com.dataquadinc.model.RequirementsModel;
 import com.dataquadinc.repository.RequirementsDao;
 import com.dataquadinc.service.EmailService;
@@ -297,9 +295,6 @@ public class RequirementsController {
 	}
 
 
-
-
-
 	@GetMapping("/get/{jobId}")
 	public ResponseEntity<RequirementsDto> getRequirementById(@PathVariable String jobId) {
 		return new ResponseEntity<>(service.getRequirementDetailsById(jobId), HttpStatus.OK);
@@ -399,6 +394,35 @@ public class RequirementsController {
 	public ResponseEntity<List<RecruiterRequirementsDto>> getJobsByRecruiter(@PathVariable String recruiterId) {
 		return new ResponseEntity<>(service.getJobsAssignedToRecruiter(recruiterId),HttpStatus.OK);
 	}
+
+	@GetMapping("/recruiter/{recruiterId}/filterByDate")
+	public ResponseEntity<?> getJobsAssignedToRecruiterByDate(
+			@PathVariable String recruiterId,
+			@RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		try {
+			List<RecruiterRequirementsDto> result = service.getJobsAssignedToRecruiterByDate(recruiterId, startDate, endDate);
+
+			// Log success
+			logger.info("Fetched {} jobs successfully for recruiterId: {} between {} and {}", result.size(), recruiterId, startDate, endDate);
+			return ResponseEntity.ok(result);
+
+		} catch (NoJobsAssignedToRecruiterException ex) {
+			// Log and return 404 with error message
+			logger.error("No jobs found for recruiterId: {} between {} and {}", recruiterId, startDate, endDate);
+			return ResponseEntity.status(HttpStatus.NOT_FOUND)
+					.body(Collections.singletonMap("message", ex.getMessage()));
+
+		} catch (Exception ex) {
+			// Log and return 500 with generic error message
+			logger.error("An error occurred while fetching jobs for recruiterId: {}", recruiterId, ex);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body(Collections.singletonMap("message", "An internal error occurred while fetching recruiter jobs."));
+		}
+	}
+
+
 	@PutMapping("/updateRequirement/{jobId}")
 	public ResponseEntity<ResponseBean> updateRequirement(
 			@PathVariable String jobId,
@@ -559,5 +583,38 @@ public class RequirementsController {
 		return service.getCandidateData(userId);
 	}
 
+	@GetMapping("/assignedby/{name}/filterByDate")
+	public ResponseEntity<?> getRequirementsByAssignedByAndDateRange(
+			@PathVariable String name,
+			@RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		// Validate date range
+		if (endDate.isBefore(startDate)) {
+			logger.warn("End date {} is before start date {}", endDate, startDate);
+			return ResponseEntity.badRequest()
+					.body(Collections.singletonMap("message", "End date cannot be before start date"));
+		}
+
+		// Fetch requirements by assignedBy and date range
+		List<RequirementsModel> requirements = service.getRequirementsByAssignedByAndDateRange(name, startDate, endDate);
+
+		if (requirements.isEmpty()) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND)
+					.body(Collections.singletonMap("message", "No requirements found for assignedBy: " + name));
+		}
+
+		// Clean recruiter names
+		for (RequirementsModel model : requirements) {
+			if (model.getRecruiterName() != null) {
+				Set<String> cleanedNames = model.getRecruiterName().stream()
+						.map(r -> r.replaceAll("[\\[\\]\"]", "").trim())
+						.collect(Collectors.toSet());
+				model.setRecruiterName(cleanedNames);
+			}
+		}
+
+		return ResponseEntity.ok(requirements);
+	}
 
 }
