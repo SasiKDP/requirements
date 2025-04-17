@@ -536,7 +536,7 @@ public class RequirementsService {
 			return new ResponseBean(true, "Updated Successfully", null, null);
 		} catch (Exception e) {
 			logger.error("Error updating requirement", e);
-			return new ResponseBean(false, "Error updating requirement", "Internal Server Error", null);
+			return new ResponseBean(true, "Error updating requirement", "Internal Server Error", null);
 		}
 	}
 
@@ -887,4 +887,5 @@ public class RequirementsService {
 
 		return employeeDetails;
 	}
+
 }

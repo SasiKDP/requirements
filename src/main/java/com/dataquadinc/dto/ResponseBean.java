@@ -9,8 +9,8 @@ public class ResponseBean {
     private Object data;
     private String error;
 
-    public ResponseBean(boolean success, String message, String error, Object data) {
-        this.success = success;
+    public ResponseBean(boolean b, String message, String error, Object data) {
+        this.success = b;
         this.message = message;
         this.error = error;
         this.data = data;
@@ -48,7 +48,7 @@ public class ResponseBean {
     public void setError(String error) {
         this.error = error;
     }
-    // Helper methods for easy instantiation of successful and error responses
+
     public static ResponseBean successResponse(String message, Object data) {
         return new ResponseBean(true, message, null, data);
     }
@@ -56,4 +56,5 @@ public class ResponseBean {
     public static ResponseBean errorResponse(String message, String error) {
         return new ResponseBean(false, message, error, null);
     }
+
 }

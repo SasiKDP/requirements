@@ -3,7 +3,10 @@ package com.dataquadinc.controller;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.dataquadinc.dto.*;
@@ -157,7 +160,7 @@ public class 	RequirementsController {
 			if (jobDescriptionBytes == null || jobDescriptionBytes.length == 0) {
 				logger.error("Job description is missing for job ID: {}", jobId);
 				// Return a ResponseBean with an error message
-				ResponseBean errorResponse = new ResponseBean(false, "Job description is missing for job ID: " + jobId, "No file found", null);
+				ResponseBean errorResponse = new ResponseBean(true, "Job description is missing for job ID: " + jobId, "No file found", null);
 				return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
 			}
 
@@ -204,13 +207,13 @@ public class 	RequirementsController {
 		} catch (RequirementNotFoundException e) {
 			logger.error("Requirement not found: {}", e.getMessage());
 			// Return a ResponseBean with the error message
-			ResponseBean errorResponse = new ResponseBean(false, e.getMessage(), "Not Found", null);
+			ResponseBean errorResponse = new ResponseBean(true, e.getMessage(), "Not Found", null);
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
 
 		} catch (Exception e) {
 			logger.error("Unexpected error while downloading job description for job ID {}: {}", jobId, e.getMessage());
 			// Return a ResponseBean with the error message
-			ResponseBean errorResponse = new ResponseBean(false, "Unexpected error: " + e.getMessage(), "Internal Server Error", null);
+			ResponseBean errorResponse = new ResponseBean(true, "Unexpected error: " + e.getMessage(), "Internal Server Error", null);
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
 		}
 	}
@@ -308,6 +311,7 @@ public class 	RequirementsController {
 
 			// Flag to check if any error occurs before sending emails
 			boolean allEmailsSentSuccessfully = true;
+			List<String> assignedRecruiters = new ArrayList<>();
 
 			// Convert List to Set and clean the recruiter IDs
 			Set<String> cleanedRecruiterIds = recruiterIds.stream()
@@ -322,36 +326,50 @@ public class 	RequirementsController {
 
 					// Fetch the recruiter's email and name (assuming these methods exist in your service)
 					String recruiterEmail = service.getRecruiterEmail(recruiterId);
-					String recruiterName = service.getRecruiterName(recruiterId); // This should be available in the service
-
-					// Log recruiter ID and fetched email
-					logger.info("Fetched recruiterId: {} with email: {}", recruiterId, recruiterEmail);
+					String recruiterName = service.getRecruiterName(recruiterId);
 
 					// Check if the email and name are not null or empty
 					if (recruiterEmail == null || recruiterEmail.isEmpty()) {
 						throw new RecruiterNotFoundException("Email for recruiter " + recruiterId + " not found");
 					}
 
-					// Add the recruiter name to the job requirement's recruiterName set
-					requirement.getRecruiterName().add(recruiterName); // Add recruiter name to Set
+					// Add recruiter to the list of assigned recruiters
+					assignedRecruiters.add(recruiterId);
 
-					System.out.println("Recruiter names before saving: " + requirement.getRecruiterName());
-
-					// Prepare the email subject and body
-					String subject = "New Job Assignment: " + requirement.getJobTitle();
-
+					// Prepare email subject and body based on the status
+					String subject = "New Job Assignment: " + requirement.getJobTitle() + " (Job ID: " + jobId + ")";
 					String body = "Dear " + recruiterName + ",\n\n" +
-							"I hope this message finds you well. \n\n" +
-							"You have been assigned a new job requirement, and the details are outlined below:  \n\n" +
+							"You have been assigned a new job requirement, and the details are outlined below: \n\n" +
 							"Job Title: " + requirement.getJobTitle() + "\n" +
+							"Job ID: " + jobId + "\n" +
 							"Client: " + requirement.getClientName() + "\n" +
 							"Location: " + requirement.getLocation() + "\n" +
 							"Job Type: " + requirement.getJobType() + "\n" +
 							"Experience Required: " + requirement.getExperienceRequired() + " years\n\n" +
-							"Assigned By: " + requirement.getAssignedBy() + "\n\n" + // Added Assigned By field
-							"Please take a moment to review the details and proceed with the necessary actions. Additional information can be accessed via your dashboard.\n\n" +
-							"If you have any questions or require further clarification, feel free to reach out.\n\n" +
+							"Assigned By: " + requirement.getAssignedBy() + "\n\n" +
+							"Please review the details and proceed with the necessary actions.\n\n" +
 							"Best Regards,\nDataquad";
+
+					// Modify subject and body based on job status (Closed or Hold)
+					if ("Closed".equalsIgnoreCase(requirement.getStatus())) {
+						subject = "Job Closed: " + requirement.getJobTitle() + " (Job ID: " + jobId + ")";
+						body = "Dear " + recruiterName + ",\n\n" +
+								"The job requirement with Job ID: " + jobId + " has been closed. Here are the details:\n\n" +
+								"Job Title: " + requirement.getJobTitle() + "\n" +
+								"Client: " + requirement.getClientName() + "\n" +
+								"Location: " + requirement.getLocation() + "\n\n" +
+								"Thank you for your efforts in working on this job.\n\n" +
+								"Best Regards,\nDataquad";
+					} else if ("Hold".equalsIgnoreCase(requirement.getStatus())) {
+						subject = "Job on Hold: " + requirement.getJobTitle() + " (Job ID: " + jobId + ")";
+						body = "Dear " + recruiterName + ",\n\n" +
+								"The job requirement with Job ID: " + jobId + " is currently on hold. Please find the details below:\n\n" +
+								"Job Title: " + requirement.getJobTitle() + "\n" +
+								"Client: " + requirement.getClientName() + "\n" +
+								"Location: " + requirement.getLocation() + "\n\n" +
+								"Please await further instructions regarding this job.\n\n" +
+								"Best Regards,\nDataquad";
+					}
 
 					// Send email to the recruiter
 					emailService.sendEmail(recruiterEmail, subject, body);
@@ -366,9 +384,11 @@ public class 	RequirementsController {
 				}
 			}
 
-			// Return success response after attempting to assign recruiters and send emails
+			// Prepare the response
+			ResponseBean jobAssignmentResponse = new ResponseBean(true, jobId, requirement.getStatus(), assignedRecruiters);
+
 			if (allEmailsSentSuccessfully) {
-				return ResponseEntity.ok(ResponseBean.successResponse("Recruiters assigned and email notifications sent successfully.", null));
+				return ResponseEntity.ok(ResponseBean.successResponse("Status updated and email notifications sent successfully.", jobAssignmentResponse));
 			} else {
 				return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
 						.body(ResponseBean.errorResponse("Some recruiter emails failed to send. Please check the logs for details.", null));
@@ -381,8 +401,6 @@ public class 	RequirementsController {
 		}
 	}
 
-
-
 	@PutMapping("/updateStatus")
 	public ResponseEntity<Void> updateStatus(@RequestBody StatusDto status) {
 		service.statusUpdate(status);
@@ -393,9 +411,8 @@ public class 	RequirementsController {
 	public ResponseEntity<List<RecruiterRequirementsDto>> getJobsByRecruiter(@PathVariable String recruiterId) {
 		return new ResponseEntity<>(service.getJobsAssignedToRecruiter(recruiterId),HttpStatus.OK);
 	}
-
 	@PutMapping("/updateRequirement/{jobId}")
-	public ResponseEntity<Map<String, Object>> updateRequirement(
+	public ResponseEntity<ResponseBean> updateRequirement(
 			@PathVariable String jobId,
 			@RequestParam("jobTitle") String jobTitle,
 			@RequestParam("clientName") String clientName,
@@ -413,115 +430,126 @@ public class 	RequirementsController {
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
 			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
-			@RequestParam("assignedBy") String assignedBy
+			@RequestParam("assignedBy") String assignedBy // Added assignedBy parameter
 	) throws IOException {
 		try {
-			logger.info("Received request to update requirement with jobId: {}", jobId);
-
+			// Validate that only one of jobDescription or jobDescriptionFile is provided
 			if ((jobDescription != null && !jobDescription.isEmpty()) &&
 					(jobDescriptionFile != null && !jobDescriptionFile.isEmpty())) {
-				logger.warn("Both jobDescription and jobDescriptionFile provided. Only one should be given.");
-				return ResponseEntity.badRequest().body(Map.of("error", "Provide either jobDescription or jobDescriptionFile, not both."));
+				return ResponseEntity.badRequest()
+						.body(ResponseBean.errorResponse("You can either provide a job description text or upload a job description file, but not both.", "Bad Request"));
 			}
 
+			// Fetch the existing requirement
 			RequirementsDto existingRequirement = service.getRequirementDetailsById(jobId);
 			if (existingRequirement == null) {
-				logger.warn("Requirement not found for jobId: {}", jobId);
-				return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Requirement not found for jobId: " + jobId));
+				return ResponseEntity.status(HttpStatus.NOT_FOUND)
+						.body(ResponseBean.errorResponse("Requirement not found for the provided jobId", "Not Found"));
 			}
 
-			logger.info("Updating fields for requirement with jobId: {}", jobId);
+			// Debugging: Check the current status
+			System.out.println("Existing status before update: " + existingRequirement.getStatus());
 
-			existingRequirement.setJobTitle(jobTitle);
-			existingRequirement.setClientName(clientName);
-			existingRequirement.setStatus(status);
-			existingRequirement.setJobType(jobType);
-			existingRequirement.setLocation(location);
-			existingRequirement.setJobMode(jobMode);
-			existingRequirement.setExperienceRequired(experienceRequired);
-			existingRequirement.setNoticePeriod(noticePeriod);
-			existingRequirement.setRelevantExperience(relevantExperience);
-			existingRequirement.setQualification(qualification);
-			existingRequirement.setSalaryPackage(salaryPackage);
-			existingRequirement.setNoOfPositions(noOfPositions);
-			existingRequirement.setRecruiterIds(recruiterIds);
-			existingRequirement.setRecruiterName(recruiterName);
-			existingRequirement.setAssignedBy(assignedBy);
+			// Set or nullify fields that are not being updated
+			if (jobTitle != null && !jobTitle.isEmpty()) existingRequirement.setJobTitle(jobTitle);
+			else existingRequirement.setJobTitle(null);
 
-			if (jobDescriptionFile != null && !jobDescriptionFile.isEmpty()) {
-				logger.info("Setting jobDescriptionBlob from file for jobId: {}", jobId);
-				existingRequirement.setJobDescription(null);
-				existingRequirement.setJobDescriptionBlob(jobDescriptionFile.getBytes());
+			// Check and update the status
+			if (status != null && !status.isEmpty()) {
+				existingRequirement.setStatus(status);
+				System.out.println("Updated status to: " + status); // Debugging: Log updated status
 			} else {
-				logger.info("Setting jobDescription text for jobId: {}", jobId);
-				existingRequirement.setJobDescription(jobDescription);
-				existingRequirement.setJobDescriptionBlob(null);
+				existingRequirement.setStatus(null);
 			}
 
-			service.updateRequirementDetails(existingRequirement);
-			logger.info("Requirement updated successfully for jobId: {}", jobId);
+			// Handle clientName and other fields similarly
+			if (clientName != null && !clientName.isEmpty()) existingRequirement.setClientName(clientName);
+			else existingRequirement.setClientName(null);
 
-			String subject = "";
-			String body = "";
+			// Logic to set job description and BLOB
+			String finalJobDescription = null;
+			byte[] jobDescriptionBlob = null;
 
-			if (status.equalsIgnoreCase("closed")) {
-				subject = "📌 Requirement Closed - " + jobTitle + " (Job ID: " + jobId + ")";
-				body = String.format(
-						"Dear Recruiter,\n\n" +
-								"We would like to inform you that the following requirement has been formally marked as **CLOSED**:\n\n" +
-								"• Job Title   : %s\n" +
-								"• Client Name : %s\n" +
-								"• Job ID      : %s\n" +
-								"• Location    : %s\n\n" +
-								"Kindly update your records accordingly and stop any further processing for this role.\n\n" +
-								"We appreciate your continued efforts and collaboration.\n\n" +
-								"Warm regards,\n" +
-								"Dataquad Team",
-						jobTitle, clientName, jobId, location
-				);
-				logger.info("Prepared email content for CLOSED status");
-			} else if (status.equalsIgnoreCase("hold")) {
-				subject = "⏸️ Requirement On Hold - " + jobTitle + " (Job ID: " + jobId + ")";
-				body = String.format(
-						"Dear Recruiter,\n\n" +
-								"Please be informed that the below requirement is currently placed **ON HOLD**:\n\n" +
-								"• Job Title   : %s\n" +
-								"• Client Name : %s\n" +
-								"• Job ID      : %s\n" +
-								"• Location    : %s\n\n" +
-								"Kindly hold off on submitting any further candidates for this role until we notify you of any updates.\n" +
-								"If you have any questions or need clarification, please feel free to reach out to the BDM or the Admin team.\n\n" +
-								"Thank you for your cooperation.\n\n" +
-								"Warm regards,\n" +
-								"Dataquad Team",
-						jobTitle, clientName, jobId, location
-				);
-				logger.info("Prepared email content for HOLD status");
+			// If jobDescriptionFile is provided, process the file and set the BLOB
+			if (jobDescriptionFile != null && !jobDescriptionFile.isEmpty()) {
+				jobDescriptionBlob = jobDescriptionFile.getBytes(); // Save the file as a BLOB
+				finalJobDescription = null; // Use the file (no text)
+			}
+			// If jobDescription (text) is provided, use it and set the BLOB to null
+			else if (jobDescription != null && !jobDescription.isEmpty()) {
+				finalJobDescription = jobDescription;
+				jobDescriptionBlob = null; // Use the text (no file)
 			}
 
-			if ((status.equalsIgnoreCase("closed") || status.equalsIgnoreCase("hold")) && recruiterName != null) {
-				for (String email : recruiterName) {
-					emailService.sendEmail(email, subject, body);
-					logger.info("Email sent to: {}", email);
-				}
-			}
+			// Set the job description (from file or text)
+			existingRequirement.setJobDescription(finalJobDescription);
+			existingRequirement.setJobDescriptionBlob(jobDescriptionBlob); // Set the BLOB (or null)
 
-			Map<String, Object> response = new LinkedHashMap<>();
-			response.put("jobId", jobId);
-			response.put("updatedStatus", status.toLowerCase());
-			response.put("assignedRecruiters", recruiterIds);
-			response.put("message", "Status updated and email notifications sent successfully.");
-			logger.info("Returning successful update response for jobId: {}", jobId);
+			// Set the other fields and nullify any fields that are not being updated
+			if (jobType != null && !jobType.isEmpty()) existingRequirement.setJobType(jobType);
+			else existingRequirement.setJobType(null);
 
-			return ResponseEntity.ok(response);
+			if (location != null && !location.isEmpty()) existingRequirement.setLocation(location);
+			else existingRequirement.setLocation(null);
 
+			if (jobMode != null && !jobMode.isEmpty()) existingRequirement.setJobMode(jobMode);
+			else existingRequirement.setJobMode(null);
+
+			if (experienceRequired != null && !experienceRequired.isEmpty()) existingRequirement.setExperienceRequired(experienceRequired);
+			else existingRequirement.setExperienceRequired(null);
+
+			if (noticePeriod != null && !noticePeriod.isEmpty()) existingRequirement.setNoticePeriod(noticePeriod);
+			else existingRequirement.setNoticePeriod(null);
+
+			if (relevantExperience != null && !relevantExperience.isEmpty()) existingRequirement.setRelevantExperience(relevantExperience);
+			else existingRequirement.setRelevantExperience(null);
+
+			if (qualification != null && !qualification.isEmpty()) existingRequirement.setQualification(qualification);
+			else existingRequirement.setQualification(null);
+
+			if (salaryPackage != null && !salaryPackage.isEmpty()) existingRequirement.setSalaryPackage(salaryPackage);
+			else existingRequirement.setSalaryPackage(null);
+
+			if (noOfPositions > 0) existingRequirement.setNoOfPositions(noOfPositions);
+			else existingRequirement.setNoOfPositions(0); // If noOfPositions is not updated, set to 0
+
+			if (recruiterIds != null && !recruiterIds.isEmpty()) existingRequirement.setRecruiterIds(recruiterIds);
+			else existingRequirement.setRecruiterIds(null);
+
+			if (recruiterName != null && !recruiterName.isEmpty()) existingRequirement.setRecruiterName(recruiterName);
+			else existingRequirement.setRecruiterName(null);
+
+			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
+			else existingRequirement.setAssignedBy(null);
+
+			// Call the service to update the requirement
+			ResponseBean response = service.updateRequirementDetails(existingRequirement);
+
+			// Debugging: Log the updated status after saving
+			System.out.println("Status after saving: " + existingRequirement.getStatus());
+
+
+
+			// Return success response
+			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
+
+		} catch (IllegalArgumentException e) {
+			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
 		} catch (Exception e) {
-			logger.error("Error updating requirement with jobId: {}: {}", jobId, e.getMessage(), e);
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(Map.of("error", "Unexpected error: " + e.getMessage()));
+					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"));
 		}
 	}
 
+
+	@DeleteMapping("/deleteRequirement/{jobId}")
+	public ResponseEntity<ResponseBean> deleteRequirement(@PathVariable String jobId) {
+		// Call the service method to delete the requirement by jobId
+		ResponseBean response = service.deleteRequirementDetails(jobId);
+
+		// Return the response entity with the appropriate status code
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
 	@GetMapping("/{jobId}")
 	public ResponseEntity<RecruiterDetailsDTO> getRecruiterDetails(@PathVariable String jobId) {
 		RecruiterDetailsDTO recruiterDetails = service.getRecruiterDetailsByJobId(jobId);
