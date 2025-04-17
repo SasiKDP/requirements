@@ -1,5 +1,6 @@
 package com.dataquadinc.exceptions;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashMap;
@@ -71,6 +72,22 @@ public class GlobalExceptionHandler {
 		body.put("timestamp", LocalDateTime.now());
 
 		return new ResponseEntity<>(body, HttpStatus.NOT_FOUND);
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<?> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+		if (ex.getRequiredType() == LocalDate.class) {
+			return ResponseEntity.badRequest()
+					.body(Collections.singletonMap("message", "Invalid date format. Use yyyy-MM-dd (e.g., 2025-04-30)."));
+		}
+		return ResponseEntity.badRequest()
+				.body(Collections.singletonMap("message", "Invalid request parameter."));
+	}
+	@ExceptionHandler(AssignedByNotFoundException.class)
+	public ResponseEntity<Map<String, String>> handleAssignedByNotFoundException(AssignedByNotFoundException ex) {
+		Map<String, String> response = new HashMap<>();
+		response.put("message", ex.getMessage());
+		return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
 	}
 
 }
