@@ -601,12 +601,9 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     Tuple getUserRoleAndUsername(@Param("userId") String userId);
 
     @Query(value = "SELECT * FROM requirements_model_prod r " +
-            "WHERE LOWER(r.assigned_by) = LOWER(:assignedBy) " +
-            "AND EXISTS (" +
-            "   SELECT 1 FROM user_details_prod u " +
-            "   WHERE LOWER(u.user_name) = LOWER(:assignedBy)" +
+            "WHERE LOWER(r.assigned_by) = (" +
+            "   SELECT LOWER(u.user_name) FROM user_details_prod u WHERE u.user_id = :userId" +
             ")", nativeQuery = true)
-    List<RequirementsModel> findByAssignedByIgnoreCase(@Param("assignedBy") String assignedBy);
-
+    List<RequirementsModel> findByAssignedByUserId(@Param("userId") String userId);
 
 }

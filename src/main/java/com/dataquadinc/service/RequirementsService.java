@@ -880,16 +880,17 @@ public class RequirementsService {
 		return tuple.getElements().stream().anyMatch(e -> alias.equalsIgnoreCase(e.getAlias()));
 	}
 
-	public List<RequirementsModel> getRequirementsByAssignedBy(String name) {
-		List<RequirementsModel> requirements = requirementsDao.findByAssignedByIgnoreCase(name);
+	public List<RequirementsModel> getRequirementsByAssignedBy(String userId) {
+		List<RequirementsModel> requirements = requirementsDao.findByAssignedByUserId(userId);
 
 		if (requirements.isEmpty()) {
-			logger.warn("No requirements found or '{}' is not a valid user", name);
-			throw new ResourceNotFoundException("No requirements found: '" + name + "' may not be a valid user.");
+			logger.warn("No requirements found for user ID '{}'", userId);
+			throw new ResourceNotFoundException("No requirements found for user ID: '" + userId + "'.");
 		}
 
-		logger.info("Total requirements assigned by '{}': {}", name, requirements.size());
+		logger.info("Total requirements assigned by user ID '{}': {}", userId, requirements.size());
 		return requirements;
 	}
+
 
 }
