@@ -916,7 +916,7 @@ public class RequirementsService {
 
 		if (requirements.isEmpty()) {
 			logger.warn("No requirements found for user ID '{}'", userId);
-			throw new ResourceNotFoundException("No requirements found for user ID: '" + userId + "'.");
+			throw new ResourceNotFoundException("No requirements found for user ID: '" + userId + "'or may not be in db");
 		}
 
 		logger.info("Total requirements assigned by user ID '{}': {}", userId, requirements.size());
