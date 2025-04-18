@@ -899,8 +899,4 @@ public class RequirementsService {
 
 		return requirements;
 	}
-
-	public String getRecruiterEmailById(String recruiterId) {
-        return recruiterId;
-    }
 }

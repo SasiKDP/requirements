@@ -8,8 +8,8 @@ public class RequirementStatusUpdateResponse {
     private String updatedStatus;
     private Set<String> assignedRecruiters;
 
-    // Constructor (without the message field)
-    public RequirementStatusUpdateResponse(String jobId, String updatedStatus, Set<String> assignedRecruiters, String s) {
+    // Correct constructor
+    public RequirementStatusUpdateResponse(String jobId, String updatedStatus, Set<String> assignedRecruiters) {
         this.jobId = jobId;
         this.updatedStatus = updatedStatus;
         this.assignedRecruiters = assignedRecruiters;

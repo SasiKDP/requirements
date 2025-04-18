@@ -395,7 +395,8 @@ public class 	RequirementsController {
 	@GetMapping("/recruiter/{recruiterId}")
 	public ResponseEntity<List<RecruiterRequirementsDto>> getJobsByRecruiter(@PathVariable String recruiterId) {
 		return new ResponseEntity<>(service.getJobsAssignedToRecruiter(recruiterId),HttpStatus.OK);
-	}@PutMapping("/updateRequirement/{jobId}")
+	}
+	@PutMapping("/updateRequirement/{jobId}")
 	public ResponseEntity<ResponseBean> updateRequirement(
 			@PathVariable String jobId,
 			@RequestParam("jobTitle") String jobTitle,
@@ -431,54 +432,138 @@ public class 	RequirementsController {
 						.body(ResponseBean.errorResponse("Requirement not found for the provided jobId", "Not Found"));
 			}
 
+			// Debugging: Check the current status
+			System.out.println("Existing status before update: " + existingRequirement.getStatus());
+
 			// Set or nullify fields that are not being updated
 			if (jobTitle != null && !jobTitle.isEmpty()) existingRequirement.setJobTitle(jobTitle);
 			else existingRequirement.setJobTitle(null);
 
+			// Check and update the status
 			if (status != null && !status.isEmpty()) {
 				existingRequirement.setStatus(status);
+				System.out.println("Updated status to: " + status); // Debugging: Log updated status
 			} else {
 				existingRequirement.setStatus(null);
 			}
 
-			// Other fields handled similarly (clientName, jobDescription, etc.)
+			// Handle clientName and other fields similarly
+			if (clientName != null && !clientName.isEmpty()) existingRequirement.setClientName(clientName);
+			else existingRequirement.setClientName(null);
 
-			// Check if the status is "Closed" or "Hold" and handle email notifications
-			if (assignedBy != null && (status.equalsIgnoreCase("Closed") || status.equalsIgnoreCase("Hold"))) {
-				for (String recruiterId : recruiterIds) {
-					String email = service.getRecruiterEmailById(recruiterId); // Implement this in service if not done
+			// Logic to set job description and BLOB
+			String finalJobDescription = null;
+			byte[] jobDescriptionBlob = null;
 
-					// Check if email is valid
-					if (!isValidEmail(email)) {
-						continue; // Skip invalid emails
-					}
-
-					String subject = status.equalsIgnoreCase("Closed")
-							? "Job Closed Notification - Job ID: " + jobId
-							: "Job On Hold Notification - Job ID: " + jobId;
-
-					String body = status.equalsIgnoreCase("Closed")
-							? "The job associated with Job ID " + jobId + " has been marked as CLOSED."
-							: "The job associated with Job ID " + jobId + " is currently ON HOLD.";
-
-					emailService.sendEmail(email, subject, body);
-				}
-
-				// Build the response with a message
-				RequirementStatusUpdateResponse statusUpdateResponse = new RequirementStatusUpdateResponse(
-						jobId,
-						status.toLowerCase(),
-						recruiterIds,
-						"Status updated and email notifications sent successfully."
-				);
-
-				// Return the response
-				return ResponseEntity.ok(ResponseBean.successResponse("Requirement updated successfully", statusUpdateResponse));
+			// If jobDescriptionFile is provided, process the file and set the BLOB
+			if (jobDescriptionFile != null && !jobDescriptionFile.isEmpty()) {
+				jobDescriptionBlob = jobDescriptionFile.getBytes(); // Save the file as a BLOB
+				finalJobDescription = null; // Use the file (no text)
+			}
+			// If jobDescription (text) is provided, use it and set the BLOB to null
+			else if (jobDescription != null && !jobDescription.isEmpty()) {
+				finalJobDescription = jobDescription;
+				jobDescriptionBlob = null; // Use the text (no file)
 			}
 
-			// Update the requirement and return success response
-			ResponseBean response = service.updateRequirementDetails(existingRequirement);
-			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
+			// Set the job description (from file or text)
+			existingRequirement.setJobDescription(finalJobDescription);
+			existingRequirement.setJobDescriptionBlob(jobDescriptionBlob); // Set the BLOB (or null)
+
+			// Set the other fields and nullify any fields that are not being updated
+			if (jobType != null && !jobType.isEmpty()) existingRequirement.setJobType(jobType);
+			else existingRequirement.setJobType(null);
+
+			if (location != null && !location.isEmpty()) existingRequirement.setLocation(location);
+			else existingRequirement.setLocation(null);
+
+			if (jobMode != null && !jobMode.isEmpty()) existingRequirement.setJobMode(jobMode);
+			else existingRequirement.setJobMode(null);
+
+			if (experienceRequired != null && !experienceRequired.isEmpty()) existingRequirement.setExperienceRequired(experienceRequired);
+			else existingRequirement.setExperienceRequired(null);
+
+			if (noticePeriod != null && !noticePeriod.isEmpty()) existingRequirement.setNoticePeriod(noticePeriod);
+			else existingRequirement.setNoticePeriod(null);
+
+			if (relevantExperience != null && !relevantExperience.isEmpty()) existingRequirement.setRelevantExperience(relevantExperience);
+			else existingRequirement.setRelevantExperience(null);
+
+			if (qualification != null && !qualification.isEmpty()) existingRequirement.setQualification(qualification);
+			else existingRequirement.setQualification(null);
+
+			if (salaryPackage != null && !salaryPackage.isEmpty()) existingRequirement.setSalaryPackage(salaryPackage);
+			else existingRequirement.setSalaryPackage(null);
+
+			if (noOfPositions > 0) existingRequirement.setNoOfPositions(noOfPositions);
+			else existingRequirement.setNoOfPositions(0); // If noOfPositions is not updated, set to 0
+
+			if (recruiterIds != null && !recruiterIds.isEmpty()) existingRequirement.setRecruiterIds(recruiterIds);
+			else existingRequirement.setRecruiterIds(null);
+
+			if (recruiterName != null && !recruiterName.isEmpty()) existingRequirement.setRecruiterName(recruiterName);
+			else existingRequirement.setRecruiterName(null);
+
+			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
+			else existingRequirement.setAssignedBy(null);
+
+			// Call the service to update the requirement
+			service.updateRequirementDetails(existingRequirement);
+
+// Prepare custom structured response data
+			RequirementStatusUpdateResponse data = new RequirementStatusUpdateResponse(
+					jobId,
+					existingRequirement.getStatus(),
+					existingRequirement.getRecruiterIds()
+			);
+
+			// ✅ After setting status, fetch the current updated status
+			String currentStatus = existingRequirement.getStatus();
+
+// ✅ Only send email if status is Closed or Hold
+			if ("Closed".equalsIgnoreCase(currentStatus) || "Hold".equalsIgnoreCase(currentStatus)) {
+
+				Set<String> recruiterNames = existingRequirement.getRecruiterName();
+
+				if (recruiterNames != null && !recruiterNames.isEmpty()) {
+					for (String recruiter : recruiterNames) {
+						try {
+							// ✅ Get email by recruiter name
+							Object recruiterService = new Object();
+							String email = String.valueOf(recruiterService.getClass());
+
+							// ✅ Validate email format
+							if (email != null && email.contains("@")) {
+								String subject = "Requirement Status Update: " + currentStatus;
+								String body = "Dear " + recruiter + ",\n\n"
+										+ "The job requirement titled '" + existingRequirement.getJobTitle()
+										+ "' for client '" + existingRequirement.getClientName()
+										+ "' has been updated to status: '" + currentStatus + "'.\n"
+										+ "This change was made by: " + existingRequirement.getAssignedBy() + ".\n\n"
+										+ "Please review this update.\n\n"
+										+ "Regards,\nRecruitment Team";
+
+								// ✅ Send the email
+								emailService.sendEmail(email, subject, body);
+								System.out.println("✅ Email sent to: " + email);
+							} else {
+								System.out.println("⚠️ Invalid or missing email for recruiter: " + recruiter);
+							}
+						} catch (Exception e) {
+							System.out.println("❌ Error sending email to recruiter: " + recruiter + " | Reason: " + e.getMessage());
+						}
+					}
+				} else {
+					System.out.println("⚠️ No recruiters assigned for email notification.");
+				}
+			}
+
+
+			// Debugging: Log the updated status after saving
+			System.out.println("Status after saving: " + existingRequirement.getStatus());
+
+			// Return success response
+			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully",data));
 
 		} catch (IllegalArgumentException e) {
 			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
@@ -487,10 +572,6 @@ public class 	RequirementsController {
 					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"));
 		}
 	}
-
-	private boolean isValidEmail(String email) {
-        return false;
-    }
 
 
 	@DeleteMapping("/deleteRequirement/{jobId}")
