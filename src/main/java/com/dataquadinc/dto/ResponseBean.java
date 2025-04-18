@@ -9,8 +9,8 @@ public class ResponseBean {
     private Object data;
     private String error;
 
-    public ResponseBean(boolean b, String message, String error, Object data) {
-        this.success = b;
+    public ResponseBean(boolean success, String message, String error, Object data) {
+        this.success = success;
         this.message = message;
         this.error = error;
         this.data = data;

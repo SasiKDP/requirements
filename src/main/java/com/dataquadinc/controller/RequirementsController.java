@@ -507,63 +507,18 @@ public class 	RequirementsController {
 			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
 			else existingRequirement.setAssignedBy(null);
 
-			// Call the service to update the requirement
-			service.updateRequirementDetails(existingRequirement);
 
-// Prepare custom structured response data
-			RequirementStatusUpdateResponse data = new RequirementStatusUpdateResponse(
-					jobId,
-					existingRequirement.getStatus(),
-					existingRequirement.getRecruiterIds()
-			);
+			ResponseBean response = service.updateRequirementDetails(existingRequirement);
+			return ResponseEntity.ok(response);
 
-			// ✅ After setting status, fetch the current updated status
-			String currentStatus = existingRequirement.getStatus();
-
-// ✅ Only send email if status is Closed or Hold
-			if ("Closed".equalsIgnoreCase(currentStatus) || "Hold".equalsIgnoreCase(currentStatus)) {
-
-				Set<String> recruiterNames = existingRequirement.getRecruiterName();
-
-				if (recruiterNames != null && !recruiterNames.isEmpty()) {
-					for (String recruiter : recruiterNames) {
-						try {
-							// ✅ Get email by recruiter name
-							Object recruiterService = new Object();
-							String email = String.valueOf(recruiterService.getClass());
-
-							// ✅ Validate email format
-							if (email != null && email.contains("@")) {
-								String subject = "Requirement Status Update: " + currentStatus;
-								String body = "Dear " + recruiter + ",\n\n"
-										+ "The job requirement titled '" + existingRequirement.getJobTitle()
-										+ "' for client '" + existingRequirement.getClientName()
-										+ "' has been updated to status: '" + currentStatus + "'.\n"
-										+ "This change was made by: " + existingRequirement.getAssignedBy() + ".\n\n"
-										+ "Please review this update.\n\n"
-										+ "Regards,\nRecruitment Team";
-
-								// ✅ Send the email
-								emailService.sendEmail(email, subject, body);
-								System.out.println("✅ Email sent to: " + email);
-							} else {
-								System.out.println("⚠️ Invalid or missing email for recruiter: " + recruiter);
-							}
-						} catch (Exception e) {
-							System.out.println("❌ Error sending email to recruiter: " + recruiter + " | Reason: " + e.getMessage());
-						}
-					}
-				} else {
-					System.out.println("⚠️ No recruiters assigned for email notification.");
-				}
-			}
-
-
-			// Debugging: Log the updated status after saving
-			System.out.println("Status after saving: " + existingRequirement.getStatus());
-
-			// Return success response
-			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully",data));
+//			// Call the service to update the requirement
+//			ResponseBean response = service.updateRequirementDetails(existingRequirement);
+//
+//			// Debugging: Log the updated status after saving
+//			System.out.println("Status after saving: " + existingRequirement.getStatus());
+//
+//			// Return success response
+//			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully",response));
 
 		} catch (IllegalArgumentException e) {
 			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
