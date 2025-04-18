@@ -51,20 +51,11 @@ public class BDM_service {
     }
 
     private String generateCustomId() {
-        List<BDM_Client> clients = repository.findAll();
-        int maxNumber = clients.stream()
-                .map(client -> {
-                    try {
-                        return Integer.parseInt(client.getId().replace("CLIENT", ""));
-                    } catch (NumberFormatException e) {
-                        return 0;
-                    }
-                })
-                .max(Integer::compare)
-                .orElse(0);
-
-        return String.format("CLIENT%03d", maxNumber + 1);
+        Integer maxNumber = repository.findMaxClientNumber();  // Just one value, not the whole table
+        if (maxNumber == null) maxNumber = 0;
+        return String.format("CLIENT%03d", maxNumber + 1);  // Like CLIENT001, CLIENT002, etc.
     }
+
 
     private BDM_Dto convertToDTO(BDM_Client client) {
         BDM_Dto dto = new BDM_Dto();
