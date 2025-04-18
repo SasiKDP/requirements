@@ -605,9 +605,9 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                                                               @Param("startDate") LocalDateTime startDate,
                                                               @Param("endDate") LocalDateTime endDate);
 
-    @Query(value = "SELECT * FROM requirements_model r " +
+    @Query(value = "SELECT * FROM requirements_model_prod r " +
             "WHERE LOWER(r.assigned_by) = (" +
-            "   SELECT LOWER(u.user_name) FROM user_details u WHERE u.user_id = :userId" +
+            "   SELECT LOWER(u.user_name) FROM user_details_prod u WHERE u.user_id = :userId" +
             ")", nativeQuery = true)
     List<RequirementsModel> findByAssignedByUserId(@Param("userId") String userId);
 
