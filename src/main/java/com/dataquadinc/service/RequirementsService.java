@@ -887,16 +887,16 @@ public class RequirementsService {
 
 		return employeeDetails;
 	}
-	public List<RequirementsModel> getRequirementsByAssignedBy(String userId) {
-		List<RequirementsModel> requirements = requirementsDao.findByAssignedByUserId(userId);
+	public List<RequirementsModel> getRequirementsByAssignedBy(String name) {
+		List<RequirementsModel> requirements = requirementsDao.findByAssignedByIgnoreCase(name);
 
 		if (requirements.isEmpty()) {
-			logger.warn("No requirements found for user ID '{}'", userId);
-			throw new ResourceNotFoundException("No requirements found for user ID: '" + userId + "'.");
+			logger.warn("No requirements found or '{}' is not a valid user", name);
+			throw new ResourceNotFoundException("No requirements found: '" + name + "' may not be a valid user.");
 		}
+		// Log the count
+		logger.info("Total requirements assigned by '{}': {}", name, requirements.size());
 
-		logger.info("Total requirements assigned by user ID '{}': {}", userId, requirements.size());
 		return requirements;
 	}
-
 }

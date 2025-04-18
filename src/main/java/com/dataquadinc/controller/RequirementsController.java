@@ -555,21 +555,27 @@ public class 	RequirementsController {
 		return service.getCandidateData(userId);
 	}
 
-	@GetMapping("/assignedby/{id}")
-	public List<RequirementsModel> getRequirementsByAssignedBy(@PathVariable("id") String id) {
-		List<RequirementsModel> requirements = service.getRequirementsByAssignedBy(id);
+	@GetMapping("/assignedby/{name}")
+	public List<RequirementsModel> getRequirementsByAssignedBy(@PathVariable String name) {
+		// Fetch the list of requirements filtered by the assignedBy value
+		List<RequirementsModel> requirements = service.getRequirementsByAssignedBy(name);
 
-		// Clean recruiterName
+		// If no requirements are found, return an empty list
+		if (requirements == null || requirements.isEmpty()) {
+			return new ArrayList<>();
+		}
+
+		// Clean the recruiterName field for each requirement
 		for (RequirementsModel model : requirements) {
 			if (model.getRecruiterName() != null) {
 				Set<String> cleanedNames = model.getRecruiterName().stream()
-						.map(recruiter -> recruiter.replaceAll("[\\[\\]\"]", "").trim())
+						.map(recruiter -> recruiter.replaceAll("[\\[\\]\"]", "").trim()) // Clean each recruiter name
 						.collect(Collectors.toSet());
+
 				model.setRecruiterName(cleanedNames);
 			}
 		}
 
 		return requirements;
 	}
-
 }
