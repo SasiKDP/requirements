@@ -7,6 +7,7 @@ import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -347,10 +348,6 @@ public class RequirementsService {
 
 
 	public List<RequirementsDto> getRequirementsByDateRange(LocalDate startDate, LocalDate endDate) {
-		// 💥 First check: Date range should not exceed 31 days
-		if (ChronoUnit.DAYS.between(startDate, endDate) > 31) {
-			throw new DateRangeValidationException("Date range must not exceed one month.");
-		}
 
 		// 💥 Second check: End date must not be before start date
 		if (endDate.isBefore(startDate)) {
@@ -471,6 +468,47 @@ public class RequirementsService {
 				})
 				.collect(Collectors.toList());
 	}
+
+
+	public List<RecruiterRequirementsDto> getJobsAssignedToRecruiterByDate(String recruiterId, LocalDate startDate, LocalDate endDate) {
+
+		// 💥 First check: Null check for input dates
+		if (startDate == null || endDate == null) {
+			throw new DateRangeValidationException("Start date and End date must not be null.");
+		}
+
+		// 💥 Second check: End date must not be before start date
+		if (endDate.isBefore(startDate)) {
+			throw new DateRangeValidationException("End date cannot be before start date.");
+		}
+
+		// 💥 Convert LocalDate to LocalDateTime for comparison
+		LocalDateTime startDateTime = startDate.atStartOfDay();
+		LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+		// 🔍 Fetch jobs assigned to recruiter within the date range
+		List<RequirementsModel> jobs = requirementsDao.findJobsByRecruiterIdAndDateRange(recruiterId, startDateTime, endDateTime);
+
+		// 💥 Fourth check: No jobs found
+		if (jobs.isEmpty()) {
+			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter: " + recruiterId +
+					" between " + startDate + " and " + endDate);
+		}
+
+		// ✅ Add logger here since this block is guaranteed to have results
+		Logger logger = LoggerFactory.getLogger(RequirementsService.class);
+		logger.info("✅ Fetched {} jobs assigned to recruiter {} between {} and {}", jobs.size(), recruiterId, startDate, endDate);
+
+		// 🔄 Map entities to DTOs
+		return jobs.stream()
+				.map(job -> {
+					RecruiterRequirementsDto dto = modelMapper.map(job, RecruiterRequirementsDto.class);
+					dto.setAssignedBy(job.getAssignedBy()); // Ensure assignedBy is mapped
+					return dto;
+				})
+				.collect(Collectors.toList());
+	}
+
 
 
 	@Transactional
@@ -714,46 +752,54 @@ public class RequirementsService {
 	}
 
 	public CandidateStatsResponse getCandidateStats() {
-		List<EmployeeCandidateDTO> employeeDtoList = new ArrayList<>();
-		List<TeamleadCandidateDTO> teamleadDtoList = new ArrayList<>();
+		List<UserStatsDTO> userStatsList = new ArrayList<>();
 
 		// 👤 Employee Stats
 		List<Tuple> employeeStats = requirementsDao.getEmployeeCandidateStats();
-		employeeDtoList.addAll(employeeStats.stream()
-				.map(tuple -> new EmployeeCandidateDTO(
-						tuple.get("employeeId", String.class),
-						tuple.get("employeeName", String.class),
-						tuple.get("employeeEmail", String.class),
-						"Employee",
-						convertToInt(tuple.get("numberOfClients")),
-						convertToInt(tuple.get("numberOfRequirements")),
-						convertToInt(tuple.get("numberOfSubmissions")),
-						convertToInt(tuple.get("numberOfInterviews")),
-						convertToInt(tuple.get("numberOfPlacements"))
-				))
-				.collect(Collectors.toList()));
+		userStatsList.addAll(employeeStats.stream()
+				.map(tuple -> {
+					UserStatsDTO dto = new UserStatsDTO();
+					dto.setEmployeeId(tuple.get("employeeId", String.class));
+					dto.setEmployeeName(tuple.get("employeeName", String.class));
+					dto.setEmployeeEmail(tuple.get("employeeEmail", String.class));
+					dto.setRole("Employee");
+
+					dto.setNumberOfClients(convertToInt(tuple.get("numberOfClients")));
+					dto.setNumberOfRequirements(convertToInt(tuple.get("numberOfRequirements")));
+					dto.setNumberOfSubmissions(convertToInt(tuple.get("numberOfSubmissions")));
+					dto.setNumberOfInterviews(convertToInt(tuple.get("numberOfInterviews")));
+					dto.setNumberOfPlacements(convertToInt(tuple.get("numberOfPlacements")));
+
+					return dto;
+				}).collect(Collectors.toList())
+		);
 
 		// 👨‍🏫 Teamlead Stats
 		List<Tuple> teamleadStats = requirementsDao.getTeamleadCandidateStats();
-		teamleadDtoList.addAll(teamleadStats.stream()
-				.map(tuple -> new TeamleadCandidateDTO(
-						tuple.get("employeeId", String.class),
-						tuple.get("employeeName", String.class),
-						tuple.get("employeeEmail", String.class),
-						"Teamlead",
-						convertToInt(tuple.get("numberOfClients")),
-						convertToInt(tuple.get("numberOfRequirements")),
-						convertToInt(tuple.get("selfSubmissions")),
-						convertToInt(tuple.get("selfInterviews")),
-						convertToInt(tuple.get("selfPlacements")),
-						convertToInt(tuple.get("teamSubmissions")),
-						convertToInt(tuple.get("teamInterviews")),
-						convertToInt(tuple.get("teamPlacements"))
-				))
-				.collect(Collectors.toList()));
+		userStatsList.addAll(teamleadStats.stream()
+				.map(tuple -> {
+					UserStatsDTO dto = new UserStatsDTO();
+					dto.setEmployeeId(tuple.get("employeeId", String.class));
+					dto.setEmployeeName(tuple.get("employeeName", String.class));
+					dto.setEmployeeEmail(tuple.get("employeeEmail", String.class));
+					dto.setRole("Teamlead");
 
-		return new CandidateStatsResponse(employeeDtoList, teamleadDtoList);
+					dto.setNumberOfClients(convertToInt(tuple.get("numberOfClients")));
+					dto.setNumberOfRequirements(convertToInt(tuple.get("numberOfRequirements")));
+					dto.setSelfSubmissions(convertToInt(tuple.get("selfSubmissions")));
+					dto.setSelfInterviews(convertToInt(tuple.get("selfInterviews")));
+					dto.setSelfPlacements(convertToInt(tuple.get("selfPlacements")));
+					dto.setTeamSubmissions(convertToInt(tuple.get("teamSubmissions")));
+					dto.setTeamInterviews(convertToInt(tuple.get("teamInterviews")));
+					dto.setTeamPlacements(convertToInt(tuple.get("teamPlacements")));
+
+					return dto;
+				}).collect(Collectors.toList())
+		);
+
+		return new CandidateStatsResponse(userStatsList);
 	}
+
 
 
 	private int convertToInt(Object value) {
@@ -875,22 +921,46 @@ public class RequirementsService {
 	}
 
 
+
 	// helper method to check if alias exists in tuple
 	private boolean hasAlias(Tuple tuple, String alias) {
 		return tuple.getElements().stream().anyMatch(e -> alias.equalsIgnoreCase(e.getAlias()));
 	}
 
-	public List<RequirementsModel> getRequirementsByAssignedBy(String userId) {
-		List<RequirementsModel> requirements = requirementsDao.findByAssignedByUserId(userId);
+	public List<RequirementsModel> getRequirementsByAssignedBy(String name) {
+		List<RequirementsModel> requirements = requirementsDao.findByAssignedByIgnoreCase(name);
 
 		if (requirements.isEmpty()) {
-			logger.warn("No requirements found for user ID '{}'", userId);
-			throw new ResourceNotFoundException("No requirements found for user ID: '" + userId + "'or may not be in db.");
+			logger.warn("No requirements found or '{}' is not a valid user", name);
+			throw new ResourceNotFoundException("No requirements found: '" + name + "' may not be a valid user.");
 		}
 
-		logger.info("Total requirements assigned by user ID '{}': {}", userId, requirements.size());
+		logger.info("Total requirements assigned by '{}': {}", name, requirements.size());
 		return requirements;
 	}
+	public List<RequirementsModel> getRequirementsByAssignedByAndDateRange(String assignedBy, LocalDate startDate, LocalDate endDate) {
+		logger.info("Fetching requirements for '{}' between {} and {}", assignedBy, startDate, endDate);
 
+		// Validate date range
+		if (endDate.isBefore(startDate)) {
+			throw new DateRangeValidationException("End date cannot be before start date.");
+		}
 
+		// Check if assignedBy exists in user_details_prod using native query
+		Integer exists = requirementsDao.existsByUsernameInUserTable(assignedBy);
+		if (exists == null || exists != 1) {
+			throw new AssignedByNotFoundException("AssignedBy username '" + assignedBy + "' not found.");
+		}
+
+		// Convert LocalDate to LocalDateTime
+		LocalDateTime startDateTime = startDate.atStartOfDay();
+		LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+		// Fetch from native query
+		List<RequirementsModel> requirements = requirementsDao.findJobsAssignedByNameAndDateRange(assignedBy, startDateTime, endDateTime);
+
+		logger.info("Total requirements found for '{}' between {} and {}: {}", assignedBy, startDate, endDate, requirements.size());
+
+		return requirements;
+	}
 }

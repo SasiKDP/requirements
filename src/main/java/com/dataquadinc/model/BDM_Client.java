@@ -5,9 +5,11 @@ import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -54,10 +56,14 @@ public class BDM_Client {
     @Column(columnDefinition = "LONGBLOB")
     private byte[] documentedData;  // Stores actual file content
 
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
     @PrePersist
     public void prePersist() {
         if (this.id == null || this.id.isEmpty()) {
-            this.id = "BDM" + UUID.randomUUID().toString().substring(0, 8);  // Generate Unique ID
+            this.id = "CLIENT" + UUID.randomUUID().toString().substring(0, 8);
         }
     }
 }
