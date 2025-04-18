@@ -477,9 +477,9 @@ public class RequirementsService {
 			RequirementsModel existingRequirement = requirementsDao.findById(requirementsDto.getJobId())
 					.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + requirementsDto.getJobId()));
 
-			logger.info("Before update: " + existingRequirement);
+			logger.info("Before update: {}", existingRequirement);
 
-			// Update fields (same as your existing update logic)
+			// Update fields
 			if (requirementsDto.getJobTitle() != null) existingRequirement.setJobTitle(requirementsDto.getJobTitle());
 			if (requirementsDto.getClientName() != null) existingRequirement.setClientName(requirementsDto.getClientName());
 			if (requirementsDto.getJobDescription() != null && !requirementsDto.getJobDescription().isEmpty()) {
@@ -511,7 +511,7 @@ public class RequirementsService {
 			if (requirementsDto.getStatus() != null) existingRequirement.setStatus(requirementsDto.getStatus());
 
 			requirementsDao.save(existingRequirement);
-			logger.info("After update: " + existingRequirement);
+			logger.info("After update: {}", existingRequirement);
 
 			// Send emails to recruiters if status is "Closed" or "Hold"
 			String currentStatus = existingRequirement.getStatus();
@@ -521,25 +521,30 @@ public class RequirementsService {
 				if (recruiterNames != null && !recruiterNames.isEmpty()) {
 					for (String recruiter : recruiterNames) {
 						try {
-							// Mock recruiter email fetching
-							String email = recruiter + "@example.com"; // Replace this logic with actual lookup
-							if (email != null && email.contains("@")) {
-								String subject = "Requirement Status Update: " + currentStatus;
-								String body = "Dear " + recruiter + ",\n\n"
-										+ "The job requirement titled '" + existingRequirement.getJobTitle()
-										+ "' for client '" + existingRequirement.getClientName()
-										+ "' has been updated to status: '" + currentStatus + "'.\n"
-										+ "This change was made by: " + existingRequirement.getAssignedBy() + ".\n\n"
-										+ "Regards,\nRecruitment Team";
+							// Clean recruiter name
+							recruiter = recruiter.replaceAll("[\\[\\]]", "").trim();
 
-								// Send the email
+							// Construct email
+							String email = recruiter + "@example.com"; // Replace with real lookup if needed
+							String subject = "Requirement Status Update: " + currentStatus;
+							String body = "Dear " + recruiter + ",\n\n"
+									+ "The job requirement titled '" + existingRequirement.getJobTitle()
+									+ "' for client '" + existingRequirement.getClientName()
+									+ "' has been updated to status: '" + currentStatus + "'.\n"
+									+ "This change was made by: " + existingRequirement.getAssignedBy() + ".\n\n"
+									+ "Regards,\nRecruitment Team";
+
+							// Log recruiter details and email content
+							logger.info("📧 Sending Email\nRecruiter: {}\nEmail: {}\nSubject: {}\nBody:\n{}", recruiter, email, subject, body);
+
+							if (email != null && email.contains("@")) {
 								emailService.sendEmail(email, subject, body);
-								logger.info("✅ Email sent to: " + email);
+								logger.info("✅ Email successfully sent to: {}", email);
 							} else {
-								logger.warn("⚠️ Invalid email for recruiter: " + recruiter);
+								logger.warn("⚠️ Invalid email for recruiter: {}", recruiter);
 							}
 						} catch (Exception e) {
-							logger.error("❌ Failed to send email to recruiter: " + recruiter, e);
+							logger.error("❌ Failed to send email to recruiter: {}", recruiter, e);
 						}
 					}
 				}
@@ -551,7 +556,6 @@ public class RequirementsService {
 			data.put("updatedStatus", existingRequirement.getStatus());
 			data.put("assignedRecruiters", existingRequirement.getRecruiterIds());
 
-			// Return ResponseBean directly with the correct structure
 			return new ResponseBean(true, "Requirement updated and mail sent successfully", null, data);
 
 		} catch (Exception e) {
