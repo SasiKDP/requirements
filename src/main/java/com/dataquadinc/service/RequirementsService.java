@@ -471,43 +471,31 @@ public class RequirementsService {
 				})
 				.collect(Collectors.toList());
 	}
-
-
 	@Transactional
 	public ResponseBean updateRequirementDetails(RequirementsDto requirementsDto) {
 		try {
-			// Fetch the existing requirement by jobId
 			RequirementsModel existingRequirement = requirementsDao.findById(requirementsDto.getJobId())
 					.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + requirementsDto.getJobId()));
 
-			// Log before update
-			logger.info("Before update: " + existingRequirement);
+			logger.info("Before update: {}", existingRequirement);
 
-			// Update the existing requirement with the new details from the DTO
+			// Update fields
 			if (requirementsDto.getJobTitle() != null) existingRequirement.setJobTitle(requirementsDto.getJobTitle());
-			if (requirementsDto.getClientName() != null)
-				existingRequirement.setClientName(requirementsDto.getClientName());
-
-			// Handle job description: either text or file
+			if (requirementsDto.getClientName() != null) existingRequirement.setClientName(requirementsDto.getClientName());
 			if (requirementsDto.getJobDescription() != null && !requirementsDto.getJobDescription().isEmpty()) {
-				existingRequirement.setJobDescription(requirementsDto.getJobDescription());  // Set text-based description
-				existingRequirement.setJobDescriptionBlob(null);  // Nullify the BLOB if text is provided
+				existingRequirement.setJobDescription(requirementsDto.getJobDescription());
+				existingRequirement.setJobDescriptionBlob(null);
 			}
-
-			// If a file for job description is provided, set it as BLOB and nullify the text description
 			if (requirementsDto.getJobDescriptionFile() != null && !requirementsDto.getJobDescriptionFile().isEmpty()) {
 				byte[] jobDescriptionBytes = saveJobDescriptionFileAsBlob(requirementsDto.getJobDescriptionFile(), requirementsDto.getJobId());
-				existingRequirement.setJobDescriptionBlob(jobDescriptionBytes);  // Set the BLOB field
-				existingRequirement.setJobDescription(null);  // Nullify the text-based description
+				existingRequirement.setJobDescriptionBlob(jobDescriptionBytes);
+				existingRequirement.setJobDescription(null);
 			}
-
-			// If the jobDescriptionFile is null, but jobDescriptionBlob is updated, update the BLOB
 			if (requirementsDto.getJobDescriptionFile() == null && requirementsDto.getJobDescriptionBlob() != null) {
-				existingRequirement.setJobDescriptionBlob(requirementsDto.getJobDescriptionBlob());  // Set the BLOB field
-				existingRequirement.setJobDescription(null);  // Nullify the text-based description
+				existingRequirement.setJobDescriptionBlob(requirementsDto.getJobDescriptionBlob());
+				existingRequirement.setJobDescription(null);
 			}
 
-			// Set other fields
 			existingRequirement.setJobType(requirementsDto.getJobType());
 			existingRequirement.setLocation(requirementsDto.getLocation());
 			existingRequirement.setJobMode(requirementsDto.getJobMode());
@@ -522,18 +510,54 @@ public class RequirementsService {
 			existingRequirement.setAssignedBy(requirementsDto.getAssignedBy());
 			if (requirementsDto.getStatus() != null) existingRequirement.setStatus(requirementsDto.getStatus());
 
-
-			// Save the updated requirement to the database
 			requirementsDao.save(existingRequirement);
+			logger.info("After update: {}", existingRequirement);
 
-			// Log after update
-			logger.info("After update: " + existingRequirement);
+			// Send emails to recruiters if status is "Closed" or "Hold"
+			String currentStatus = existingRequirement.getStatus();
+			if ("Closed".equalsIgnoreCase(currentStatus) || "Hold".equalsIgnoreCase(currentStatus)) {
+				Set<String> recruiterNames = existingRequirement.getRecruiterName();
 
-			// Send emails to recruiters (after the requirement has been successfully updated)
-			sendEmailsToRecruiters(existingRequirement); // Assuming this method handles the sending of emails to recruiters
+				if (recruiterNames != null && !recruiterNames.isEmpty()) {
+					for (String recruiter : recruiterNames) {
+						try {
+							// Clean recruiter name
+							recruiter = recruiter.replaceAll("[\\[\\]]", "").trim();
 
-			// Return success response
-			return new ResponseBean(true, "Updated Successfully", null, null);
+							// Construct email
+							String email = recruiter + "@example.com"; // Replace with real lookup if needed
+							String subject = "Requirement Status Update: " + currentStatus;
+							String body = "Dear " + recruiter + ",\n\n"
+									+ "The job requirement titled '" + existingRequirement.getJobTitle()
+									+ "' for client '" + existingRequirement.getClientName()
+									+ "' has been updated to status: '" + currentStatus + "'.\n"
+									+ "This change was made by: " + existingRequirement.getAssignedBy() + ".\n\n"
+									+ "Regards,\nRecruitment Team";
+
+							// Log recruiter details and email content
+							logger.info("📧 Sending Email\nRecruiter: {}\nEmail: {}\nSubject: {}\nBody:\n{}", recruiter, email, subject, body);
+
+							if (email != null && email.contains("@")) {
+								emailService.sendEmail(email, subject, body);
+								logger.info("✅ Email successfully sent to: {}", email);
+							} else {
+								logger.warn("⚠️ Invalid email for recruiter: {}", recruiter);
+							}
+						} catch (Exception e) {
+							logger.error("❌ Failed to send email to recruiter: {}", recruiter, e);
+						}
+					}
+				}
+			}
+
+			// Prepare custom data for response
+			Map<String, Object> data = new HashMap<>();
+			data.put("jobId", existingRequirement.getJobId());
+			data.put("updatedStatus", existingRequirement.getStatus());
+			data.put("assignedRecruiters", existingRequirement.getRecruiterIds());
+
+			return new ResponseBean(true, "Requirement updated and mail sent successfully", null, data);
+
 		} catch (Exception e) {
 			logger.error("Error updating requirement", e);
 			return new ResponseBean(false, "Error updating requirement", "Internal Server Error", null);
@@ -899,4 +923,7 @@ public class RequirementsService {
 
 		return requirements;
 	}
+
+
+
 }

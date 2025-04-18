@@ -507,14 +507,18 @@ public class 	RequirementsController {
 			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
 			else existingRequirement.setAssignedBy(null);
 
-			// Call the service to update the requirement
+
 			ResponseBean response = service.updateRequirementDetails(existingRequirement);
+			return ResponseEntity.ok(response);
 
-			// Debugging: Log the updated status after saving
-			System.out.println("Status after saving: " + existingRequirement.getStatus());
-
-			// Return success response
-			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
+//			// Call the service to update the requirement
+//			ResponseBean response = service.updateRequirementDetails(existingRequirement);
+//
+//			// Debugging: Log the updated status after saving
+//			System.out.println("Status after saving: " + existingRequirement.getStatus());
+//
+//			// Return success response
+//			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully",response));
 
 		} catch (IllegalArgumentException e) {
 			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
