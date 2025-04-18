@@ -606,16 +606,14 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                                                               @Param("endDate") LocalDateTime endDate);
 
     @Query(value = "SELECT * FROM requirements_model_prod r " +
-            "WHERE LOWER(r.assigned_by) = LOWER(:assignedBy) " +
-            "AND EXISTS (" +
-            "   SELECT 1 FROM user_details_prod u " +
-            "   WHERE LOWER(u.user_name) = LOWER(:assignedBy)" +
+            "WHERE LOWER(r.assigned_by) = (" +
+            "   SELECT LOWER(u.user_name) FROM user_details_prod u WHERE u.user_id = :userId" +
             ")", nativeQuery = true)
-    List<RequirementsModel> findByAssignedByIgnoreCase(@Param("assignedBy") String assignedBy);
+    List<RequirementsModel> findByAssignedByUserId(@Param("userId") String userId);
 
     // Native query to validate if the username exists in user_details_prod
-    @Query(value = "SELECT EXISTS (SELECT 1 FROM user_details_prod WHERE user_name = :assignedBy)", nativeQuery = true)
-    Integer existsByUsernameInUserTable(@Param("assignedBy") String assignedBy);
+    @Query(value = "SELECT user_name FROM user_details_prod WHERE user_id = :userId", nativeQuery = true)
+    String findUserNameByUserId(@Param("userId") String userId);
 
 
     @Query(value = "SELECT * FROM requirements_model_prod " +
@@ -626,4 +624,5 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );
+
 }

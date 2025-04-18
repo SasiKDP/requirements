@@ -927,40 +927,54 @@ public class RequirementsService {
 		return tuple.getElements().stream().anyMatch(e -> alias.equalsIgnoreCase(e.getAlias()));
 	}
 
-	public List<RequirementsModel> getRequirementsByAssignedBy(String name) {
-		List<RequirementsModel> requirements = requirementsDao.findByAssignedByIgnoreCase(name);
+	public List<RequirementsModel> getRequirementsByAssignedBy(String userId) {
+		List<RequirementsModel> requirements = requirementsDao.findByAssignedByUserId(userId);
 
 		if (requirements.isEmpty()) {
-			logger.warn("No requirements found or '{}' is not a valid user", name);
-			throw new ResourceNotFoundException("No requirements found: '" + name + "' may not be a valid user.");
+			logger.warn("No requirements found for user ID '{}'", userId);
+			throw new ResourceNotFoundException("No requirements found for user ID: '" + userId + "' or may not be in db.");
 		}
 
-		logger.info("Total requirements assigned by '{}': {}", name, requirements.size());
+		logger.info("Total requirements assigned by user ID '{}': {}", userId, requirements.size());
 		return requirements;
 	}
-	public List<RequirementsModel> getRequirementsByAssignedByAndDateRange(String assignedBy, LocalDate startDate, LocalDate endDate) {
-		logger.info("Fetching requirements for '{}' between {} and {}", assignedBy, startDate, endDate);
 
-		// Validate date range
+
+	public List<RequirementsModel> getRequirementsByAssignedByAndDateRange(String userId, LocalDate startDate, LocalDate endDate) {
+
+		if (startDate == null || endDate == null) {
+			throw new DateRangeValidationException("Start date and End date must not be null.");
+		}
+
 		if (endDate.isBefore(startDate)) {
 			throw new DateRangeValidationException("End date cannot be before start date.");
 		}
 
-		// Check if assignedBy exists in user_details_prod using native query
-		Integer exists = requirementsDao.existsByUsernameInUserTable(assignedBy);
-		if (exists == null || exists != 1) {
-			throw new AssignedByNotFoundException("AssignedBy username '" + assignedBy + "' not found.");
+		String assignedBy = requirementsDao.findUserNameByUserId(userId);
+
+		if (assignedBy == null) {
+			throw new AssignedByNotFoundException("User ID '" + userId + "' not found.");
 		}
 
-		// Convert LocalDate to LocalDateTime
 		LocalDateTime startDateTime = startDate.atStartOfDay();
 		LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
-		// Fetch from native query
-		List<RequirementsModel> requirements = requirementsDao.findJobsAssignedByNameAndDateRange(assignedBy, startDateTime, endDateTime);
+		// ✅ Hibernate will log the queries when this line is executed
+		List<RequirementsModel> requirements = requirementsDao.findJobsAssignedByNameAndDateRange(
+				assignedBy, startDateTime, endDateTime
+		);
 
-		logger.info("Total requirements found for '{}' between {} and {}: {}", assignedBy, startDate, endDate, requirements.size());
+		if (requirements.isEmpty()) {
+			throw new NoJobsAssignedToRecruiterException("No requirements found for userId '" + userId +
+					"' between " + startDate + " and " + endDate);
+		}
+
+		// ✅ Move this log AFTER query execution
+		logger.info("✅ Fetched {} requirements assigned by '{}' (userId: {}) between {} and {}",
+				requirements.size(), assignedBy, userId, startDate, endDate);
 
 		return requirements;
 	}
+
+
 }
