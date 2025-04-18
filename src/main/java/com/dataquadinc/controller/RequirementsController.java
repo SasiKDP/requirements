@@ -609,38 +609,54 @@ public class RequirementsController {
 		return requirements;
 	}
 
-	@GetMapping("/assignedby/{name}/filterByDate")
+	@GetMapping("/assignedby/{userId}/filterByDate")
 	public ResponseEntity<?> getRequirementsByAssignedByAndDateRange(
-			@PathVariable String name,
+			@PathVariable String userId,
 			@RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
 			@RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
-		// Validate date range
-		if (endDate.isBefore(startDate)) {
-			logger.warn("End date {} is before start date {}", endDate, startDate);
-			return ResponseEntity.badRequest()
-					.body(Collections.singletonMap("message", "End date cannot be before start date"));
-		}
-
-		// Fetch requirements by assignedBy and date range
-		List<RequirementsModel> requirements = service.getRequirementsByAssignedByAndDateRange(name, startDate, endDate);
-
-		if (requirements.isEmpty()) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND)
-					.body(Collections.singletonMap("message", "No requirements found for assignedBy: " + name));
-		}
-
-		// Clean recruiter names
-		for (RequirementsModel model : requirements) {
-			if (model.getRecruiterName() != null) {
-				Set<String> cleanedNames = model.getRecruiterName().stream()
-						.map(r -> r.replaceAll("[\\[\\]\"]", "").trim())
-						.collect(Collectors.toSet());
-				model.setRecruiterName(cleanedNames);
+		try {
+			// Validate date range
+			if (endDate.isBefore(startDate)) {
+				logger.warn("End date {} is before start date {}", endDate, startDate);
+				return ResponseEntity.badRequest()
+						.body(Collections.singletonMap("message", "End date cannot be before start date"));
 			}
-		}
 
-		return ResponseEntity.ok(requirements);
+			// Call service to get requirements
+			List<RequirementsModel> requirements = service.getRequirementsByAssignedByAndDateRange(userId, startDate, endDate);
+
+			if (requirements.isEmpty()) {
+				logger.warn("No requirements found for userId: {} between {} and {}", userId, startDate, endDate);
+				return ResponseEntity.status(HttpStatus.NOT_FOUND)
+						.body(Collections.singletonMap("message", "No requirements found for assignedBy userId: " + userId));
+			}
+
+			// Clean recruiter names
+			for (RequirementsModel model : requirements) {
+				if (model.getRecruiterName() != null) {
+					Set<String> cleanedNames = model.getRecruiterName().stream()
+							.map(r -> r.replaceAll("[\\[\\]\"]", "").trim())
+							.collect(Collectors.toSet());
+					model.setRecruiterName(cleanedNames);
+				}
+			}
+
+			// ✅ Log success at the end
+			logger.info("Fetched {} requirements successfully for userId: {} between {} and {}", requirements.size(), userId, startDate, endDate);
+			return ResponseEntity.ok(requirements);
+
+		} catch (AssignedByNotFoundException ex) {
+			logger.error("User ID not found: {} between {} and {}", userId, startDate, endDate);
+			return ResponseEntity.status(HttpStatus.NOT_FOUND)
+					.body(Collections.singletonMap("message", ex.getMessage()));
+
+		} catch (Exception ex) {
+			logger.error("An error occurred while fetching requirements for userId: {}", userId, ex);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body(Collections.singletonMap("message", "An internal error occurred while fetching requirements."));
+		}
 	}
+
 
 }
