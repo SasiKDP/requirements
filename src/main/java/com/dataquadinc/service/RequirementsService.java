@@ -928,16 +928,20 @@ public class RequirementsService {
 	}
 
 	public List<RequirementsModel> getRequirementsByAssignedBy(String userId) {
-		List<RequirementsModel> requirements = requirementsDao.findByAssignedByUserId(userId);
-
-		if (requirements.isEmpty()) {
-			logger.warn("No requirements found for user ID '{}'", userId);
-			throw new ResourceNotFoundException("No requirements found for user ID: '" + userId + "' or may not be in db.");
+		// Check if the user exists
+		int userExists = requirementsDao.countByUserId(userId);
+		if (userExists == 0) {
+			logger.warn("User ID '{}' not found in the database", userId);
+			throw new ResourceNotFoundException("User ID '" + userId + "' not found in the database.");
 		}
+
+		// Fetch requirements assigned by the user
+		List<RequirementsModel> requirements = requirementsDao.findByAssignedByUserId(userId);
 
 		logger.info("Total requirements assigned by user ID '{}': {}", userId, requirements.size());
 		return requirements;
 	}
+
 
 
 	public List<RequirementsModel> getRequirementsByAssignedByAndDateRange(String userId, LocalDate startDate, LocalDate endDate) {

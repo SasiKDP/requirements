@@ -611,6 +611,10 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             ")", nativeQuery = true)
     List<RequirementsModel> findByAssignedByUserId(@Param("userId") String userId);
 
+    @Query(value = "SELECT COUNT(*) FROM user_details_prod WHERE user_id = :userId", nativeQuery = true)
+    int countByUserId(@Param("userId") String userId);
+
+
     // Native query to validate if the username exists in user_details_prod
     @Query(value = "SELECT user_name FROM user_details_prod WHERE user_id = :userId", nativeQuery = true)
     String findUserNameByUserId(@Param("userId") String userId);
