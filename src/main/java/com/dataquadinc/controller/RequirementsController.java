@@ -507,18 +507,14 @@ public class 	RequirementsController {
 			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
 			else existingRequirement.setAssignedBy(null);
 
-
+			// Call the service to update the requirement
 			ResponseBean response = service.updateRequirementDetails(existingRequirement);
-			return ResponseEntity.ok(response);
 
-//			// Call the service to update the requirement
-//			ResponseBean response = service.updateRequirementDetails(existingRequirement);
-//
-//			// Debugging: Log the updated status after saving
-//			System.out.println("Status after saving: " + existingRequirement.getStatus());
-//
-//			// Return success response
-//			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully",response));
+			// Debugging: Log the updated status after saving
+			System.out.println("Status after saving: " + existingRequirement.getStatus());
+
+			// Return success response
+			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
 
 		} catch (IllegalArgumentException e) {
 			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
@@ -527,7 +523,6 @@ public class 	RequirementsController {
 					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"));
 		}
 	}
-
 
 	@DeleteMapping("/deleteRequirement/{jobId}")
 	public ResponseEntity<ResponseBean> deleteRequirement(@PathVariable String jobId) {
@@ -547,11 +542,14 @@ public class 	RequirementsController {
 			return ResponseEntity.notFound().build();
 		}
 	}
+
+
 	@GetMapping("/stats")
-	public ResponseEntity<List<EmployeeCandidateDTO>> getEmployeeStats() {
-		List<EmployeeCandidateDTO> stats = service.getEmployeeStats();
+	public ResponseEntity<CandidateStatsResponse> getCandidateStats() {
+		CandidateStatsResponse stats = service.getCandidateStats();
 		return ResponseEntity.ok(stats);
 	}
+
 
 	// Fetch both Submitted Candidates and Scheduled Interviews in one API call
 	@GetMapping("/list/{userId}")
