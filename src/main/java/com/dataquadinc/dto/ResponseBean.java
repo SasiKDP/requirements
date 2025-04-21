@@ -1,3 +1,4 @@
+
 package com.dataquadinc.dto;
 
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
@@ -48,7 +49,7 @@ public class ResponseBean {
     public void setError(String error) {
         this.error = error;
     }
-
+    // Helper methods for easy instantiation of successful and error responses
     public static ResponseBean successResponse(String message, Object data) {
         return new ResponseBean(true, message, null, data);
     }
@@ -56,5 +57,4 @@ public class ResponseBean {
     public static ResponseBean errorResponse(String message, String error) {
         return new ResponseBean(false, message, error, null);
     }
-
 }

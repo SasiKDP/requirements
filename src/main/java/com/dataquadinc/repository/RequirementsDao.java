@@ -31,6 +31,10 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     @Query(value = "SELECT email, user_name FROM user_details WHERE user_id = :userId AND status != 'inactive'", nativeQuery = true)
     Tuple findUserEmailAndUsernameByUserId(@Param("userId") String userId);
 
+    @Query(value = "SELECT email, user_name FROM user_details WHERE LOWER(TRIM(user_name)) = LOWER(TRIM(:assignedBy)) AND status != 'inactive'", nativeQuery = true)
+    Tuple findUserEmailAndUsernameByAssignedBy(@Param("assignedBy") String assignedBy);
+
+
     @Query(value = """
             SELECT u.user_id, u.user_name, r.name AS role_name, u.email, 
                    u.designation, u.joining_date, u.gender, u.dob, 
@@ -195,6 +199,87 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                 WHERE r.name IN ('Employee', 'Teamlead')
             """, nativeQuery = true)
     List<Tuple> getEmployeeCandidateStats();
+
+
+
+    @Query(value = """
+    SELECT 
+        u.user_id AS employeeId,
+        u.user_name AS employeeName,
+        u.email AS employeeEmail,
+        'TEAMLEAD' AS role,
+
+        -- Number of unique clients for jobs assigned by this teamlead
+        COALESCE(COUNT(DISTINCT r.client_name), 0) AS numberOfClients,
+
+        -- Number of jobs assigned by this teamlead
+        COALESCE(COUNT(DISTINCT r.job_id), 0) AS numberOfRequirements,
+
+        -- Submissions made by the teamlead themselves
+        COALESCE(SUM(CASE WHEN c.user_id = u.user_id THEN 1 ELSE 0 END), 0) AS selfSubmissions,
+
+        -- Interviews scheduled (future) by teamlead
+        COALESCE(SUM(CASE
+                             WHEN c.user_id = u.user_id
+                              AND c.interview_date_time IS NOT NULL
+                              AND c.interview_date_time >= NOW()
+                              AND c.job_id IN (
+                                 SELECT job_id FROM requirements_model_prod r2
+                                 WHERE r2.client_name = r.client_name AND r2.assigned_by = u.user_name
+                              )
+                             THEN 1 ELSE 0
+                         END), 0) AS selfInterviews,
+               
+        -- Placements made by teamlead
+        COALESCE(SUM(CASE 
+            WHEN c.user_id = u.user_id AND (
+                c.interview_status = 'Placed'
+                OR (JSON_VALID(c.interview_status) = 1 AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
+            ) THEN 1 ELSE 0 
+        END), 0) AS selfPlacements,
+
+        -- Team submissions (recruiters submitting to jobs assigned by teamlead)
+        COALESCE(SUM(CASE
+                    WHEN c.user_id != u.user_id
+                    AND c.job_id IN (
+                        SELECT job_id FROM requirements_model_prod r2
+                        WHERE r2.client_name = r.client_name AND r2.assigned_by = u.user_name
+                    )
+                    THEN 1 ELSE 0
+                END), 0) AS teamSubmissions,
+
+        -- Team interviews (future) on teamlead's jobs
+       COALESCE(SUM(CASE
+                   WHEN c.user_id IS NOT NULL
+                    AND c.user_id != u.user_id
+                    AND c.interview_date_time IS NOT NULL
+                    AND c.job_id IN (
+                       SELECT job_id FROM requirements_model_prod r2
+                       WHERE r2.client_name = r.client_name AND r2.assigned_by = u.user_name
+                    )
+                   THEN 1 ELSE 0
+               END), 0) AS teamInterviews,
+
+        -- Team placements on teamlead's jobs
+        COALESCE(SUM(CASE 
+            WHEN c.user_id != u.user_id AND (
+                c.interview_status = 'Placed'
+                OR (JSON_VALID(c.interview_status) = 1 AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
+            ) THEN 1 ELSE 0 
+        END), 0) AS teamPlacements
+
+    FROM user_details_prod u
+    JOIN requirements_model_prod r ON r.assigned_by = u.user_name
+    LEFT JOIN candidates_prod c ON c.job_id = r.job_id
+    WHERE EXISTS (
+        SELECT 1 FROM user_roles_prod ur 
+        JOIN roles_prod rl ON ur.role_id = rl.id 
+        WHERE ur.user_id = u.user_id AND rl.name = 'Teamlead'
+    )
+    GROUP BY u.user_id, u.user_name, u.email
+    """, nativeQuery = true)
+    List<Tuple> getTeamleadCandidateStats();
+
 
     @Query(value = """
                 SELECT 
