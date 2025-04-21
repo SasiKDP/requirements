@@ -945,7 +945,7 @@ public class RequirementsService {
 
 
 	public List<RequirementsModel> getRequirementsByAssignedByAndDateRange(String userId, LocalDate startDate, LocalDate endDate) {
-
+		// 1. Validate date range
 		if (startDate == null || endDate == null) {
 			throw new DateRangeValidationException("Start date and End date must not be null.");
 		}
@@ -954,31 +954,35 @@ public class RequirementsService {
 			throw new DateRangeValidationException("End date cannot be before start date.");
 		}
 
-		String assignedBy = requirementsDao.findUserNameByUserId(userId);
-
-		if (assignedBy == null) {
-			throw new AssignedByNotFoundException("User ID '" + userId + "' not found.");
+		// 2. Check if user exists
+		int userExists = requirementsDao.countByUserId(userId);
+		if (userExists == 0) {
+			logger.warn("User ID '{}' not found in the database", userId);
+			throw new ResourceNotFoundException("User ID '" + userId + "' not found in the database.");
 		}
 
+		// 3. Get userName from userId
+		String assignedBy = requirementsDao.findUserNameByUserId(userId);
+
+		// 4. Prepare date range
 		LocalDateTime startDateTime = startDate.atStartOfDay();
 		LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
-		// ✅ Hibernate will log the queries when this line is executed
+		// 5. Fetch data
 		List<RequirementsModel> requirements = requirementsDao.findJobsAssignedByNameAndDateRange(
 				assignedBy, startDateTime, endDateTime
 		);
 
+		// 6. Handle empty result
 		if (requirements.isEmpty()) {
 			throw new NoJobsAssignedToRecruiterException("No requirements found for userId '" + userId +
 					"' between " + startDate + " and " + endDate);
 		}
 
-		// ✅ Move this log AFTER query execution
+		// 7. Log and return
 		logger.info("✅ Fetched {} requirements assigned by '{}' (userId: {}) between {} and {}",
 				requirements.size(), assignedBy, userId, startDate, endDate);
 
 		return requirements;
 	}
-
-
 }
