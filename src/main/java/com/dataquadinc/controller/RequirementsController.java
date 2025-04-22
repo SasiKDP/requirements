@@ -585,7 +585,7 @@ public class RequirementsController {
 	}
 
 
-	@GetMapping("/assignedby/{id}")
+	@GetMapping("/teamleadrequirements/{id}")
 	public List<RequirementsModel> getRequirementsByAssignedBy(@PathVariable("id") String id) {
 		List<RequirementsModel> requirements = service.getRequirementsByAssignedBy(id);
 
@@ -602,7 +602,7 @@ public class RequirementsController {
 		return requirements;
 	}
 
-	@GetMapping("/assignedby/{userId}/filterByDate")
+	@GetMapping("/teamleadrequirements/{userId}/filterByDate")
 	public ResponseEntity<?> getRequirementsByAssignedByAndDateRange(
 			@PathVariable String userId,
 			@RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
