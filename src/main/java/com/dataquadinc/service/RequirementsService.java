@@ -304,8 +304,13 @@ public class RequirementsService {
 
 
 	public Object getRequirementsDetails() {
-		// Fetch only non-closed requirements using a native query
-		List<RequirementsModel> requirementsList = requirementsDao.findAllActiveRequirements();
+		// Get the first and last date of the current month
+		LocalDate startOfMonth = LocalDate.now().withDayOfMonth(1);
+		LocalDate endOfMonth = startOfMonth.plusMonths(1).minusDays(1);
+
+		// Use LocalDate parameters to call the repository
+		List<RequirementsModel> requirementsList =
+				requirementsDao.findByRequirementAddedTimeStampBetween(startOfMonth, endOfMonth);
 
 		List<RequirementsDto> dtoList = requirementsList.stream()
 				.map(requirement -> {
@@ -454,16 +459,25 @@ public class RequirementsService {
 	}
 
 	public List<RecruiterRequirementsDto> getJobsAssignedToRecruiter(String recruiterId) {
-		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterId(recruiterId);
+		// 📅 Calculate current month start and end
+		LocalDate today = LocalDate.now();
+		LocalDateTime startDateTime = today.withDayOfMonth(1).atStartOfDay();
+		LocalDateTime endDateTime = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
+		// 🔍 Fetch jobs for recruiter within current month
+		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterIdAndDateRange(
+				recruiterId, startDateTime, endDateTime);
+
+		// ❌ Handle no results
 		if (jobsByRecruiterId.isEmpty()) {
-			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter : " + recruiterId);
+			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter : " + recruiterId + " in current month");
 		}
 
+		// 🔁 Map to DTOs
 		return jobsByRecruiterId.stream()
 				.map(job -> {
 					RecruiterRequirementsDto dto = modelMapper.map(job, RecruiterRequirementsDto.class);
-					dto.setAssignedBy(job.getAssignedBy()); // Ensure assignedBy is mapped
+					dto.setAssignedBy(job.getAssignedBy());
 					return dto;
 				})
 				.collect(Collectors.toList());
@@ -928,19 +942,33 @@ public class RequirementsService {
 	}
 
 	public List<RequirementsModel> getRequirementsByAssignedBy(String userId) {
-		// Check if the user exists
+		// 1. Check if the user exists
 		int userExists = requirementsDao.countByUserId(userId);
 		if (userExists == 0) {
 			logger.warn("User ID '{}' not found in the database", userId);
 			throw new ResourceNotFoundException("User ID '" + userId + "' not found in the database.");
 		}
 
-		// Fetch requirements assigned by the user
-		List<RequirementsModel> requirements = requirementsDao.findByAssignedByUserId(userId);
+		// 2. Get the user_name of the recruiter
+		String assignedBy = requirementsDao.findUserNameByUserId(userId);
 
-		logger.info("Total requirements assigned by user ID '{}': {}", userId, requirements.size());
+		// 3. Get current month start and end datetime
+		LocalDate today = LocalDate.now();
+		LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
+		LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
+
+		// 4. Fetch requirements created in the current month
+		List<RequirementsModel> requirements = requirementsDao.findJobsAssignedByNameAndDateRange(
+				assignedBy, startOfMonth, endOfMonth
+		);
+
+		// 5. Logging
+		logger.info("Fetched {} requirements for user ID '{}' (assigned_by='{}') for current month {} to {}",
+				requirements.size(), userId, assignedBy, startOfMonth.toLocalDate(), endOfMonth.toLocalDate());
+
 		return requirements;
 	}
+
 
 
 
