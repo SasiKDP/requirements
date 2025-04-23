@@ -223,9 +223,13 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         -- Number of jobs assigned by this teamlead
         COALESCE(COUNT(DISTINCT r.job_id), 0) AS numberOfRequirements,
 
-        -- Submissions made by the teamlead themselves
-        COALESCE(SUM(CASE WHEN c.user_id = u.user_id THEN 1 ELSE 0 END), 0) AS selfSubmissions,
-
+     -- Accurate count of submissions made by the teamlead themselves
+             (
+                 SELECT COUNT(*)
+                 FROM candidates_prod c1
+                 WHERE c1.user_id = u.user_id
+             ) AS selfSubmissions,
+            
         -- Interviews scheduled (future) by teamlead
         COALESCE(SUM(CASE
                              WHEN c.user_id = u.user_id
