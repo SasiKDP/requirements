@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -304,14 +305,15 @@ public class RequirementsService {
 
 
 	public Object getRequirementsDetails() {
-		// Get the first and last date of the current month
+		// 1. Get the first and last date of the current month
 		LocalDate startOfMonth = LocalDate.now().withDayOfMonth(1);
 		LocalDate endOfMonth = startOfMonth.plusMonths(1).minusDays(1);
 
-		// Use LocalDate parameters to call the repository
+		// 2. Fetch data from repository
 		List<RequirementsModel> requirementsList =
 				requirementsDao.findByRequirementAddedTimeStampBetween(startOfMonth, endOfMonth);
 
+		// 3. Convert to DTOs
 		List<RequirementsDto> dtoList = requirementsList.stream()
 				.map(requirement -> {
 					RequirementsDto dto = new RequirementsDto();
@@ -336,14 +338,18 @@ public class RequirementsService {
 					dto.setRecruiterName(requirement.getRecruiterName());
 					dto.setAssignedBy(requirement.getAssignedBy());
 
+					// Submissions and Interviews
 					String jobId = requirement.getJobId();
 					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
 					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
+
+					// No need to manually set age anymore
 
 					return dto;
 				})
 				.collect(Collectors.toList());
 
+		// 4. Return appropriate response
 		if (dtoList.isEmpty()) {
 			return new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now());
 		} else {
@@ -359,11 +365,6 @@ public class RequirementsService {
 			throw new DateRangeValidationException("End date cannot be before start date.");
 		}
 
-		// 💥 Third check: Start date must be within the last 1 month
-		LocalDate oneMonthAgo = LocalDate.now().minusMonths(1);
-		if (startDate.isBefore(oneMonthAgo)) {
-			throw new DateRangeValidationException("Start date must be within the last 1 month.");
-		}
 
 		List<RequirementsModel> requirements = requirementsDao.findByRequirementAddedTimeStampBetween(startDate, endDate);
 
@@ -941,7 +942,7 @@ public class RequirementsService {
 		return tuple.getElements().stream().anyMatch(e -> alias.equalsIgnoreCase(e.getAlias()));
 	}
 
-	public List<RequirementsModel> getRequirementsByAssignedBy(String userId) {
+	public List<RequirementsDto> getRequirementsByAssignedBy(String userId) {
 		// 1. Check if the user exists
 		int userExists = requirementsDao.countByUserId(userId);
 		if (userExists == 0) {
@@ -957,7 +958,7 @@ public class RequirementsService {
 		LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
 		LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
-		// 4. Fetch requirements created in the current month
+		// 4. Fetch requirements
 		List<RequirementsModel> requirements = requirementsDao.findJobsAssignedByNameAndDateRange(
 				assignedBy, startOfMonth, endOfMonth
 		);
@@ -966,18 +967,43 @@ public class RequirementsService {
 		logger.info("Fetched {} requirements for user ID '{}' (assigned_by='{}') for current month {} to {}",
 				requirements.size(), userId, assignedBy, startOfMonth.toLocalDate(), endOfMonth.toLocalDate());
 
-		return requirements;
+		// 6. Map to DTO
+		return requirements.stream()
+				.map(requirement -> {
+					RequirementsDto dto = new RequirementsDto();
+
+					dto.setJobId(requirement.getJobId());
+					dto.setJobTitle(requirement.getJobTitle());
+					dto.setClientName(requirement.getClientName());
+					dto.setJobDescription(requirement.getJobDescription());
+					dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());
+					dto.setJobType(requirement.getJobType());
+					dto.setLocation(requirement.getLocation());
+					dto.setJobMode(requirement.getJobMode());
+					dto.setExperienceRequired(requirement.getExperienceRequired());
+					dto.setNoticePeriod(requirement.getNoticePeriod());
+					dto.setRelevantExperience(requirement.getRelevantExperience());
+					dto.setQualification(requirement.getQualification());
+					dto.setSalaryPackage(requirement.getSalaryPackage());
+					dto.setNoOfPositions(requirement.getNoOfPositions());
+					dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
+					dto.setRecruiterIds(requirement.getRecruiterIds());
+					dto.setStatus(requirement.getStatus());
+					dto.setRecruiterName(requirement.getRecruiterName());
+					dto.setAssignedBy(requirement.getAssignedBy());
+					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(requirement.getJobId()));
+					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(requirement.getJobId()));
+
+					return dto;
+				})
+				.collect(Collectors.toList());
 	}
 
-
-
-
-	public List<RequirementsModel> getRequirementsByAssignedByAndDateRange(String userId, LocalDate startDate, LocalDate endDate) {
+	public List<RequirementsDto> getRequirementsByAssignedByAndDateRange(String userId, LocalDate startDate, LocalDate endDate) {
 		// 1. Validate date range
 		if (startDate == null || endDate == null) {
 			throw new DateRangeValidationException("Start date and End date must not be null.");
 		}
-
 		if (endDate.isBefore(startDate)) {
 			throw new DateRangeValidationException("End date cannot be before start date.");
 		}
@@ -1007,10 +1033,41 @@ public class RequirementsService {
 					"' between " + startDate + " and " + endDate);
 		}
 
-		// 7. Log and return
-		logger.info("✅ Fetched {} requirements assigned by '{}' (userId: {}) between {} and {}",
-				requirements.size(), assignedBy, userId, startDate, endDate);
+		// 7. Map to DTOs
+		List<RequirementsDto> dtoList = requirements.stream().map(requirement -> {
+			RequirementsDto dto = new RequirementsDto();
 
-		return requirements;
+			dto.setJobId(requirement.getJobId());
+			dto.setJobTitle(requirement.getJobTitle());
+			dto.setClientName(requirement.getClientName());
+			dto.setJobDescription(requirement.getJobDescription());
+			dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());
+			dto.setJobType(requirement.getJobType());
+			dto.setLocation(requirement.getLocation());
+			dto.setJobMode(requirement.getJobMode());
+			dto.setExperienceRequired(requirement.getExperienceRequired());
+			dto.setNoticePeriod(requirement.getNoticePeriod());
+			dto.setRelevantExperience(requirement.getRelevantExperience());
+			dto.setQualification(requirement.getQualification());
+			dto.setSalaryPackage(requirement.getSalaryPackage());
+			dto.setNoOfPositions(requirement.getNoOfPositions());
+			dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
+			dto.setRecruiterIds(requirement.getRecruiterIds());
+			dto.setStatus(requirement.getStatus());
+			dto.setRecruiterName(requirement.getRecruiterName());
+			dto.setAssignedBy(requirement.getAssignedBy());
+			dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(requirement.getJobId()));
+			dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(requirement.getJobId()));
+
+			return dto;
+		}).collect(Collectors.toList());
+
+		// 8. Log and return
+		logger.info("✅ Fetched {} requirements assigned by '{}' (userId: {}) between {} and {}",
+				dtoList.size(), assignedBy, userId, startDate, endDate);
+
+		return dtoList;
 	}
+
+
 }

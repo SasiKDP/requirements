@@ -1,5 +1,6 @@
 package com.dataquadinc.dto;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -43,5 +44,18 @@ public class RecruiterRequirementsDto {
 
 	private String status;
 	private String assignedBy;
+	public String getAge() {
+		if (requirementAddedTimeStamp == null) {
+			return "N/A";
+		}
+
+		LocalDateTime now = LocalDateTime.now();
+		Duration duration = Duration.between(requirementAddedTimeStamp, now);
+
+		long days = duration.toDays();
+		long hours = duration.toHours() % 24;
+
+		return days + " days " + hours + " hours";
+	}
 
 }

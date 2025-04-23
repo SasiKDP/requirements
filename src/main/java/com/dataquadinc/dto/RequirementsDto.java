@@ -1,5 +1,6 @@
 package com.dataquadinc.dto;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Random;
 import java.util.Set;
@@ -90,6 +91,20 @@ public class RequirementsDto
 	// New fields for submissions and interviews
 	private Integer numberOfSubmissions;
 	private Integer numberOfInterviews;
+	public String getAge() {
+		if (requirementAddedTimeStamp == null) {
+			return "N/A";
+		}
+
+		LocalDateTime now = LocalDateTime.now();
+		Duration duration = Duration.between(requirementAddedTimeStamp, now);
+
+		long days = duration.toDays();
+		long hours = duration.toHours() % 24;
+
+		return days + " days " + hours + " hours";
+	}
+
 
 	public Integer getNumberOfSubmissions() {
 		return numberOfSubmissions;
@@ -284,4 +299,5 @@ public class RequirementsDto
 	public void setAssignedBy(String assignedBy) {
 		this.assignedBy = assignedBy;
 	}
+
 }
