@@ -1,6 +1,7 @@
 package com.dataquadinc.repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -449,9 +450,177 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<RequirementsModel> findAllActiveRequirements();
 
 
+
+    @Query(value = """
+    SELECT 
+        c.candidate_id AS candidateId,
+        c.full_name AS fullName,
+        c.candidate_email_id AS candidateEmailId,
+        c.contact_number AS contactNumber,
+        c.qualification AS qualification,
+        c.skills AS skills,
+        c.overall_feedback AS overallFeedback,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        r.client_name AS clientName
+    FROM candidates c
+    JOIN requirements_model r ON c.job_id = r.job_id
+    WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
+""", nativeQuery = true)
+    List<SubmittedCandidateDTO> findSubmittedCandidatesByAssignedBy(@Param("username") String username);
+
+    @Query(value = """
+    SELECT 
+        c.candidate_id AS candidateId,
+        c.full_name AS fullName,
+        c.candidate_email_id AS candidateEmailId,
+        c.contact_number AS contactNumber,
+        c.qualification AS qualification,
+        c.skills AS skills,
+        CASE 
+            WHEN JSON_VALID(c.interview_status) = 1 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) 
+            ELSE c.interview_status 
+        END AS interviewStatus,
+        c.interview_level AS interviewLevel,
+        c.interview_date_time AS interviewDateTime,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        r.client_name AS clientName
+    FROM candidates c
+    JOIN requirements_model r ON c.job_id = r.job_id
+    WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
+      AND c.interview_date_time IS NOT NULL
+""", nativeQuery = true)
+    List<InterviewScheduledDTO> findScheduledInterviewsByAssignedBy(@Param("username") String username);
+
+    @Query(value = """
+    SELECT 
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        r.client_name AS clientName,
+        TRIM(BOTH '\"' FROM r.assigned_by) AS assignedBy,
+        r.status AS status,
+        r.no_of_positions AS noOfPositions,
+        r.qualification AS qualification,
+        r.job_type AS jobType,
+        r.job_mode AS jobMode,
+        r.requirement_added_time_stamp AS postedDate
+    FROM requirements_model r
+    WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
+""", nativeQuery = true)
+    List<JobDetailsDTO> findJobDetailsByAssignedBy(@Param("username") String username);
+
+    @Query(value = """
+    SELECT 
+        c.candidate_id AS candidateId,
+        c.full_name AS fullName,
+        c.candidate_email_id AS candidateEmailId,
+        c.contact_number AS contactNumber,
+        c.qualification AS qualification,
+        c.skills AS skills,
+        CASE 
+            WHEN JSON_VALID(c.interview_status) 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) 
+            ELSE c.interview_status 
+        END AS interviewStatus,
+        c.interview_level AS interviewLevel,
+        c.interview_date_time AS interviewDateTime,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        r.client_name AS clientName
+    FROM candidates c
+    JOIN requirements_model r ON c.job_id = r.job_id
+    WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
+      AND (
+          (JSON_VALID(c.interview_status) AND JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) = 'Placed')
+          OR c.interview_status = 'Placed'
+      )
+""", nativeQuery = true)
+    List<PlacementDetailsDTO> findPlacementCandidatesByAssignedBy(@Param("username") String username);
+
+    @Query(value = """
+    SELECT 
+        b.id AS clientId,
+        b.client_name AS clientName,
+        b.client_address AS clientAddress,
+        b.on_boarded_by AS onBoardedBy,
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_name, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"' , '') AS clientSpocName,
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_mobile_number, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"' , '') AS clientSpocMobileNumber
+    FROM bdm_client b
+    JOIN requirements_model r ON LOWER(b.client_name) = LOWER(r.client_name)
+    WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
+""", nativeQuery = true)
+    List<ClientDetailsDTO> findClientDetailsByAssignedBy(@Param("username") String username);
+
+
+
+
+
+    @Query(value = """
+    SELECT 
+        u.user_id AS employeeId,
+        u.user_name AS employeeName,                
+        r.name AS role,
+        u.email AS employeeEmail,
+        u.designation AS designation,
+        DATE_FORMAT(u.joining_date, '%Y-%m-%d') AS joiningDate, 
+        u.gender AS gender, 
+        DATE_FORMAT(u.dob, '%Y-%m-%d') AS dob, 
+        u.phone_number AS phoneNumber, 
+        u.personalemail AS personalEmail, 
+        u.status AS status
+    FROM user_details u
+    JOIN user_roles ur ON u.user_id = ur.user_id
+    JOIN roles r ON ur.role_id = r.id
+    WHERE r.name = 'Teamlead'
+    AND u.user_id = :userId
+    """, nativeQuery = true)
+    List<Tuple> getTeamleadDetailsByUserId(@Param("userId") String userId);
+
+
+    @Query(value = """
+    SELECT 
+        u.user_id AS userId,
+        u.user_name AS userName,
+        r.name AS role
+    FROM user_details u
+    JOIN user_roles ur ON u.user_id = ur.user_id
+    JOIN roles r ON ur.role_id = r.id
+    WHERE u.user_id = :userId
+""", nativeQuery = true)
+    Tuple getUserRoleAndUsername(@Param("userId") String userId);
+
+
+    @Query("SELECT r FROM RequirementsModel r " +
+            "WHERE :recruiterId MEMBER OF r.recruiterIds " +
+            "AND r.requirementAddedTimeStamp BETWEEN :startDate AND :endDate")
+    List<RequirementsModel> findJobsByRecruiterIdAndDateRange(@Param("recruiterId") String recruiterId,
+                                                              @Param("startDate") LocalDateTime startDate,
+                                                              @Param("endDate") LocalDateTime endDate);
+
     @Query(value = "SELECT * FROM requirements_model r " +
             "WHERE LOWER(r.assigned_by) = (" +
-            "   SELECT LOWER(u.user_name) FROM user_details u WHERE u.user_id = :userId" +
+            "   SELECT LOWER(u.user_name) FROM user_details_prod u WHERE u.user_id = :userId" +
             ")", nativeQuery = true)
     List<RequirementsModel> findByAssignedByUserId(@Param("userId") String userId);
+
+    @Query(value = "SELECT COUNT(*) FROM user_details WHERE user_id = :userId", nativeQuery = true)
+    int countByUserId(@Param("userId") String userId);
+
+
+    // Native query to validate if the username exists in user_details_prod
+    @Query(value = "SELECT user_name FROM user_details WHERE user_id = :userId", nativeQuery = true)
+    String findUserNameByUserId(@Param("userId") String userId);
+
+
+    @Query(value = "SELECT * FROM requirements_model " +
+            "WHERE assigned_by = :assignedBy " +
+            "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate", nativeQuery = true)
+    List<RequirementsModel> findJobsAssignedByNameAndDateRange(
+            @Param("assignedBy") String assignedBy,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
+
 }

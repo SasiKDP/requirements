@@ -2,10 +2,14 @@ package com.dataquadinc.service;
 
 import com.dataquadinc.dto.*;
 import com.dataquadinc.exceptions.ClientAlreadyExistsException;
+import com.dataquadinc.exceptions.DateRangeValidationException;
+import com.dataquadinc.exceptions.ResourceNotFoundException;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
 import com.dataquadinc.repository.RequirementsDao;
 import jakarta.persistence.Tuple;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,14 +22,15 @@ import java.nio.file.StandardCopyOption;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 public class BDM_service {
+    private static final Logger logger = LoggerFactory.getLogger(BDM_service.class);
+
 
     @Autowired
     private BDM_Repo repository;
@@ -143,8 +148,26 @@ public class BDM_service {
 
 
 
-    public List<BDM_Dto> getAllClients() {
-        return repository.findAll().stream()
+    public List<BDM_Dto>getAllClients() {
+        // 1. Get current date and the start of the current month
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
+
+        // 2. Fetch clients created in the current month
+        List<BDM_Client> clients = repository.getClientsByCreatedAtRange(startOfMonth, endOfMonth);
+
+        // 3. Handle empty result
+        if (clients.isEmpty()) {
+            logger.warn("No clients found for the current month between {} and {}", startOfMonth, endOfMonth);
+            throw new ResourceNotFoundException("No clients found for the current month.");
+        }
+
+        // 4. Logging
+        logger.info("Fetched {} clients for current month {} to {}", clients.size(), startOfMonth.toLocalDate(), endOfMonth.toLocalDate());
+
+        // 5. Return the list of clients
+        return clients.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
@@ -418,4 +441,35 @@ public class BDM_service {
                 ))
                 .collect(Collectors.toList());
     }
+
+
+
+    public List<BDM_Client> getClientsByCreatedAtRange(LocalDate startDate, LocalDate endDate) {
+        // 1. Validate date range
+        if (startDate == null || endDate == null) {
+            throw new DateRangeValidationException("Start date and End date must not be null.");
+        }
+
+        if (endDate.isBefore(startDate)) {
+            throw new DateRangeValidationException("End date cannot be before start date.");
+        }
+
+        // 2. Prepare datetime range
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+
+        // 3. Fetch data
+        List<BDM_Client> clients = repository.getClientsByCreatedAtRange(startDateTime, endDateTime);
+
+        // 4. Handle empty result
+        if (clients.isEmpty()) {
+            logger.warn("No clients found between {} and {}", startDate, endDate);
+            throw new ResourceNotFoundException("No clients found between " + startDate + " and " + endDate);
+        }
+
+        // 5. Log and return
+        logger.info("✅ Found {} clients created between {} and {}", clients.size(), startDate, endDate);
+        return clients;
+    }
+
 }

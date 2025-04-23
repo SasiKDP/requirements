@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -25,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -167,5 +169,15 @@ public class BDM_Controller {
     @GetMapping("/bdm/details/{userId}")
     public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
         return service.getBdmClientDetails(userId);
+    }
+    @GetMapping("/bdm/getAll/filterByDate")
+    public ResponseEntity<ResponseBean> getClientsByCreatedAtRange(
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        List<BDM_Client> clients = service.getClientsByCreatedAtRange(startDate, endDate);
+        return ResponseEntity.ok(
+                ResponseBean.successResponse("Clients fetched successfully by created_at range", clients)
+        );
     }
 }
