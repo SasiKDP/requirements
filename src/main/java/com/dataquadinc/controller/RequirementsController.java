@@ -586,21 +586,22 @@ public class RequirementsController {
 
 
 	@GetMapping("/teamleadrequirements/{id}")
-	public List<RequirementsModel> getRequirementsByAssignedBy(@PathVariable("id") String id) {
-		List<RequirementsModel> requirements = service.getRequirementsByAssignedBy(id);
+	public List<RequirementsDto> getRequirementsByAssignedBy(@PathVariable("id") String id) {
+		List<RequirementsDto> requirements = service.getRequirementsByAssignedBy(id);
 
-		// Clean recruiterName
-		for (RequirementsModel model : requirements) {
-			if (model.getRecruiterName() != null) {
-				Set<String> cleanedNames = model.getRecruiterName().stream()
+		// Clean recruiterName (if needed)
+		for (RequirementsDto dto : requirements) {
+			if (dto.getRecruiterName() != null) {
+				Set<String> cleanedNames = dto.getRecruiterName().stream()
 						.map(recruiter -> recruiter.replaceAll("[\\[\\]\"]", "").trim())
 						.collect(Collectors.toSet());
-				model.setRecruiterName(cleanedNames);
+				dto.setRecruiterName(cleanedNames);
 			}
 		}
 
 		return requirements;
 	}
+
 
 	@GetMapping("/teamleadrequirements/{userId}/filterByDate")
 	public ResponseEntity<?> getRequirementsByAssignedByAndDateRange(
@@ -617,7 +618,7 @@ public class RequirementsController {
 			}
 
 			// Call service to get requirements
-			List<RequirementsModel> requirements = service.getRequirementsByAssignedByAndDateRange(userId, startDate, endDate);
+			List<RequirementsDto> requirements = service.getRequirementsByAssignedByAndDateRange(userId, startDate, endDate);
 
 			if (requirements.isEmpty()) {
 				logger.warn("No requirements found for userId: {} between {} and {}", userId, startDate, endDate);
@@ -626,12 +627,12 @@ public class RequirementsController {
 			}
 
 			// Clean recruiter names
-			for (RequirementsModel model : requirements) {
-				if (model.getRecruiterName() != null) {
-					Set<String> cleanedNames = model.getRecruiterName().stream()
+			for (RequirementsDto dto : requirements) {
+				if (dto.getRecruiterName() != null) {
+					Set<String> cleanedNames = dto.getRecruiterName().stream()
 							.map(r -> r.replaceAll("[\\[\\]\"]", "").trim())
 							.collect(Collectors.toSet());
-					model.setRecruiterName(cleanedNames);
+					dto.setRecruiterName(cleanedNames);
 				}
 			}
 
