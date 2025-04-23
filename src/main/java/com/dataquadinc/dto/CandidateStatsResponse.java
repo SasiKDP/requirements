@@ -4,32 +4,19 @@ import java.util.List;
 
 public class CandidateStatsResponse {
 
-    private List<EmployeeCandidateDTO> employees;
-    private List<TeamleadCandidateDTO> teamleads;
+    private List<UserStatsDTO> userStats;
 
-    // ✅ No-args constructor required by Jackson
     public CandidateStatsResponse() {}
 
-    // ✅ All-args constructor for convenience
-    public CandidateStatsResponse(List<EmployeeCandidateDTO> employees, List<TeamleadCandidateDTO> teamleads) {
-        this.employees = employees;
-        this.teamleads = teamleads;
+    public CandidateStatsResponse(List<UserStatsDTO> userStats) {
+        this.userStats = userStats;
     }
 
-    // ✅ Getters and setters
-    public List<EmployeeCandidateDTO> getEmployees() {
-        return employees;
+    public List<UserStatsDTO> getUserStats() {
+        return userStats;
     }
 
-    public void setEmployees(List<EmployeeCandidateDTO> employees) {
-        this.employees = employees;
-    }
-
-    public List<TeamleadCandidateDTO> getTeamleads() {
-        return teamleads;
-    }
-
-    public void setTeamleads(List<TeamleadCandidateDTO> teamleads) {
-        this.teamleads = teamleads;
+    public void setUserStats(List<UserStatsDTO> userStats) {
+        this.userStats = userStats;
     }
 }
