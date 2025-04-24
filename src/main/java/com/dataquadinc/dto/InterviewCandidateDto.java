@@ -7,15 +7,16 @@ public class InterviewCandidateDto {
     private String interviewStatus;
     private String interviewLevel;
     private String interviewDateTime;
+    private String recruiterName;
 
-    public InterviewCandidateDto(String candidateId, String candidateName, String email, String interviewStatus,
-                                 String interviewLevel, String interviewDateTime) {
+    public InterviewCandidateDto(String candidateId, String candidateName, String email, String interviewStatus, String interviewLevel, String interviewDateTime, String recruiterName) {
         this.candidateId = candidateId;
         this.candidateName = candidateName;
         this.email = email;
         this.interviewStatus = interviewStatus;
         this.interviewLevel = interviewLevel;
         this.interviewDateTime = interviewDateTime;
+        this.recruiterName = recruiterName;
     }
 
     public String getCandidateId() {
@@ -65,6 +66,13 @@ public class InterviewCandidateDto {
     public void setInterviewDateTime(String interviewDateTime) {
         this.interviewDateTime = interviewDateTime;
     }
-// ✅ Getters & Setters
+
+    public String getRecruiterName() {
+        return recruiterName;
+    }
+
+    public void setRecruiterName(String recruiterName) {
+        this.recruiterName = recruiterName;
+    }
 }
 

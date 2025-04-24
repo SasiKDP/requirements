@@ -3,7 +3,6 @@ package com.dataquadinc.controller;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -562,8 +561,21 @@ public class RequirementsController {
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 	@GetMapping("/{jobId}")
-	public ResponseEntity<RecruiterDetailsDTO> getRecruiterDetails(@PathVariable String jobId) {
-		RecruiterDetailsDTO recruiterDetails = service.getRecruiterDetailsByJobId(jobId);
+	public ResponseEntity<RequirementDetailsDto> getRequirementDetailsByJobId(@PathVariable String jobId) {
+		// Get requirement details by jobId
+		RequirementDetailsDto recruiterDetails = service.getRequirementDetailsByJobId(jobId);
+
+		// Check if requirement details are available and recruiterName exists inside the requirement
+		if (recruiterDetails != null && recruiterDetails.getRequirement() != null
+				&& recruiterDetails.getRequirement().getRecruiterName() != null) {
+
+			Set<String> cleanedNames = recruiterDetails.getRequirement().getRecruiterName().stream()
+					.map(recruiter -> recruiter.replaceAll("[\\[\\]\"]", "").trim()) // Clean each recruiter name
+					.collect(Collectors.toSet());
+
+			// Set cleaned recruiter names back into the requirement
+			recruiterDetails.getRequirement().setRecruiterName(cleanedNames);
+		}
 
 		if (recruiterDetails != null) {
 			return ResponseEntity.ok(recruiterDetails);
@@ -571,6 +583,8 @@ public class RequirementsController {
 			return ResponseEntity.notFound().build();
 		}
 	}
+
+
 	@GetMapping("/stats")
 	public ResponseEntity<CandidateStatsResponse> getCandidateStats() {
 		CandidateStatsResponse stats = service.getCandidateStats();
