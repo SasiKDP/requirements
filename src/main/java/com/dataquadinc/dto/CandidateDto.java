@@ -16,6 +16,8 @@ public class CandidateDto {
     private String qualification;
     private String skills;
     private String overallFeedback;
+    private String recruiterName;
+
 
 }
 

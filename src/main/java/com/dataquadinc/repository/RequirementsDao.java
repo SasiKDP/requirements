@@ -23,11 +23,16 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     @Query("SELECT r FROM RequirementsModel r WHERE r.jobId = :jobId")
     Optional<RequirementsModel> findRecruitersByJobId(@Param("jobId") String jobId);
 
-    @Query(value = "SELECT * FROM candidates_prod WHERE job_id = :jobId AND user_id = :recruiterId", nativeQuery = true)
-    List<Tuple> findCandidatesByJobIdAndRecruiterId(@Param("jobId") String jobId, @Param("recruiterId") String recruiterId);
+    @Query(value = "SELECT c.*, u.user_name AS recruiterName FROM candidates_prod c " +
+            "JOIN user_details_prod u ON c.user_email = u.email " +
+            "WHERE c.job_id = :jobId", nativeQuery = true)
+    List<Tuple> findCandidatesByJobId(@Param("jobId") String jobId);
 
-    @Query(value = "SELECT * FROM candidates_prod WHERE job_id = :jobId AND user_id = :recruiterId AND interview_status = 'Scheduled'", nativeQuery = true)
-    List<Tuple> findInterviewScheduledCandidatesByJobIdAndRecruiterId(@Param("jobId") String jobId, @Param("recruiterId") String recruiterId);
+
+    @Query(value = "SELECT c.*, u.user_name AS recruiterName FROM candidates_prod c " +
+            "JOIN user_details_prod u ON c.user_email = u.email " +
+            "WHERE c.job_id = :jobId AND c.interview_date_time IS NOT NULL", nativeQuery = true)
+    List<Tuple> findInterviewScheduledCandidatesByJobId(@Param("jobId") String jobId);
 
     @Query(value = "SELECT email, user_name FROM user_details_prod WHERE user_id = :userId AND status != 'inactive'", nativeQuery = true)
     Tuple findUserEmailAndUsernameByUserId(@Param("userId") String userId);
@@ -88,7 +93,6 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     GROUP BY r.job_id
 """, nativeQuery = true)
     List<Tuple> findRequirementsByClientName(@Param("clientName") String clientName);
-
 
 
     // Fetch all submissions for a client across ALL job IDs
@@ -638,4 +642,11 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     );
 
     @Query(value = "SELECT email, user_name FROM user_details_prod WHERE LOWER(TRIM(user_name)) = LOWER(TRIM(:assignedBy)) AND status != 'inactive'", nativeQuery = true)
-    Tuple findUserEmailAndUsernameByAssignedBy(@Param("assignedBy") String assignedBy);}
+    Tuple findUserEmailAndUsernameByAssignedBy(@Param("assignedBy") String assignedBy);
+
+    @Query(value = "SELECT * FROM placement_prod WHERE job_id = :jobId", nativeQuery = true)
+    List<Tuple> findPlacementsByJobId(@Param("jobId") String jobId);
+
+    Optional<RequirementsModel> findByJobId(String jobId);
+
+}
