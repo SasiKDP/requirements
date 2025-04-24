@@ -105,7 +105,6 @@ public class RequirementsDto
 		return days + " days " + hours + " hours";
 	}
 
-
 	public Integer getNumberOfSubmissions() {
 		return numberOfSubmissions;
 	}

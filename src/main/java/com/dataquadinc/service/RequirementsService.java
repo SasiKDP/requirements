@@ -5,12 +5,10 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -175,74 +173,173 @@ public class RequirementsService {
 				return;
 			}
 
+
 			logger.info("Found {} recruiters to send emails to for job ID: {}", recruiterIds.size(), model.getJobId());
 
+			String status = (model.getStatus() == null || model.getStatus().trim().isEmpty())
+					? "in progress"
+					: model.getStatus().toLowerCase();
+
+			// Send emails to recruiters
 			for (String recruiterId : recruiterIds) {
 				try {
-					// Clean the recruiterId (remove quotes if present)
 					String cleanedRecruiterId = cleanRecruiterId(recruiterId);
 					logger.debug("Processing recruiter with ID: {} (cleaned ID: {})", recruiterId, cleanedRecruiterId);
 
-					// Fetch recruiter email and username from the database
 					Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
 
 					if (userTuple != null) {
-						String recruiterEmail = userTuple.get(0, String.class);  // Fetch email
-						String recruiterName = userTuple.get(1, String.class);  // Fetch username
+						String recruiterEmail = userTuple.get(0, String.class);
+						String recruiterName = userTuple.get(1, String.class);
 
 						if (recruiterEmail != null && !recruiterEmail.isEmpty()) {
-							// Construct and send email
-							String subject = "New Job Assignment: " + model.getJobTitle();
-							String text = constructEmailBody(model, recruiterName);
+							String subject;
+							String body;
 
-							logger.info("Attempting to send email to recruiter: {} <{}> for job ID: {}",
-									recruiterName, recruiterEmail, model.getJobId());
-
-							try {
-								emailService.sendEmail(recruiterEmail, subject, text);
-								logger.info("Email successfully sent to recruiter: {} <{}> for job ID: {}",
-										recruiterName, recruiterEmail, model.getJobId());
-							} catch (Exception e) {
-								logger.error("Failed to send email to recruiter: {} <{}> for job ID: {}. Error: {}",
-										recruiterName, recruiterEmail, model.getJobId(), e.getMessage(), e);
+							switch (status) {
+								case "closed":
+									subject = "Job Closed Notification - Job ID: " + model.getJobId();
+									body = constructClosedEmailBody(model, recruiterName);
+									break;
+								case "hold":
+									subject = "Job On Hold Notification - Job ID: " + model.getJobId();
+									body = constructHoldEmailBody(model, recruiterName);
+									break;
+								default:
+									subject = "New Job Assignment - Job ID: " + model.getJobId();
+									body = constructEmailBody(model, recruiterName);
+									break;
 							}
+
+							emailService.sendEmail(recruiterEmail, subject, body);
+							logger.info("Email successfully sent to recruiter: {} <{}> for job ID: {}",
+									recruiterName, recruiterEmail, model.getJobId());
 						} else {
-							logger.error("Empty or null email found for recruiter ID: {} (Name: {}) for job ID: {}",
-									cleanedRecruiterId, recruiterName, model.getJobId());
+							logger.error("Email not found for recruiter ID: {}", cleanedRecruiterId);
 						}
 					} else {
-						logger.error("No user information found for recruiter ID: {} for job ID: {}",
-								cleanedRecruiterId, model.getJobId());
+						logger.error("No user data found for recruiter ID: {}", cleanedRecruiterId);
 					}
 				} catch (Exception e) {
-					logger.error("Error processing recruiter {} for job ID: {}. Error: {}",
-							recruiterId, model.getJobId(), e.getMessage(), e);
+					logger.error("Error processing recruiter {} for job ID: {}. Error: {}", recruiterId, model.getJobId(), e.getMessage(), e);
 				}
+			}
+
+			// Send email to Team Lead (assignedBy)
+			try {
+				String assignedByUsername = model.getAssignedBy();
+
+				if (assignedByUsername != null && !assignedByUsername.trim().isEmpty()) {
+					String cleanedUsername = assignedByUsername.trim().replaceAll("^\"|\"$", "").toLowerCase();
+					logger.info("Looking up Team Lead using username → Raw: '{}', Cleaned: '{}'", assignedByUsername, cleanedUsername);
+
+					Tuple leadTuple = requirementsDao.findUserEmailAndUsernameByAssignedBy(cleanedUsername);
+
+					if (leadTuple != null) {
+						String leadEmail = leadTuple.get(0, String.class);
+						String leadName = leadTuple.get(1, String.class);
+
+						if (leadEmail != null && !leadEmail.isEmpty()) {
+							String subject;
+							String body;
+
+							switch (status) {
+								case "closed":
+									subject = "Team Lead Notification: Job Closed - Job ID: " + model.getJobId();
+									body = constructClosedEmailBodyForLead(model, leadName);
+									break;
+								case "hold":
+									subject = "Team Lead Notification: Job On Hold - Job ID: " + model.getJobId();
+									body = constructHoldEmailBodyForLead(model, leadName);
+									break;
+								default:
+									subject = "Team Lead Notification: New Job Assigned - Job ID: " + model.getJobId();
+									body = constructLeadAssignmentBody(model, leadName);
+									break;
+							}
+
+							emailService.sendEmail(leadEmail, subject, body);
+							logger.info("✅ Email sent to Team Lead: {} <{}> for job ID: {}", leadName, leadEmail, model.getJobId());
+						} else {
+							logger.warn("⚠️ Lead email is empty for assignedBy username: '{}'", assignedByUsername);
+						}
+					} else {
+						logger.warn("❌ No user found as Team Lead with username: '{}'", assignedByUsername);
+					}
+				}
+			} catch (Exception e) {
+				logger.error("🚨 Error sending email to Team Lead for job ID: {}. Error: {}", model.getJobId(), e.getMessage(), e);
 			}
 
 			logger.info("Completed email sending process for job ID: {}", model.getJobId());
 		} catch (Exception e) {
-			logger.error("Critical error in sending emails to recruiters for job ID: {}. Error: {}",
-					model.getJobId(), e.getMessage(), e);
-			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage(), e);
+			logger.error("Critical error in sending emails to recruiters/team lead for job ID: {}. Error: {}", model.getJobId(), e.getMessage(), e);
+			throw new RuntimeException("Error in sending emails: " + e.getMessage(), e);
 		}
 	}
 
-	// Update constructEmailBody method to use recruiterName instead of fetching separately
-	private String constructEmailBody(RequirementsModel model, String recruiterName) {
-		return "Dear " + recruiterName + ",\n\n" +
-				"I hope you are doing well.\n\n" +
-				"You have been assigned a new job requirement. Please find the details below:\n\n" +
+	private String constructLeadAssignmentBody(RequirementsModel model, String leadName) {
+		return "Dear " + leadName + ",\n\n" +
+				"You have successfully assigned a job requirement to your team. Here are the details:\n\n" +
+				"▶ Job ID: " + model.getJobId() + "\n" +
 				"▶ Job Title: " + model.getJobTitle() + "\n" +
 				"▶ Client: " + model.getClientName() + "\n" +
 				"▶ Location: " + model.getLocation() + "\n" +
 				"▶ Job Type: " + model.getJobType() + "\n" +
-				"▶ Experience Required: " + model.getExperienceRequired() + " years\n" +
-				"▶ Assigned By: " + model.getAssignedBy() + "\n\n" +
-				"Please review the details and proceed with the necessary actions. Additional information is available on your dashboard.\n\n" +
-				"If you have any questions or need further clarification, feel free to reach out.\n\n" +
-				"Best regards,\n" +
+				"▶ Experience Required: " + model.getExperienceRequired() + " years\n\n" +
+				"Recruiters have been notified.\n\n" +
+				"Regards,\nDataquad";
+	}
+
+	private String constructClosedEmailBodyForLead(RequirementsModel model, String leadName) {
+		return "Dear " + leadName + ",\n\n" +
+				"The job requirement you assigned has been marked as *Closed*:\n\n" +
+				"▶ Job ID: " + model.getJobId() + "\n" +
+				"▶ Job Title: " + model.getJobTitle() + "\n" +
+				"▶ Client: " + model.getClientName() + "\n\n" +
+				"Regards,\nDataquad";
+	}
+
+	private String constructHoldEmailBodyForLead(RequirementsModel model, String leadName) {
+		return "Dear " + leadName + ",\n\n" +
+				"The job requirement you assigned has been put on *Hold*:\n\n" +
+				"▶ Job ID: " + model.getJobId() + "\n" +
+				"▶ Job Title: " + model.getJobTitle() + "\n" +
+				"▶ Client: " + model.getClientName() + "\n\n" +
+				"We’ll inform you once it’s resumed.\n\n" +
+				"Regards,\nDataquad";
+	}
+
+
+	// Update constructEmailBody method to use recruiterName instead of fetching separately
+	private String constructEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",\n\n" +
 				"Dataquad";
+	}
+
+
+	private String constructClosedEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",\n\n" +
+				"This is to inform you that the following job requirement has been marked as *Closed*:\n\n" +
+				"▶ Job Title: " + model.getJobTitle() + "\n" +
+				"▶ Client: " + model.getClientName() + "\n" +
+				"▶ Location: " + model.getLocation() + "\n" +
+				"▶ Job Type: " + model.getJobType() + "\n\n" +
+				"No further action is required from your end.\n\n" +
+				"Regards,\nDataquad";
+	}
+
+
+	private String constructHoldEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",\n\n" +
+				"Please note that the following job requirement has been put on *Hold*:\n\n" +
+				"▶ Job Title: " + model.getJobTitle() + "\n" +
+				"▶ Client: " + model.getClientName() + "\n" +
+				"▶ Location: " + model.getLocation() + "\n" +
+				"▶ Job Type: " + model.getJobType() + "\n\n" +
+				"You will be notified when the status changes.\n\n" +
+				"Thanks for your patience.\n\n" +
+				"Best,\nDataquad";
 	}
 
 
@@ -586,10 +683,11 @@ public class RequirementsService {
 			sendEmailsToRecruiters(existingRequirement); // Assuming this method handles the sending of emails to recruiters
 
 			// Return success response
-			return new ResponseBean(true, "Updated Successfully", null, null);
+			String successMessage = "Requirement updated successfully. Emails sent to assigned recruiters and Team Lead.";
+			return new ResponseBean(true, successMessage, null, null);
 		} catch (Exception e) {
 			logger.error("Error updating requirement", e);
-			return new ResponseBean(false, "Error updating requirement", "Internal Server Error", null);
+			return new ResponseBean(false, "Error updating requirement" + e.getMessage(), "Internal Server Error", null);
 		}
 	}
 
@@ -935,12 +1033,6 @@ public class RequirementsService {
 		return employeeDetails;
 	}
 
-
-
-	// helper method to check if alias exists in tuple
-	private boolean hasAlias(Tuple tuple, String alias) {
-		return tuple.getElements().stream().anyMatch(e -> alias.equalsIgnoreCase(e.getAlias()));
-	}
 
 	public List<RequirementsDto> getRequirementsByAssignedBy(String userId) {
 		// 1. Check if the user exists

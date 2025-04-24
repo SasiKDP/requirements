@@ -67,24 +67,28 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<Tuple> findJobsByBdmUserId(@Param("userId") String userId);
 
     @Query(value = """
-    SELECT u.user_name AS recruiter_name, 
-           r.client_name, 
-           r.job_id, 
-           r.job_title, 
-           r.assigned_by, 
-           r.location, 
-           r.notice_period
+    SELECT 
+        r.job_id AS job_id,
+        r.job_title AS job_title,
+        r.client_name AS client_name,
+        r.location AS location,
+        r.notice_period AS notice_period,
+        r.assigned_by AS assigned_by,
+        GROUP_CONCAT(u.user_name) AS recruiter_name
     FROM requirements_model_prod r
-    JOIN job_recruiters_prod jr 
-        ON r.job_id = jr.job_id
-    JOIN user_details_prod u 
-        ON jr.recruiter_id = u.user_id
     JOIN bdm_client_prod b 
         ON TRIM(UPPER(r.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin
-    WHERE TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(:clientName)) COLLATE utf8mb4_bin
-    AND r.job_id IS NOT NULL
+    JOIN user_details_prod u_bdm 
+        ON b.on_boarded_by = u_bdm.user_name
+    LEFT JOIN job_recruiters_prod jr 
+        ON r.job_id = jr.job_id
+    LEFT JOIN user_details_prod u 
+        ON jr.recruiter_id = u.user_id
+    WHERE TRIM(UPPER(r.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(:clientName)) COLLATE utf8mb4_bin
+    GROUP BY r.job_id
 """, nativeQuery = true)
     List<Tuple> findRequirementsByClientName(@Param("clientName") String clientName);
+
 
 
     // Fetch all submissions for a client across ALL job IDs
@@ -633,4 +637,5 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             @Param("endDate") LocalDateTime endDate
     );
 
-}
+    @Query(value = "SELECT email, user_name FROM user_details_prod WHERE LOWER(TRIM(user_name)) = LOWER(TRIM(:assignedBy)) AND status != 'inactive'", nativeQuery = true)
+    Tuple findUserEmailAndUsernameByAssignedBy(@Param("assignedBy") String assignedBy);}

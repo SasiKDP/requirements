@@ -1,9 +1,7 @@
 package com.dataquadinc.service;
 
 import com.dataquadinc.dto.*;
-import com.dataquadinc.exceptions.ClientAlreadyExistsException;
-import com.dataquadinc.exceptions.DateRangeValidationException;
-import com.dataquadinc.exceptions.ResourceNotFoundException;
+import com.dataquadinc.exceptions.*;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
 import com.dataquadinc.repository.RequirementsDao;
@@ -18,7 +16,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -41,9 +38,14 @@ public class BDM_service {
     @Autowired
     private RequirementsDao requirementsDao;
 
+    private static final Logger log = LoggerFactory.getLogger(BDM_service.class);
+
+
     private final Path UPLOAD_DIR = Paths.get("uploads");
 
     public BDM_Client saveClient(BDM_Client client) {
+
+
 
         String normalizedClientName = client.getClientName().trim().toLowerCase();
         boolean exists = repository.existsByClientNameIgnoreCase(normalizedClientName);
@@ -223,11 +225,17 @@ public class BDM_service {
     }
 
     public BdmClientDetailsDTO getBdmClientDetails(String userId) {
+        log.info("🔍 Fetching BDM client details for userId: {}", userId);
+
         // 1️⃣ Fetch BDM Details
         List<BdmDetailsDto> bdmDetails = getBdmDetails(userId);
+        log.info("✅ Fetched {} BDM details for userId: {}", bdmDetails.size(), userId);
+
 
         // 2️⃣ Fetch Clients onboarded by the BDM
         List<BdmClientDto> clientDetails = getClientDetails(userId);
+        log.info("✅ Fetched {} client details for userId: {}", clientDetails.size(), userId);
+
 
         // 3️⃣ Fetch Submissions for each client
         Map<String, List<BdmSubmissionDTO>> submissions = new HashMap<>();
@@ -253,11 +261,27 @@ public class BDM_service {
             requirements.put(client.getClientName(), getRequirements(client.getClientName()));
         }
 
+        // 🔢 Logging total counts across all clients
+        int totalSubmissions = submissions.values().stream().mapToInt(List::size).sum();
+        int totalInterviews = interviews.values().stream().mapToInt(List::size).sum();
+        int totalPlacements = placements.values().stream().mapToInt(List::size).sum();
+        int totalRequirements = requirements.values().stream().mapToInt(List::size).sum();
+
+        log.info("📊 Total Clients: {}", clientDetails.size());
+        log.info("📊 Total Submissions (all clients combined): {}", totalSubmissions);
+        log.info("📊 Total Interviews (all clients combined): {}", totalInterviews);
+        log.info("📊 Total Placements (all clients combined): {}", totalPlacements);
+        log.info("📊 Total Requirements (all clients combined): {}", totalRequirements);
+
         // Return DTO with all details
+        log.info("✅ Successfully fetched all details for BDM userId: {}", userId);
+
         return new BdmClientDetailsDTO(bdmDetails, clientDetails, submissions, interviews, placements, requirements);
     }
 
     private List<RequirementDto> getRequirements(String clientName) {
+        log.info("🔍 Fetching requirements for client: {}", clientName);
+
         // Fetch the requirement data for the given client from the database
         List<Tuple> requirementTuples = requirementsDao.findRequirementsByClientName(clientName);
 
@@ -278,6 +302,7 @@ public class BDM_service {
 
     private List<BdmDetailsDto> getBdmDetails(String userId) {
         List<Tuple> bdmTuples = requirementsDao.findBdmEmployeeByUserId(userId);
+        log.info("🔍 Fetching BDM details for userId: {}", userId);
 
         return bdmTuples.stream()
                 .map(tuple -> new BdmDetailsDto(
@@ -340,6 +365,7 @@ public class BDM_service {
 
     private List<BdmClientDto> getClientDetails(String userId) {
         List<Tuple> clientTuples = requirementsDao.findClientsByBdmUserId(userId);
+        log.info("🔍 Fetching client details for userId: {}", userId);
 
         return clientTuples.stream()
                 .map(tuple -> new BdmClientDto(
@@ -370,14 +396,10 @@ public class BDM_service {
                 .collect(Collectors.toList());
     }
 
-    // Utility method to safely split strings
-    private List<String> splitString(String str) {
-        return (str != null && !str.isEmpty()) ? Arrays.asList(str.split(",")) : new ArrayList<>();
-    }
-
-
     private List<BdmSubmissionDTO> getSubmissions(String clientName) {
         List<Tuple> submissionTuples = requirementsDao.findAllSubmissionsByClientName(clientName);
+        log.info("🔍 Fetching submissions for client: {}", clientName);
+
         return submissionTuples.stream()
                 .map(tuple -> new BdmSubmissionDTO(
                         tuple.get("candidate_id", String.class),
@@ -462,4 +484,137 @@ public class BDM_service {
         return clients;
     }
 
+    public List<RequirementsDto> getRequirementsForBdmByUserId(String userId) {
+        int userExists = requirementsDao.countByUserId(userId);
+        if (userExists == 0) {
+            logger.warn("User ID '{}' not found in the database", userId);
+            throw new ResourceNotFoundException("User ID '" + userId + "' not found in the database.");
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
+
+        // ✅ Use the new method that filters by date range
+        List<Tuple> results = repo.findRequirementsByBdmUserIdAndDateRange(userId, startOfMonth, endOfMonth);
+
+        List<RequirementsDto> dtos = results.stream().map(tuple -> {
+            RequirementsDto dto = new RequirementsDto();
+
+            dto.setJobId((String) tuple.get("job_id"));
+            dto.setJobTitle((String) tuple.get("job_title"));
+            dto.setClientName((String) tuple.get("client_name"));
+            dto.setJobDescription((String) tuple.get("job_description"));
+            dto.setJobDescriptionBlob((byte[]) tuple.get("job_description_blob"));
+            dto.setJobType((String) tuple.get("job_type"));
+            dto.setLocation((String) tuple.get("location"));
+            dto.setJobMode((String) tuple.get("job_mode"));
+            dto.setExperienceRequired((String) tuple.get("experience_required"));
+            dto.setNoticePeriod((String) tuple.get("notice_period"));
+            dto.setRelevantExperience((String) tuple.get("relevant_experience"));
+            dto.setQualification((String) tuple.get("qualification"));
+            dto.setSalaryPackage((String) tuple.get("salary_package"));
+            dto.setNoOfPositions((Integer) tuple.get("no_of_positions"));
+
+            Timestamp timestamp = (Timestamp) tuple.get("requirement_added_time_stamp");
+            dto.setRequirementAddedTimeStamp(timestamp != null ? timestamp.toLocalDateTime() : null);
+
+            dto.setStatus((String) tuple.get("status"));
+            dto.setAssignedBy((String) tuple.get("assigned_by"));
+
+            String recruiterIdsStr = (String) tuple.get("recruiter_ids");
+            dto.setRecruiterIds(recruiterIdsStr != null ?
+                    Arrays.stream(recruiterIdsStr.split(",")).map(String::trim).collect(Collectors.toSet())
+                    : Collections.emptySet());
+
+            String recruiterNamesStr = (String) tuple.get("recruiter_name");
+            dto.setRecruiterName(recruiterNamesStr != null ?
+                    Arrays.stream(recruiterNamesStr.split(",")).map(String::trim).collect(Collectors.toSet())
+                    : Collections.emptySet());
+
+            String jobId = (String) tuple.get("job_id");
+            dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
+            dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
+
+            return dto;
+        }).collect(Collectors.toList());
+
+        logger.info("Fetched {} requirements for BDM with user ID '{}' for current month {} to {}",
+                dtos.size(), userId, startOfMonth.toLocalDate(), endOfMonth.toLocalDate());
+
+        return dtos;
+    }
+
+    public List<RequirementsDto> getRequirementsByBdmUserIdAndDateRange(String userId, LocalDate startDate, LocalDate endDate) {
+        // Validation logic...
+
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
+
+        List<Tuple> requirements = repo.findRequirementsByBdmUserIdAndDateRange(userId, startDateTime, endDateTime);
+
+        if (requirements.isEmpty()) {
+            throw new RequirementNotFoundException("No requirements found for BDM " + userId +
+                    " between " + startDate + " and " + endDate);
+        }
+
+        // Group by job_id to manually aggregate
+        Map<String, RequirementsDto> dtoMap = new HashMap<>();
+
+        for (Tuple tuple : requirements) {
+            String jobId = (String) tuple.get("job_id");
+
+            RequirementsDto dto = dtoMap.computeIfAbsent(jobId, id -> {
+                RequirementsDto newDto = new RequirementsDto();
+
+                newDto.setJobId(id);
+                newDto.setJobTitle((String) tuple.get("job_title"));
+                newDto.setClientName((String) tuple.get("client_name"));
+                newDto.setJobDescription((String) tuple.get("job_description"));
+                newDto.setJobDescriptionBlob((byte[]) tuple.get("job_description_blob"));
+                newDto.setJobType((String) tuple.get("job_type"));
+                newDto.setLocation((String) tuple.get("location"));
+                newDto.setJobMode((String) tuple.get("job_mode"));
+                newDto.setExperienceRequired((String) tuple.get("experience_required"));
+                newDto.setNoticePeriod((String) tuple.get("notice_period"));
+                newDto.setRelevantExperience((String) tuple.get("relevant_experience"));
+                newDto.setQualification((String) tuple.get("qualification"));
+                newDto.setSalaryPackage((String) tuple.get("salary_package"));
+                newDto.setNoOfPositions((Integer) tuple.get("no_of_positions"));
+
+                Timestamp timestamp = (Timestamp) tuple.get("requirement_added_time_stamp");
+                newDto.setRequirementAddedTimeStamp(timestamp != null ? timestamp.toLocalDateTime() : null);
+
+                newDto.setStatus((String) tuple.get("status"));
+                newDto.setAssignedBy((String) tuple.get("assigned_by"));
+
+                newDto.setRecruiterIds(new HashSet<>());
+                newDto.setRecruiterName(new HashSet<>());
+
+                newDto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(id));
+                newDto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(id));
+
+                return newDto;
+            });
+
+            // Add recruiter info
+            String recruiterId = (String) tuple.get("recruiter_id");
+            String recruiterName = (String) tuple.get("recruiter_name");
+
+            if (recruiterId != null) {
+                dto.getRecruiterIds().add(recruiterId);
+            }
+
+            if (recruiterName != null) {
+                dto.getRecruiterName().add(recruiterName);
+            }
+        }
+
+        List<RequirementsDto> resultList = new ArrayList<>(dtoMap.values());
+
+        logger.info("✅ Fetched {} requirements for BDM userId {} between {} and {}",
+                resultList.size(), userId, startDate, endDate);
+
+        return resultList;
+    }
 }
