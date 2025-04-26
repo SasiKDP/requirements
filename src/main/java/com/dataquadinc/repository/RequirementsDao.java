@@ -251,12 +251,18 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                          END), 0) AS selfInterviews,
                
         -- Placements made by teamlead
-        COALESCE(SUM(CASE 
-            WHEN c.user_id = u.user_id AND (
-                c.interview_status = 'Placed'
-                OR (JSON_VALID(c.interview_status) = 1 AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
-            ) THEN 1 ELSE 0 
-        END), 0) AS selfPlacements,
+        COALESCE(SUM(CASE\s
+                            WHEN c.user_id = u.user_id AND (
+                                c.interview_status = 'Placed'
+                                OR (
+                                    JSON_VALID(c.interview_status) = 1\s
+                                    AND JSON_UNQUOTE(JSON_EXTRACT(
+                                        c.interview_status,\s
+                                        CONCAT('$[', JSON_LENGTH(c.interview_status)-1, '].status')
+                                    )) = 'Placed'
+                                )
+                            ) THEN 1 ELSE 0\s
+                        END), 0) AS selfPlacements,
 
         -- Team submissions (recruiters submitting to jobs assigned by teamlead)
         COALESCE(SUM(CASE
@@ -281,12 +287,18 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                END), 0) AS teamInterviews,
 
         -- Team placements on teamlead's jobs
-        COALESCE(SUM(CASE 
-            WHEN c.user_id != u.user_id AND (
-                c.interview_status = 'Placed'
-                OR (JSON_VALID(c.interview_status) = 1 AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
-            ) THEN 1 ELSE 0 
-        END), 0) AS teamPlacements
+        COALESCE(SUM(CASE\s
+                                                       WHEN c.user_id != u.user_id AND (
+                                                           c.interview_status = 'Placed'
+                                                           OR (
+                                                               JSON_VALID(c.interview_status) = 1\s
+                                                               AND JSON_UNQUOTE(JSON_EXTRACT(
+                                                                   c.interview_status,\s
+                                                                   CONCAT('$[', JSON_LENGTH(c.interview_status)-1, '].status')
+                                                               )) = 'Placed'
+                                                           )
+                                                       ) THEN 1 ELSE 0\s
+                                                   END), 0) AS teamPlacements
 
     FROM user_details_prod u
     JOIN requirements_model_prod r ON r.assigned_by = u.user_name
