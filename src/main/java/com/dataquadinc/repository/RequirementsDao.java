@@ -17,9 +17,6 @@ import com.dataquadinc.model.RequirementsModel;
 @Repository
 public interface RequirementsDao extends JpaRepository<RequirementsModel, String> {
 
-    @Query("SELECT r FROM RequirementsModel r WHERE :recruiterId MEMBER OF r.recruiterIds")
-    List<RequirementsModel> findJobsByRecruiterId(String recruiterId);
-
     @Query("SELECT r FROM RequirementsModel r WHERE r.jobId = :jobId")
     Optional<RequirementsModel> findRecruitersByJobId(@Param("jobId") String jobId);
 
@@ -87,73 +84,91 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<Tuple> findRequirementsByClientName(@Param("clientName") String clientName);
 
     @Query(value = """
-            SELECT c.candidate_id, c.full_name, c.candidate_email_id AS candidateEmailId, 
-                   c.contact_number, c.qualification, c.skills, c.overall_feedback, c.user_id,
-                   r.job_id, r.job_title, b.client_name
-            FROM candidate_submissions c
-            JOIN requirements_model r ON c.job_id = r.job_id
-            JOIN bdm_client b ON r.client_name = b.client_name
-            WHERE b.client_name = :clientName
-            """, nativeQuery = true)
+        SELECT 
+            cd.candidate_id, 
+            cd.full_name, 
+            cd.candidate_email_id AS candidateEmailId, 
+            cd.contact_number, 
+            cd.qualification, 
+            cs.skills, 
+            cs.overall_feedback, 
+            cd.user_id,
+            r.job_id, 
+            r.job_title, 
+            b.client_name
+        FROM candidate_submissions cs
+        JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+        JOIN requirements_model r ON cs.job_id = r.job_id
+        JOIN bdm_client b ON r.client_name = b.client_name
+        WHERE b.client_name = :clientName
+        """, nativeQuery = true)
     List<Tuple> findAllSubmissionsByClientName(@Param("clientName") String clientName);
 
     @Query(value = """
-            SELECT c.candidate_id, 
-                   c.full_name, 
-                   c.candidate_email_id AS candidateEmailId, 
-                   c.contact_number, 
-                   c.qualification, 
-                   c.skills, 
-                   CASE 
-                       WHEN JSON_VALID(c.interview_status) 
-                       THEN JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) 
-                       ELSE c.interview_status 
-                   END AS interview_status, 
-                   c.interview_level, 
-                   c.interview_date_time, 
-                   r.job_id, 
-                   r.job_title, 
-                   b.client_name
-            FROM (
-                SELECT candidate_id, full_name, candidate_email_id, contact_number, qualification, 
-                       skills, interview_status, interview_level, interview_date_time, job_id, 
-                       ROW_NUMBER() OVER (PARTITION BY candidate_id ORDER BY interview_date_time DESC) AS rn 
-                FROM candidate_submissions 
-            ) c
-            JOIN requirements_model r ON c.job_id = r.job_id
-            LEFT JOIN bdm_client b ON r.client_name = b.client_name
-            WHERE (b.client_name = :clientName OR r.client_name = :clientName 
-                   OR (:clientName IS NULL AND EXISTS (
-                        SELECT 1 FROM candidates c2 
-                        WHERE c2.job_id = r.job_id
-                   )) )
-            AND c.rn = 1
-            AND b.client_name IS NOT NULL 
-            AND c.interview_date_time IS NOT NULL
-            """, nativeQuery = true)
+    SELECT 
+        cd.candidate_id, 
+        cd.full_name, 
+        cd.candidate_email_id AS candidateEmailId, 
+        cd.contact_number, 
+        cd.qualification, 
+        cs.skills, 
+        CASE 
+            WHEN JSON_VALID(li.interview_status) 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(li.interview_status, '$[0].status')) 
+            ELSE li.interview_status 
+        END AS interview_status, 
+        li.interview_level, 
+        li.interview_date_time, 
+        r.job_id, 
+        r.job_title, 
+        b.client_name
+    FROM (
+        SELECT 
+            idt.candidate_id,
+            idt.interview_status,
+            idt.interview_level,
+            idt.interview_date_time,
+            cs.job_id,
+            ROW_NUMBER() OVER (PARTITION BY idt.candidate_id ORDER BY idt.interview_date_time DESC) AS rn 
+        FROM interview_details idt
+        JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
+    ) li
+    JOIN candidate_submissions cs ON li.job_id = cs.job_id
+    JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    LEFT JOIN bdm_client b ON r.client_name = b.client_name
+    WHERE (b.client_name = :clientName OR r.client_name = :clientName 
+           OR (:clientName IS NULL AND EXISTS (
+                SELECT 1 FROM candidate_submissions cs2 
+                WHERE cs2.job_id = r.job_id
+           )) )
+    AND li.rn = 1
+    AND b.client_name IS NOT NULL 
+    AND li.interview_date_time IS NOT NULL
+    """, nativeQuery = true)
     List<Tuple> findAllInterviewsByClientName(@Param("clientName") String clientName);
 
     @Query(value = """
-                SELECT 
-                    idt.candidate_id, 
-                    idt.full_name, 
-                    idt.candidate_email_id AS candidateEmailId,  
-                    r.job_id, 
-                    r.job_title, 
-                    b.client_name
-                FROM interview_details idt
-                JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
-                JOIN requirements_model r ON cs.job_id = r.job_id
-                JOIN bdm_client b ON r.client_name = b.client_name
-                WHERE b.client_name = :clientName
-                  AND (
-                    (JSON_VALID(idt.interview_status) 
-                     AND JSON_SEARCH(idt.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
-                    OR UPPER(idt.interview_status) = 'PLACED'
-                  )
-            """, nativeQuery = true)
+        SELECT 
+            cd.candidate_id, 
+            cd.full_name, 
+            cd.candidate_email_id AS candidateEmailId,  
+            r.job_id, 
+            r.job_title, 
+            b.client_name
+        FROM interview_details idt
+        JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
+        JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+        JOIN requirements_model r ON cs.job_id = r.job_id
+        JOIN bdm_client b ON r.client_name = b.client_name
+        WHERE b.client_name = :clientName
+          AND (
+            (JSON_VALID(idt.interview_status) 
+             AND JSON_SEARCH(idt.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
+            OR UPPER(idt.interview_status) = 'PLACED'
+          )
+        """, nativeQuery = true)
     List<Tuple> findAllPlacementsByClientName(@Param("clientName") String clientName);
-
 
     @Query(value = """
                 SELECT 
@@ -217,33 +232,33 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         COALESCE(COUNT(DISTINCT r.job_id), 0) AS numberOfRequirements,
 
         -- Submissions made by the teamlead themselves
-        COALESCE(SUM(CASE WHEN c.user_id = u.user_id THEN 1 ELSE 0 END), 0) AS selfSubmissions,
+        COALESCE(SUM(CASE WHEN cd.user_id = u.user_id THEN 1 ELSE 0 END), 0) AS selfSubmissions,
 
         -- Interviews scheduled (future) by teamlead
         COALESCE(SUM(CASE
-                             WHEN c.user_id = u.user_id
-                              AND c.interview_date_time IS NOT NULL
-                              AND c.interview_date_time >= NOW()
-                              AND c.job_id IN (
-                                 SELECT job_id FROM requirements_model_prod r2
-                                 WHERE r2.client_name = r.client_name AND r2.assigned_by = u.user_name
-                              )
-                             THEN 1 ELSE 0
-                         END), 0) AS selfInterviews,
-               
+                     WHEN cd.user_id = u.user_id
+                      AND i.interview_date_time IS NOT NULL
+                      AND i.interview_date_time >= NOW()
+                      AND s.job_id IN (
+                         SELECT job_id FROM requirements_model r2
+                         WHERE r2.client_name = r.client_name AND r2.assigned_by = u.user_name
+                      )
+                     THEN 1 ELSE 0
+                 END), 0) AS selfInterviews,
+           
         -- Placements made by teamlead
         COALESCE(SUM(CASE 
-            WHEN c.user_id = u.user_id AND (
-                c.interview_status = 'Placed'
-                OR (JSON_VALID(c.interview_status) = 1 AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
+            WHEN cd.user_id = u.user_id AND (
+                i.interview_status = 'Placed'
+                OR (JSON_VALID(i.interview_status) = 1 AND JSON_SEARCH(i.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
             ) THEN 1 ELSE 0 
         END), 0) AS selfPlacements,
 
         -- Team submissions (recruiters submitting to jobs assigned by teamlead)
         COALESCE(SUM(CASE
-                    WHEN c.user_id != u.user_id
-                    AND c.job_id IN (
-                        SELECT job_id FROM requirements_model_prod r2
+                    WHEN cd.user_id != u.user_id
+                    AND s.job_id IN (
+                        SELECT job_id FROM requirements_model r2
                         WHERE r2.client_name = r.client_name AND r2.assigned_by = u.user_name
                     )
                     THEN 1 ELSE 0
@@ -251,11 +266,11 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 
         -- Team interviews (future) on teamlead's jobs
        COALESCE(SUM(CASE
-                   WHEN c.user_id IS NOT NULL
-                    AND c.user_id != u.user_id
-                    AND c.interview_date_time IS NOT NULL
-                    AND c.job_id IN (
-                       SELECT job_id FROM requirements_model_prod r2
+                   WHEN cd.user_id IS NOT NULL
+                    AND cd.user_id != u.user_id
+                    AND i.interview_date_time IS NOT NULL
+                    AND s.job_id IN (
+                       SELECT job_id FROM requirements_model r2
                        WHERE r2.client_name = r.client_name AND r2.assigned_by = u.user_name
                     )
                    THEN 1 ELSE 0
@@ -263,121 +278,123 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 
         -- Team placements on teamlead's jobs
         COALESCE(SUM(CASE 
-            WHEN c.user_id != u.user_id AND (
-                c.interview_status = 'Placed'
-                OR (JSON_VALID(c.interview_status) = 1 AND JSON_SEARCH(c.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
+            WHEN cd.user_id != u.user_id AND (
+                i.interview_status = 'Placed'
+                OR (JSON_VALID(i.interview_status) = 1 AND JSON_SEARCH(i.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
             ) THEN 1 ELSE 0 
         END), 0) AS teamPlacements
 
-    FROM user_details_prod u
-    JOIN requirements_model_prod r ON r.assigned_by = u.user_name
-    LEFT JOIN candidates_prod c ON c.job_id = r.job_id
+    FROM user_details u
+    JOIN requirements_model r ON r.assigned_by = u.user_name
+    LEFT JOIN candidate_submissions s ON s.job_id = r.job_id
+    LEFT JOIN candidates cd ON cd.candidate_id = s.candidate_id
+    LEFT JOIN interview_details i ON i.client_name = r.client_name
     WHERE EXISTS (
-        SELECT 1 FROM user_roles_prod ur 
-        JOIN roles_prod rl ON ur.role_id = rl.id 
+        SELECT 1 FROM user_roles ur 
+        JOIN roles rl ON ur.role_id = rl.id 
         WHERE ur.user_id = u.user_id AND rl.name = 'Teamlead'
     )
     GROUP BY u.user_id, u.user_name, u.email
     """, nativeQuery = true)
     List<Tuple> getTeamleadCandidateStats();
 
-
     @Query(value = """
-                SELECT 
-                    idt.candidate_id AS candidateId,
-                    idt.full_name AS fullName,
-                    idt.candidate_email_id AS candidateEmailId,
-                    idt.contact_number AS contactNumber,
-                    idt.qualification AS qualification,
-                    cs.skills AS skills,
-                    idt.overall_feedback AS overallFeedback,
-                    r.job_id AS jobId,
-                    r.job_title AS jobTitle,
-                    r.client_name AS clientName
-                FROM interview_details idt
-                JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
-                JOIN requirements_model r ON cs.job_id = r.job_id
-                WHERE idt.user_id = :userId
-            """, nativeQuery = true)
+    SELECT 
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        cs.skills AS skills,
+        cs.overall_feedback AS overallFeedback,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        r.client_name AS clientName
+    FROM interview_details idt
+    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id
+    JOIN candidates cd ON cd.candidate_id = cs.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    WHERE idt.user_id = :userId
+""", nativeQuery = true)
     List<SubmittedCandidateDTO> findSubmittedCandidatesByUserId(@Param("userId") String userId);
 
-
     @Query(value = """
-                SELECT 
-                    idt.candidate_id AS candidateId,
-                    idt.full_name AS fullName,
-                    idt.candidate_email_id AS candidateEmailId,
-                    idt.contact_number AS contactNumber,
-                    idt.qualification AS qualification,
-                    cs.skills AS skills,
-                    CASE 
-                        WHEN JSON_VALID(idt.interview_status) = 1 
-                        THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
-                        ELSE idt.interview_status 
-                    END AS interviewStatus,
-                    idt.interview_level AS interviewLevel,
-                    idt.interview_date_time AS interviewDateTime,
-                    r.job_id AS jobId,
-                    r.job_title AS jobTitle,
-                    idt.client_name AS clientName
-                FROM interview_details idt
-                JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
-                JOIN requirements_model r ON cs.job_id = r.job_id
-                WHERE idt.user_id = :userId
-                  AND idt.interview_date_time IS NOT NULL
-                  AND idt.client_name IS NOT NULL
-            """, nativeQuery = true)
+    SELECT 
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        cs.skills AS skills,
+        CASE 
+            WHEN JSON_VALID(idt.interview_status) = 1 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
+            ELSE idt.interview_status 
+        END AS interviewStatus,
+        idt.interview_level AS interviewLevel,
+        idt.interview_date_time AS interviewDateTime,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        idt.client_name AS clientName
+    FROM interview_details idt
+    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id
+    JOIN candidates cd ON cd.candidate_id = cs.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    WHERE idt.user_id = :userId
+      AND idt.interview_date_time IS NOT NULL
+      AND idt.client_name IS NOT NULL
+""", nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByUserId(@Param("userId") String userId);
 
-
     @Query(value = """
-                SELECT 
-                    r.job_id AS jobId,
-                    TRIM(r.job_title) AS jobTitle,
-                    TRIM(r.client_name) AS clientName,
-                    TRIM(BOTH '\\"' FROM r.assigned_by) AS assignedBy,
-                    r.status AS status,
-                    r.no_of_positions AS noOfPositions,
-                    r.qualification AS qualification,
-                    r.job_type AS jobType,
-                    r.job_mode AS jobMode,
-                    r.requirement_added_time_stamp AS postedDate
-                FROM requirements_model r
-                JOIN job_recruiters jr ON r.job_id = jr.job_id
-                JOIN user_details u ON jr.recruiter_id = u.user_id
-                WHERE u.user_id = :userId
-            """, nativeQuery = true)
+    SELECT 
+        r.job_id AS jobId,
+        TRIM(r.job_title) AS jobTitle,
+        TRIM(r.client_name) AS clientName,
+        TRIM(BOTH '\\"' FROM r.assigned_by) AS assignedBy,
+        r.status AS status,
+        r.no_of_positions AS noOfPositions,
+        r.qualification AS qualification,
+        r.job_type AS jobType,
+        r.job_mode AS jobMode,
+        r.requirement_added_time_stamp AS postedDate
+    FROM requirements_model r
+    JOIN job_recruiters jr ON r.job_id = jr.job_id
+    JOIN user_details u ON jr.recruiter_id = u.user_id
+    WHERE u.user_id = :userId
+""", nativeQuery = true)
     List<JobDetailsDTO> findJobDetailsByUserId(@Param("userId") String userId);
 
     @Query(value = """
-                SELECT 
-                    idt.candidate_id AS candidateId,
-                    idt.full_name AS fullName,
-                    idt.candidate_email_id AS candidateEmailId,
-                    idt.contact_number AS contactNumber,
-                    idt.qualification AS qualification,
-                    cs.skills AS skills,
-                    CASE 
-                        WHEN JSON_VALID(idt.interview_status) 
-                        THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
-                        ELSE idt.interview_status 
-                    END AS interviewStatus,
-                    idt.interview_level AS interviewLevel,
-                    idt.interview_date_time AS interviewDateTime,
-                    r.job_id AS jobId,
-                    r.job_title AS jobTitle,
-                    idt.client_name AS clientName
-                FROM interview_details idt
-                JOIN user_details u ON idt.user_id = u.user_id
-                JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id AND cs.job_id = idt.job_id
-                JOIN requirements_model r ON cs.job_id = r.job_id
-                WHERE u.user_id = :userId
-                  AND (
-                      (JSON_VALID(idt.interview_status) 
-                       AND JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) = 'Placed')
-                      OR UPPER(idt.interview_status) = 'PLACED'
-                  )
-            """, nativeQuery = true)
+    SELECT 
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        cs.skills AS skills,
+        CASE 
+            WHEN JSON_VALID(idt.interview_status) 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
+            ELSE idt.interview_status 
+        END AS interviewStatus,
+        idt.interview_level AS interviewLevel,
+        idt.interview_date_time AS interviewDateTime,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        idt.client_name AS clientName
+    FROM interview_details idt
+    JOIN user_details u ON idt.user_id = u.user_id
+    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id
+    JOIN candidates cd ON cd.candidate_id = cs.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    WHERE u.user_id = :userId
+      AND (
+          (JSON_VALID(idt.interview_status) 
+           AND JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) = 'Placed')
+          OR UPPER(idt.interview_status) = 'PLACED'
+      )
+""", nativeQuery = true)
     List<PlacementDetailsDTO> findPlacementCandidatesByUserId(@Param("userId") String userId);
 
 
@@ -453,44 +470,47 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 
     @Query(value = """
     SELECT 
-        c.candidate_id AS candidateId,
-        c.full_name AS fullName,
-        c.candidate_email_id AS candidateEmailId,
-        c.contact_number AS contactNumber,
-        c.qualification AS qualification,
-        c.skills AS skills,
-        c.overall_feedback AS overallFeedback,
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        s.skills AS skills,
+        s.overall_feedback AS overallFeedback,
         r.job_id AS jobId,
         r.job_title AS jobTitle,
         r.client_name AS clientName
-    FROM candidates c
-    JOIN requirements_model r ON c.job_id = r.job_id
+    FROM candidates cd
+    JOIN candidate_submissions s ON cd.candidate_id = s.candidate_id
+    JOIN requirements_model r ON s.job_id = r.job_id
     WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
 """, nativeQuery = true)
     List<SubmittedCandidateDTO> findSubmittedCandidatesByAssignedBy(@Param("username") String username);
 
     @Query(value = """
     SELECT 
-        c.candidate_id AS candidateId,
-        c.full_name AS fullName,
-        c.candidate_email_id AS candidateEmailId,
-        c.contact_number AS contactNumber,
-        c.qualification AS qualification,
-        c.skills AS skills,
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        s.skills AS skills,
         CASE 
-            WHEN JSON_VALID(c.interview_status) = 1 
-            THEN JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) 
-            ELSE c.interview_status 
+            WHEN JSON_VALID(i.interview_status) = 1 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(i.interview_status, '$[0].status')) 
+            ELSE i.interview_status 
         END AS interviewStatus,
-        c.interview_level AS interviewLevel,
-        c.interview_date_time AS interviewDateTime,
+        i.interview_level AS interviewLevel,
+        i.interview_date_time AS interviewDateTime,
         r.job_id AS jobId,
         r.job_title AS jobTitle,
         r.client_name AS clientName
-    FROM candidates c
-    JOIN requirements_model r ON c.job_id = r.job_id
+    FROM candidates cd
+    JOIN candidate_submissions s ON cd.candidate_id = s.candidate_id
+    JOIN interview_details i ON i.candidate_id = s.candidate_id
+    JOIN requirements_model r ON s.job_id = r.job_id
     WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
-      AND c.interview_date_time IS NOT NULL
+      AND i.interview_date_time IS NOT NULL
 """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByAssignedBy(@Param("username") String username);
 
@@ -511,30 +531,33 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 """, nativeQuery = true)
     List<JobDetailsDTO> findJobDetailsByAssignedBy(@Param("username") String username);
 
+
     @Query(value = """
     SELECT 
-        c.candidate_id AS candidateId,
-        c.full_name AS fullName,
-        c.candidate_email_id AS candidateEmailId,
-        c.contact_number AS contactNumber,
-        c.qualification AS qualification,
-        c.skills AS skills,
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        s.skills AS skills,
         CASE 
-            WHEN JSON_VALID(c.interview_status) 
-            THEN JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) 
-            ELSE c.interview_status 
+            WHEN JSON_VALID(i.interview_status) 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(i.interview_status, '$[0].status')) 
+            ELSE i.interview_status 
         END AS interviewStatus,
-        c.interview_level AS interviewLevel,
-        c.interview_date_time AS interviewDateTime,
+        i.interview_level AS interviewLevel,
+        i.interview_date_time AS interviewDateTime,
         r.job_id AS jobId,
         r.job_title AS jobTitle,
         r.client_name AS clientName
-    FROM candidates c
-    JOIN requirements_model r ON c.job_id = r.job_id
+    FROM candidates cd
+    JOIN candidate_submissions s ON cd.candidate_id = s.candidate_id
+    JOIN interview_details i ON i.candidate_id = s.candidate_id
+    JOIN requirements_model r ON s.job_id = r.job_id
     WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
       AND (
-          (JSON_VALID(c.interview_status) AND JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) = 'Placed')
-          OR c.interview_status = 'Placed'
+          (JSON_VALID(i.interview_status) AND JSON_UNQUOTE(JSON_EXTRACT(i.interview_status, '$[0].status')) = 'Placed')
+          OR i.interview_status = 'Placed'
       )
 """, nativeQuery = true)
     List<PlacementDetailsDTO> findPlacementCandidatesByAssignedBy(@Param("username") String username);
