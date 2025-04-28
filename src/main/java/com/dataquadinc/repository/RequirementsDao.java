@@ -23,16 +23,32 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     @Query("SELECT r FROM RequirementsModel r WHERE r.jobId = :jobId")
     Optional<RequirementsModel> findRecruitersByJobId(@Param("jobId") String jobId);
 
-    @Query(value = "SELECT c.*, u.user_name AS recruiterName FROM candidates_prod c " +
+    @Query(value = "SELECT c.*, " +
+            "u.user_name AS recruiterName, " +
+            "JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) AS interviewStatus " +
+            "FROM candidates_prod c " +
             "JOIN user_details_prod u ON c.user_email = u.email " +
-            "WHERE c.job_id = :jobId", nativeQuery = true)
+            "WHERE c.job_id = :jobId",
+            nativeQuery = true)
     List<Tuple> findCandidatesByJobId(@Param("jobId") String jobId);
 
 
-    @Query(value = "SELECT c.*, u.user_name AS recruiterName FROM candidates_prod c " +
+
+    @Query(value = "SELECT c.*, " +
+            "u.user_name AS recruiterName, " +
+            "JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) AS interviewStatus " +
+            "FROM candidates_prod c " +
             "JOIN user_details_prod u ON c.user_email = u.email " +
-            "WHERE c.job_id = :jobId AND c.interview_date_time IS NOT NULL", nativeQuery = true)
+            "WHERE c.job_id = :jobId " +
+            "AND c.interview_date_time IS NOT NULL " +
+            "AND JSON_UNQUOTE(JSON_EXTRACT(c.interview_status, '$[0].status')) IS NOT NULL",
+            nativeQuery = true)
     List<Tuple> findInterviewScheduledCandidatesByJobId(@Param("jobId") String jobId);
+
+
+
+
+
 
     @Query(value = "SELECT email, user_name FROM user_details_prod WHERE user_id = :userId AND status != 'inactive'", nativeQuery = true)
     Tuple findUserEmailAndUsernameByUserId(@Param("userId") String userId);

@@ -831,7 +831,7 @@ public class RequirementsService {
 								getTupleValue(candidate, "candidate_id"),
 								getTupleValue(candidate, "full_name"),
 								getTupleValue(candidate, "candidate_email_id"),
-								getTupleValue(candidate, "interview_status"),
+								getTupleValue(candidate, "interviewStatus"),
 								getTupleValue(candidate, "contact_number"),
 								getTupleValue(candidate, "qualification"),
 								getTupleValue(candidate, "skills"),
@@ -868,7 +868,7 @@ public class RequirementsService {
 								getTupleValue(candidate, "candidate_id"),
 								getTupleValue(candidate, "full_name"),
 								getTupleValue(candidate, "candidate_email_id"),
-								getTupleValue(candidate, "interview_status"),
+								getTupleValue(candidate, "interviewStatus"),
 								getTupleValue(candidate, "interview_level"),
 								interviewDateTime,
 								recruiterName  // Add recruiter name
