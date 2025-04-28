@@ -41,6 +41,9 @@ public class BDM_service {
     @Autowired
     private RequirementsDao requirementsDao;
 
+    private static final Logger log = LoggerFactory.getLogger(BDM_service.class);
+
+
     private final Path UPLOAD_DIR = Paths.get("uploads");
 
     public BDM_Client saveClient(BDM_Client client) {
@@ -231,11 +234,17 @@ public class BDM_service {
     }
 
     public BdmClientDetailsDTO getBdmClientDetails(String userId) {
+        log.info("🔍 Fetching BDM client details for userId: {}", userId);
+
         // 1️⃣ Fetch BDM Details
         List<BdmDetailsDto> bdmDetails = getBdmDetails(userId);
+        log.info("✅ Fetched {} BDM details for userId: {}", bdmDetails.size(), userId);
+
 
         // 2️⃣ Fetch Clients onboarded by the BDM
         List<BdmClientDto> clientDetails = getClientDetails(userId);
+        log.info("✅ Fetched {} client details for userId: {}", clientDetails.size(), userId);
+
 
         // 3️⃣ Fetch Submissions for each client
         Map<String, List<BdmSubmissionDTO>> submissions = new HashMap<>();
@@ -261,11 +270,27 @@ public class BDM_service {
             requirements.put(client.getClientName(), getRequirements(client.getClientName()));
         }
 
+        // 🔢 Logging total counts across all clients
+        int totalSubmissions = submissions.values().stream().mapToInt(List::size).sum();
+        int totalInterviews = interviews.values().stream().mapToInt(List::size).sum();
+        int totalPlacements = placements.values().stream().mapToInt(List::size).sum();
+        int totalRequirements = requirements.values().stream().mapToInt(List::size).sum();
+
+        log.info("📊 Total Clients: {}", clientDetails.size());
+        log.info("📊 Total Submissions (all clients combined): {}", totalSubmissions);
+        log.info("📊 Total Interviews (all clients combined): {}", totalInterviews);
+        log.info("📊 Total Placements (all clients combined): {}", totalPlacements);
+        log.info("📊 Total Requirements (all clients combined): {}", totalRequirements);
+
         // Return DTO with all details
+        log.info("✅ Successfully fetched all details for BDM userId: {}", userId);
+
         return new BdmClientDetailsDTO(bdmDetails, clientDetails, submissions, interviews, placements, requirements);
     }
 
     private List<RequirementDto> getRequirements(String clientName) {
+        log.info("🔍 Fetching requirements for client: {}", clientName);
+
         // Fetch the requirement data for the given client from the database
         List<Tuple> requirementTuples = requirementsDao.findRequirementsByClientName(clientName);
 
@@ -286,6 +311,7 @@ public class BDM_service {
 
     private List<BdmDetailsDto> getBdmDetails(String userId) {
         List<Tuple> bdmTuples = requirementsDao.findBdmEmployeeByUserId(userId);
+        log.info("🔍 Fetching BDM details for userId: {}", userId);
 
         return bdmTuples.stream()
                 .map(tuple -> new BdmDetailsDto(
@@ -348,6 +374,7 @@ public class BDM_service {
 
     private List<BdmClientDto> getClientDetails(String userId) {
         List<Tuple> clientTuples = requirementsDao.findClientsByBdmUserId(userId);
+        log.info("🔍 Fetching client details for userId: {}", userId);
 
         return clientTuples.stream()
                 .map(tuple -> new BdmClientDto(
@@ -378,14 +405,10 @@ public class BDM_service {
                 .collect(Collectors.toList());
     }
 
-    // Utility method to safely split strings
-    private List<String> splitString(String str) {
-        return (str != null && !str.isEmpty()) ? Arrays.asList(str.split(",")) : new ArrayList<>();
-    }
-
-
     private List<BdmSubmissionDTO> getSubmissions(String clientName) {
         List<Tuple> submissionTuples = requirementsDao.findAllSubmissionsByClientName(clientName);
+        log.info("🔍 Fetching submissions for client: {}", clientName);
+
         return submissionTuples.stream()
                 .map(tuple -> new BdmSubmissionDTO(
                         tuple.get("candidate_id", String.class),
@@ -442,8 +465,6 @@ public class BDM_service {
                 .collect(Collectors.toList());
     }
 
-
-
     public List<BDM_Client> getClientsByCreatedAtRange(LocalDate startDate, LocalDate endDate) {
         // 1. Validate date range
         if (startDate == null || endDate == null) {
@@ -471,5 +492,4 @@ public class BDM_service {
         logger.info("✅ Found {} clients created between {} and {}", clients.size(), startDate, endDate);
         return clients;
     }
-
 }
