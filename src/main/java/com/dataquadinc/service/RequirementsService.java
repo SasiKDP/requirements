@@ -47,6 +47,9 @@ public class RequirementsService {
 	@Autowired
 	private EmailService emailService;
 
+	private static final Logger log = LoggerFactory.getLogger(BDM_service.class);
+
+
 
 	@Transactional
 	public RequirementAddedResponse createRequirement(RequirementsDto requirementsDto) throws IOException {
@@ -832,10 +835,13 @@ public class RequirementsService {
 
 	// Fetch both Submitted Candidates, Scheduled Interviews, and Employee Details in one call
 	public CandidateResponseDTO getCandidateData(String userId) {
-		// Fetch role and username
+		log.info("🔍 Fetching candidate data for userId: {}", userId);
+
+		// 1️⃣ Fetch role and username
 		Tuple roleInfo = requirementsDao.getUserRoleAndUsername(userId);
 		String role = roleInfo.get("role", String.class);
 		String username = roleInfo.get("userName", String.class);
+		log.info("✅ Retrieved role '{}' and username '{}' for userId: {}", role, username, userId);
 
 		List<SubmittedCandidateDTO> submittedCandidates;
 		List<InterviewScheduledDTO> scheduledInterviews;
@@ -844,14 +850,17 @@ public class RequirementsService {
 		List<ClientDetailsDTO> clientDetails;
 		List<Tuple> employeeDetailsTuples;
 
+		// 2️⃣ Fetch data based on role
 		if ("Teamlead".equalsIgnoreCase(role)) {
+			log.info("🧩 User is a Teamlead. Fetching data assigned by username: {}", username);
 			submittedCandidates = requirementsDao.findSubmittedCandidatesByAssignedBy(username);
 			scheduledInterviews = requirementsDao.findScheduledInterviewsByAssignedBy(username);
 			jobDetails = requirementsDao.findJobDetailsByAssignedBy(username);
 			placementDetails = requirementsDao.findPlacementCandidatesByAssignedBy(username);
 			clientDetails = requirementsDao.findClientDetailsByAssignedBy(username);
-			employeeDetailsTuples = requirementsDao.getTeamleadDetailsByUserId(userId); // if different query needed
+			employeeDetailsTuples = requirementsDao.getTeamleadDetailsByUserId(userId);
 		} else {
+			log.info("🧩 User is an individual contributor. Fetching data by userId: {}", userId);
 			submittedCandidates = requirementsDao.findSubmittedCandidatesByUserId(userId);
 			scheduledInterviews = requirementsDao.findScheduledInterviewsByUserId(userId);
 			jobDetails = requirementsDao.findJobDetailsByUserId(userId);
@@ -860,12 +869,28 @@ public class RequirementsService {
 			employeeDetailsTuples = requirementsDao.getEmployeeDetailsByUserId(userId);
 		}
 
+		// 3️⃣ Grouping the fetched data
+		log.info("📦 Grouping submissions, interviews, placements, job details, and client details by client name");
 		Map<String, List<SubmittedCandidateDTO>> groupedSubmissions = groupByClientName(submittedCandidates);
 		Map<String, List<InterviewScheduledDTO>> groupedInterviews = groupByClientName(scheduledInterviews);
 		Map<String, List<PlacementDetailsDTO>> groupedPlacements = groupByClientName(placementDetails);
 		Map<String, List<JobDetailsDTO>> groupedJobDetails = groupByClientName(jobDetails);
 		Map<String, List<ClientDetailsDTO>> groupedClientDetails = groupByClientName(clientDetails);
+
+		// 4️⃣ Mapping employee details
+		log.info("🛠️ Mapping employee details for userId: {}", userId);
 		List<EmployeeDetailsDTO> employeeDetails = mapEmployeeDetailsTuples(employeeDetailsTuples);
+
+		// 🔢 Logging total counts
+		log.info("📊 Total Submitted Candidates: {}", submittedCandidates.size());
+		log.info("📊 Total Scheduled Interviews: {}", scheduledInterviews.size());
+		log.info("📊 Total Job Details: {}", jobDetails.size());
+		log.info("📊 Total Placement Details: {}", placementDetails.size());
+		log.info("📊 Total Client Details: {}", clientDetails.size());
+		log.info("📊 Total Employee Details: {}", employeeDetails.size());
+
+		// 5️⃣ Return compiled DTO
+		log.info("✅ Successfully fetched and compiled candidate data for userId: {}", userId);
 
 		return new CandidateResponseDTO(
 				groupedSubmissions, groupedInterviews, groupedPlacements,
