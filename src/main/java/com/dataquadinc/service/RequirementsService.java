@@ -465,9 +465,7 @@ public class RequirementsService {
 
 		List<RequirementsModel> requirements = requirementsDao.findByRequirementAddedTimeStampBetween(startDate, endDate);
 
-		if (requirements.isEmpty()) {
-			throw new RequirementNotFoundException("No requirements found between " + startDate + " and " + endDate);
-		}
+
 
 		// ✅ Add logger here since this block is guaranteed to have results
 		Logger logger = LoggerFactory.getLogger(RequirementsService.class);
