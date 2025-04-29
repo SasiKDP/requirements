@@ -472,10 +472,7 @@ public class RequirementsService {
 		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterIdAndDateRange(
 				recruiterId, startDateTime, endDateTime);
 
-		// ❌ Handle no results
-		if (jobsByRecruiterId.isEmpty()) {
-			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter : " + recruiterId + " in current month");
-		}
+
 
 		// 🔁 Map to DTOs
 		return jobsByRecruiterId.stream()
