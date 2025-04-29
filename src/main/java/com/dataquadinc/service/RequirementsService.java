@@ -465,9 +465,7 @@ public class RequirementsService {
 
 		List<RequirementsModel> requirements = requirementsDao.findByRequirementAddedTimeStampBetween(startDate, endDate);
 
-		if (requirements.isEmpty()) {
-			throw new RequirementNotFoundException("No requirements found between " + startDate + " and " + endDate);
-		}
+
 
 		// ✅ Add logger here since this block is guaranteed to have results
 		Logger logger = LoggerFactory.getLogger(RequirementsService.class);
@@ -566,10 +564,7 @@ public class RequirementsService {
 		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterIdAndDateRange(
 				recruiterId, startDateTime, endDateTime);
 
-		// ❌ Handle no results
-		if (jobsByRecruiterId.isEmpty()) {
-			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter : " + recruiterId + " in current month");
-		}
+
 
 		// 🔁 Map to DTOs
 		return jobsByRecruiterId.stream()
@@ -601,11 +596,7 @@ public class RequirementsService {
 		// 🔍 Fetch jobs assigned to recruiter within the date range
 		List<RequirementsModel> jobs = requirementsDao.findJobsByRecruiterIdAndDateRange(recruiterId, startDateTime, endDateTime);
 
-		// 💥 Fourth check: No jobs found
-		if (jobs.isEmpty()) {
-			throw new NoJobsAssignedToRecruiterException("No Jobs Assigned To Recruiter: " + recruiterId +
-					" between " + startDate + " and " + endDate);
-		}
+
 
 		// ✅ Add logger here since this block is guaranteed to have results
 		Logger logger = LoggerFactory.getLogger(RequirementsService.class);
@@ -1177,10 +1168,7 @@ public class RequirementsService {
 		);
 
 		// 6. Handle empty result
-		if (requirements.isEmpty()) {
-			throw new NoJobsAssignedToRecruiterException("No requirements found for userId '" + userId +
-					"' between " + startDate + " and " + endDate);
-		}
+
 
 		// 7. Map to DTOs
 		List<RequirementsDto> dtoList = requirements.stream().map(requirement -> {
