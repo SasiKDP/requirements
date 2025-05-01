@@ -475,65 +475,86 @@ public class BDM_service {
     }
 
     public List<RequirementsDto> getRequirementsForBdmByUserId(String userId) {
+        // Validate user existence
         int userExists = requirementsDao.countByUserId(userId);
         if (userExists == 0) {
             logger.warn("User ID '{}' not found in the database", userId);
             throw new ResourceNotFoundException("User ID '" + userId + "' not found in the database.");
         }
 
+        // Define date range for the current month
         LocalDate today = LocalDate.now();
         LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
         LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
-        // ✅ Use the new method that filters by date range
+        // Fetch requirements within the date range
         List<Tuple> results = repo.findRequirementsByBdmUserIdAndDateRange(userId, startOfMonth, endOfMonth);
 
-        List<RequirementsDto> dtos = results.stream().map(tuple -> {
-            RequirementsDto dto = new RequirementsDto();
+        // Map to hold aggregated RequirementsDto objects by job ID
+        Map<String, RequirementsDto> dtoMap = new HashMap<>();
 
-            dto.setJobId((String) tuple.get("job_id"));
-            dto.setJobTitle((String) tuple.get("job_title"));
-            dto.setClientName((String) tuple.get("client_name"));
-            dto.setJobDescription((String) tuple.get("job_description"));
-            dto.setJobDescriptionBlob((byte[]) tuple.get("job_description_blob"));
-            dto.setJobType((String) tuple.get("job_type"));
-            dto.setLocation((String) tuple.get("location"));
-            dto.setJobMode((String) tuple.get("job_mode"));
-            dto.setExperienceRequired((String) tuple.get("experience_required"));
-            dto.setNoticePeriod((String) tuple.get("notice_period"));
-            dto.setRelevantExperience((String) tuple.get("relevant_experience"));
-            dto.setQualification((String) tuple.get("qualification"));
-            dto.setSalaryPackage((String) tuple.get("salary_package"));
-            dto.setNoOfPositions((Integer) tuple.get("no_of_positions"));
-
-            Timestamp timestamp = (Timestamp) tuple.get("requirement_added_time_stamp");
-            dto.setRequirementAddedTimeStamp(timestamp != null ? timestamp.toLocalDateTime() : null);
-
-            dto.setStatus((String) tuple.get("status"));
-            dto.setAssignedBy((String) tuple.get("assigned_by"));
-
-            String recruiterIdsStr = (String) tuple.get("recruiter_ids");
-            dto.setRecruiterIds(recruiterIdsStr != null ?
-                    Arrays.stream(recruiterIdsStr.split(",")).map(String::trim).collect(Collectors.toSet())
-                    : Collections.emptySet());
-
-            String recruiterNamesStr = (String) tuple.get("recruiter_name");
-            dto.setRecruiterName(recruiterNamesStr != null ?
-                    Arrays.stream(recruiterNamesStr.split(",")).map(String::trim).collect(Collectors.toSet())
-                    : Collections.emptySet());
-
+        // Process each result tuple
+        for (Tuple tuple : results) {
             String jobId = (String) tuple.get("job_id");
-            dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
-            dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
 
-            return dto;
-        }).collect(Collectors.toList());
+            // Initialize or retrieve existing RequirementsDto
+            RequirementsDto dto = dtoMap.computeIfAbsent(jobId, id -> {
+                RequirementsDto newDto = new RequirementsDto();
+                newDto.setJobId(id);
+                newDto.setJobTitle((String) tuple.get("job_title"));
+                newDto.setClientName((String) tuple.get("client_name"));
+                newDto.setJobDescription((String) tuple.get("job_description"));
+                newDto.setJobDescriptionBlob((byte[]) tuple.get("job_description_blob"));
+                newDto.setJobType((String) tuple.get("job_type"));
+                newDto.setLocation((String) tuple.get("location"));
+                newDto.setJobMode((String) tuple.get("job_mode"));
+                newDto.setExperienceRequired((String) tuple.get("experience_required"));
+                newDto.setNoticePeriod((String) tuple.get("notice_period"));
+                newDto.setRelevantExperience((String) tuple.get("relevant_experience"));
+                newDto.setQualification((String) tuple.get("qualification"));
+                newDto.setSalaryPackage((String) tuple.get("salary_package"));
+                newDto.setNoOfPositions((Integer) tuple.get("no_of_positions"));
 
+                Timestamp timestamp = (Timestamp) tuple.get("requirement_added_time_stamp");
+                newDto.setRequirementAddedTimeStamp(timestamp != null ? timestamp.toLocalDateTime() : null);
+
+                newDto.setStatus((String) tuple.get("status"));
+                newDto.setAssignedBy((String) tuple.get("assigned_by"));
+
+                // Initialize recruiter information
+                newDto.setRecruiterIds(new HashSet<>());
+                newDto.setRecruiterName(new HashSet<>());
+
+                // Set submission and interview counts
+                newDto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(id));
+                newDto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(id));
+
+                return newDto;
+            });
+
+            // Add recruiter information to the DTO
+            String recruiterId = (String) tuple.get("recruiter_id");
+            String recruiterName = (String) tuple.get("recruiter_name");
+
+            if (recruiterId != null) {
+                dto.getRecruiterIds().add(recruiterId);
+            }
+
+            if (recruiterName != null) {
+                dto.getRecruiterName().add(recruiterName);
+            }
+        }
+
+        // Convert the map values to a list
+        List<RequirementsDto> resultList = new ArrayList<>(dtoMap.values());
+
+        // Log the number of requirements fetched
         logger.info("Fetched {} requirements for BDM with user ID '{}' for current month {} to {}",
-                dtos.size(), userId, startOfMonth.toLocalDate(), endOfMonth.toLocalDate());
+                resultList.size(), userId, startOfMonth.toLocalDate(), endOfMonth.toLocalDate());
 
-        return dtos;
+        return resultList;
     }
+
 
     public List<RequirementsDto> getRequirementsByBdmUserIdAndDateRange(String userId, LocalDate startDate, LocalDate endDate) {
         LocalDateTime startDateTime = startDate.atStartOfDay();
