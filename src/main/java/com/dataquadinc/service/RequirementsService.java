@@ -401,7 +401,7 @@ public class RequirementsService {
 	}
 
 
-	public Object getRequirementsDetails() {
+	public List<RequirementsDto> getRequirementsDetails() {
 		// 1. Get the first and last date of the current month
 		LocalDate startOfMonth = LocalDate.now().withDayOfMonth(1);
 		LocalDate endOfMonth = startOfMonth.plusMonths(1).minusDays(1);
@@ -410,8 +410,9 @@ public class RequirementsService {
 		List<RequirementsModel> requirementsList =
 				requirementsDao.findByRequirementAddedTimeStampBetween(startOfMonth, endOfMonth);
 
-		// 3. Convert to DTOs
-		List<RequirementsDto> dtoList = requirementsList.stream()
+
+		// 4. Convert to DTOs
+		return requirementsList.stream()
 				.map(requirement -> {
 					RequirementsDto dto = new RequirementsDto();
 
@@ -440,18 +441,9 @@ public class RequirementsService {
 					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
 					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
 
-					// No need to manually set age anymore
-
 					return dto;
 				})
 				.collect(Collectors.toList());
-
-		// 4. Return appropriate response
-		if (dtoList.isEmpty()) {
-			return new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now());
-		} else {
-			return dtoList;
-		}
 	}
 
 
