@@ -3,12 +3,16 @@ package com.dataquadinc.controller;
 
 import com.dataquadinc.dto.BDM_Dto;
 import com.dataquadinc.dto.BdmClientDetailsDTO;
+import com.dataquadinc.dto.RequirementsDto;
 import com.dataquadinc.dto.ResponseBean;
+import com.dataquadinc.exceptions.ErrorResponse;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
 import com.dataquadinc.service.BDM_service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -27,7 +31,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -43,6 +49,9 @@ public class BDM_Controller {
     private BDM_Repo repo;
 
     private final Path UPLOAD_DIR = Paths.get("uploads");
+
+    private static final Logger logger = LoggerFactory.getLogger(RequirementsController.class);
+
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -77,6 +86,8 @@ public class BDM_Controller {
         List<BDM_Dto> clients = service.getAllClients();
         return ResponseEntity.ok(ResponseBean.successResponse("Clients fetched successfully", clients));
     }
+
+
 
     @GetMapping("/bdm/{id}")
     public ResponseEntity<ResponseBean> getClientById(@PathVariable String id) {
@@ -180,4 +191,57 @@ public class BDM_Controller {
                 ResponseBean.successResponse("Clients fetched successfully by created_at range", clients)
         );
     }
+
+    @GetMapping("/bdmrequirements/{userId}")
+    public ResponseEntity<?> getRequirementsByBdm(@PathVariable("userId") String userId) {
+        try {
+            logger.debug("Received request to get requirements for userId: {}", userId);
+
+            // Fetch requirements based on the BDM's userId
+            List<RequirementsDto> requirements = (List<RequirementsDto>) service.getRequirementsForBdmByUserId(userId);
+
+            // Clean up recruiterName field
+            for (RequirementsDto dto : requirements) {
+                Set<String> recruiterNames = dto.getRecruiterName();
+
+                if (recruiterNames != null) {
+                    Set<String> cleanedNames = recruiterNames.stream()
+                            .map(name -> name.replaceAll("[\\[\\]\"]", "")) // Remove brackets and extra quotes
+                            .collect(Collectors.toSet());
+                    dto.setRecruiterName(cleanedNames);
+                } else {
+                    dto.setRecruiterName(Collections.emptySet()); // or handle however appropriate
+                }
+            }
+
+            logger.debug("Found {} requirements for userId: {}", requirements.size(), userId);
+            return new ResponseEntity<>(requirements, HttpStatus.OK);
+        } catch (Exception ex) {
+            logger.error("An unexpected error occurred while fetching requirements for userId: {}", userId, ex);
+            // Handle unexpected exceptions
+            return new ResponseEntity<>(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "An unexpected error occurred", LocalDateTime.now()), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @GetMapping("/bdm/{userId}/filterByDate")
+    public ResponseEntity<?> getRequirementsForBdmByDateRange(
+            @PathVariable String userId,
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        List<RequirementsDto> requirements = service.getRequirementsByBdmUserIdAndDateRange(userId, startDate, endDate);
+
+
+        for (RequirementsDto dto : requirements) {
+            Set<String> cleanedNames = dto.getRecruiterName().stream()
+                    .map(name -> name.replaceAll("[\\[\\]\"]", ""))
+                    .collect(Collectors.toSet());
+            dto.setRecruiterName(cleanedNames);
+        }
+
+        logger.info("✅ Fetched {} requirements for BDM userId {} between {} and {}", requirements.size(), userId, startDate, endDate);
+        return new ResponseEntity<>(requirements, HttpStatus.OK);
+    }
+
+
 }
