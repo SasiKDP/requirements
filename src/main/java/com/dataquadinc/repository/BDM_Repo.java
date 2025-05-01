@@ -28,6 +28,9 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
     List<BDM_Client> getClientsByCreatedAtRange(@Param("startDate") LocalDateTime startDate,
                                                 @Param("endDate") LocalDateTime endDate);
 
+    @Query("SELECT b FROM BDM_Client b")
+    List<BDM_Client> getClients();
+
     @Query(value = """
     SELECT 
         r.job_id AS job_id,
@@ -45,7 +48,7 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
         r.salary_package AS salary_package,
         r.no_of_positions AS no_of_positions,
         r.requirement_added_time_stamp AS requirement_added_time_stamp,
-        GROUP_CONCAT(jr.recruiter_id) AS recruiter_ids,
+        GROUP_CONCAT(jr.recruiter_id) AS recruiter_id,
         r.status AS status,
         GROUP_CONCAT(u2.user_name) AS recruiter_name,
         r.assigned_by AS assigned_by
@@ -68,5 +71,6 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
             @Param("startDateTime") LocalDateTime startDateTime,
             @Param("endDateTime") LocalDateTime endDateTime
     );
+
 
 }

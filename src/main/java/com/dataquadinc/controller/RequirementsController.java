@@ -250,9 +250,6 @@ public class RequirementsController {
 	public ResponseEntity<?> getRequirements() {
 		List<RequirementsDto> requirements = (List<RequirementsDto>) service.getRequirementsDetails();
 
-		if (requirements == null || requirements.isEmpty()) {
-			return new ResponseEntity<>(new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now()), HttpStatus.NOT_FOUND);
-		}
 
 		// Clean up recruiterName field
 		for (RequirementsDto dto : requirements) {
@@ -273,13 +270,6 @@ public class RequirementsController {
 
 		List<RequirementsDto> requirements = service.getRequirementsByDateRange(startDate, endDate);
 
-		if (requirements == null || requirements.isEmpty()) {
-			logger.warn("⚠️ No requirements found between {} and {}", startDate, endDate);
-			return new ResponseEntity<>(new ErrorResponse(
-					HttpStatus.NOT_FOUND.value(),
-					"No requirements found between " + startDate + " and " + endDate,
-					LocalDateTime.now()), HttpStatus.NOT_FOUND);
-		}
 
 		for (RequirementsDto dto : requirements) {
 			Set<String> cleanedNames = dto.getRecruiterName().stream()

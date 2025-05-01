@@ -204,12 +204,6 @@ public class BDM_Controller {
             // Fetch requirements based on the BDM's userId
             List<RequirementsDto> requirements = (List<RequirementsDto>) service.getRequirementsForBdmByUserId(userId);
 
-            // If no requirements are found
-            if (requirements == null || requirements.isEmpty()) {
-                logger.warn("No requirements found for userId: {}", userId);
-                return new ResponseEntity<>(new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found for userId: " + userId, LocalDateTime.now()), HttpStatus.NOT_FOUND);
-            }
-
             // Clean up recruiterName field
             for (RequirementsDto dto : requirements) {
                 Set<String> recruiterNames = dto.getRecruiterName();
@@ -241,13 +235,6 @@ public class BDM_Controller {
 
         List<RequirementsDto> requirements = service.getRequirementsByBdmUserIdAndDateRange(userId, startDate, endDate);
 
-        if (requirements == null || requirements.isEmpty()) {
-            logger.warn("⚠️ No requirements found for BDM userId {} between {} and {}", userId, startDate, endDate);
-            return new ResponseEntity<>(new ErrorResponse(
-                    HttpStatus.NOT_FOUND.value(),
-                    "No requirements found for BDM with user ID " + userId + " between " + startDate + " and " + endDate,
-                    LocalDateTime.now()), HttpStatus.NOT_FOUND);
-        }
 
         for (RequirementsDto dto : requirements) {
             Set<String> cleanedNames = dto.getRecruiterName().stream()

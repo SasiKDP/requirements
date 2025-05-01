@@ -142,22 +142,12 @@ public class BDM_service {
 
 
     public List<BDM_Dto>getAllClients() {
-        // 1. Get current date and the start of the current month
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
-        LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
         // 2. Fetch clients created in the current month
-        List<BDM_Client> clients = repository.getClientsByCreatedAtRange(startOfMonth, endOfMonth);
-
-        // 3. Handle empty result
-        if (clients.isEmpty()) {
-            logger.warn("No clients found for the current month between {} and {}", startOfMonth, endOfMonth);
-            throw new ResourceNotFoundException("No clients found for the current month.");
-        }
+        List<BDM_Client> clients = repository.getClients();
 
         // 4. Logging
-        logger.info("Fetched {} clients for current month {} to {}", clients.size(), startOfMonth.toLocalDate(), endOfMonth.toLocalDate());
+        logger.info("Fetched {} clients for current month {} to {}", clients.size());
 
         // 5. Return the list of clients
         return clients.stream()
@@ -546,19 +536,11 @@ public class BDM_service {
     }
 
     public List<RequirementsDto> getRequirementsByBdmUserIdAndDateRange(String userId, LocalDate startDate, LocalDate endDate) {
-        // Validation logic...
-
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
 
         List<Tuple> requirements = repo.findRequirementsByBdmUserIdAndDateRange(userId, startDateTime, endDateTime);
 
-        if (requirements.isEmpty()) {
-            throw new RequirementNotFoundException("No requirements found for BDM " + userId +
-                    " between " + startDate + " and " + endDate);
-        }
-
-        // Group by job_id to manually aggregate
         Map<String, RequirementsDto> dtoMap = new HashMap<>();
 
         for (Tuple tuple : requirements) {
@@ -597,16 +579,20 @@ public class BDM_service {
                 return newDto;
             });
 
-            // Add recruiter info
-            String recruiterId = (String) tuple.get("recruiter_id");
-            String recruiterName = (String) tuple.get("recruiter_name");
-
-            if (recruiterId != null) {
-                dto.getRecruiterIds().add(recruiterId);
+            // Parse and add recruiter IDs (comma-separated string)
+            String recruiterIdsStr = (String) tuple.get("recruiter_id");
+            if (recruiterIdsStr != null && !recruiterIdsStr.isEmpty()) {
+                Arrays.stream(recruiterIdsStr.split(","))
+                        .map(String::trim)
+                        .forEach(dto.getRecruiterIds()::add);
             }
 
-            if (recruiterName != null) {
-                dto.getRecruiterName().add(recruiterName);
+            // Parse and add recruiter names
+            String recruiterNamesStr = (String) tuple.get("recruiter_name");
+            if (recruiterNamesStr != null && !recruiterNamesStr.isEmpty()) {
+                Arrays.stream(recruiterNamesStr.split(","))
+                        .map(String::trim)
+                        .forEach(dto.getRecruiterName()::add);
             }
         }
 
@@ -617,4 +603,5 @@ public class BDM_service {
 
         return resultList;
     }
+
 }
