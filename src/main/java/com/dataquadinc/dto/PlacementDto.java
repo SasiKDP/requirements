@@ -5,17 +5,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
-public class CandidateDto {
+@AllArgsConstructor
+public class PlacementDto {
     private String candidateId;
     private String candidateName;
     private String email;
     private String contactNumber;
     private String qualification;
-    private String skills;
     private String overallFeedback;
     private String recruiterName;
-
 }
-

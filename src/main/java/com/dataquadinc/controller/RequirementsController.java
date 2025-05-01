@@ -561,8 +561,28 @@ public class RequirementsController {
 		return new ResponseEntity<>(response, HttpStatus.OK);
 	}
 	@GetMapping("/{jobId}")
-	public ResponseEntity<RecruiterDetailsDTO> getRecruiterDetails(@PathVariable String jobId) {
-		RecruiterDetailsDTO recruiterDetails = service.getRecruiterDetailsByJobId(jobId);
+	public ResponseEntity<RequirementDetailsDto> getRequirementDetailsByJobId(@PathVariable String jobId) {
+		// Get requirement details by jobId
+		RequirementDetailsDto recruiterDetails = service.getRequirementDetailsByJobId(jobId);
+
+		if (recruiterDetails != null && recruiterDetails.getRequirement() != null) {
+
+			// Clean recruiter names (Set<String>)
+			if (recruiterDetails.getRequirement().getRecruiterName() != null) {
+				Set<String> cleanedRecruiterNames = recruiterDetails.getRequirement().getRecruiterName().stream()
+						.map(name -> name.replaceAll("[\\[\\]\"]", "").trim())
+						.collect(Collectors.toSet());
+				recruiterDetails.getRequirement().setRecruiterName(cleanedRecruiterNames);
+			}
+
+			// Clean assignedBy (String)
+			if (recruiterDetails.getRequirement().getAssignedBy() != null) {
+				String cleanedAssignedBy = recruiterDetails.getRequirement().getAssignedBy()
+						.replaceAll("[\\[\\]\"]", "") // remove [ ] and "
+						.trim();
+				recruiterDetails.getRequirement().setAssignedBy(cleanedAssignedBy);
+			}
+		}
 
 		if (recruiterDetails != null) {
 			return ResponseEntity.ok(recruiterDetails);
@@ -570,6 +590,9 @@ public class RequirementsController {
 			return ResponseEntity.notFound().build();
 		}
 	}
+
+
+
 	@GetMapping("/stats")
 	public ResponseEntity<CandidateStatsResponse> getCandidateStats() {
 		CandidateStatsResponse stats = service.getCandidateStats();
