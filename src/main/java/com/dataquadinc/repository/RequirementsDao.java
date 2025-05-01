@@ -20,11 +20,43 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     @Query("SELECT r FROM RequirementsModel r WHERE r.jobId = :jobId")
     Optional<RequirementsModel> findRecruitersByJobId(@Param("jobId") String jobId);
 
-    @Query(value = "SELECT * FROM candidates WHERE job_id = :jobId AND user_id = :recruiterId", nativeQuery = true)
-    List<Tuple> findCandidatesByJobIdAndRecruiterId(@Param("jobId") String jobId, @Param("recruiterId") String recruiterId);
 
-    @Query(value = "SELECT * FROM candidates WHERE job_id = :jobId AND user_id = :recruiterId AND interview_status = 'Scheduled'", nativeQuery = true)
-    List<Tuple> findInterviewScheduledCandidatesByJobIdAndRecruiterId(@Param("jobId") String jobId, @Param("recruiterId") String recruiterId);
+
+    @Query(value = """
+
+    SELECT cs.*, cd.*, u.user_name AS recruiterName 
+
+    FROM candidate_submissions cs
+
+    JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+
+    JOIN user_details u ON cd.user_email = u.email
+
+    WHERE cs.job_id = :jobId
+
+    """, nativeQuery = true)
+
+    List<Tuple> findCandidatesByJobId(@Param("jobId") String jobId);
+
+
+
+    @Query(value = """
+    SELECT cs.*, 
+           cd.*, 
+           u.user_name AS recruiterName, 
+           id.interview_date_time AS interviewDateTime,
+           id.full_name AS candidateName,      -- Candidate name from interview_details table
+           id.candidate_email_id AS email,     -- Candidate email from interview_details table
+           id.interview_level AS interviewLevel -- Interview level from interview_details table
+    FROM candidate_submissions cs
+    JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+    JOIN user_details u ON cd.user_email = u.email
+    JOIN interview_details id ON cs.candidate_id = id.candidate_id
+    WHERE cs.job_id = :jobId
+      AND id.interview_date_time IS NOT NULL
+      AND cs.job_id = id.job_id           -- Ensure job_id is present in both tables
+""", nativeQuery = true)
+    List<Tuple> findInterviewScheduledCandidatesByJobId(@Param("jobId") String jobId);
 
     @Query(value = "SELECT email, user_name FROM user_details WHERE user_id = :userId AND status != 'inactive'", nativeQuery = true)
     Tuple findUserEmailAndUsernameByUserId(@Param("userId") String userId);
@@ -725,5 +757,30 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );
+
+
+    @Query(value = """
+    SELECT 
+        cd.candidate_id, 
+        id.full_name AS candidateName, 
+        id.candidate_email_id AS email, 
+        id.contact_number AS contactNumber, 
+        cd.qualification AS qualification,
+        cs.overall_feedback AS overallFeedback,
+        u.user_name AS recruiterName
+    FROM candidate_submissions cs
+    JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+    JOIN user_details u ON cd.user_email = u.email
+    JOIN interview_details id ON cs.candidate_id = id.candidate_id
+    WHERE cs.job_id = :jobId
+      AND id.is_placed = true
+      AND cs.job_id = id.job_id
+""", nativeQuery = true)
+    List<Tuple> findPlacementsByJobId(@Param("jobId") String jobId);
+
+    Optional<RequirementsModel> findByJobId(String jobId);
+
+
+
 
 }

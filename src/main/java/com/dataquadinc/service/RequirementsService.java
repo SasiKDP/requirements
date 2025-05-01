@@ -663,96 +663,167 @@ public class RequirementsService {
 
 		return recruiters;
 	}
+	public RequirementDetailsDto getRequirementDetailsByJobId(String jobId) {
+		// Fetch the requirement
+		RequirementsModel requirement = requirementsDao.findByJobId(jobId)
+				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id: " + jobId));
 
-	public RecruiterDetailsDTO getRecruiterDetailsByJobId(String jobId) {
-		// Fetch the requirement by job ID
-		Optional<RequirementsModel> requirement = requirementsDao.findRecruitersByJobId(jobId);
+		// Manually convert to DTO
+		RequirementsDto requirementsDto = mapToDto(requirement);
 
-		if (requirement.isEmpty()) {
-			throw new RequirementNotFoundException("Requirement Not Found with Id: " + jobId);
-		}
+		// Fetch submitted candidates
+		List<Tuple> submittedCandidatesList = requirementsDao.findCandidatesByJobId(jobId);
+		List<CandidateDto> submittedCandidates = mapCandidates(submittedCandidatesList);
 
-		// Get recruiters using the new query method
-		List<RecruiterInfoDto> recruiters = getRecruitersForJob(jobId);
+		// Fetch interview scheduled candidates
+		List<Tuple> interviewCandidatesList = requirementsDao.findInterviewScheduledCandidatesByJobId(jobId);
+		List<InterviewCandidateDto> interviewScheduledCandidates = mapInterviewCandidates(interviewCandidatesList);
 
-		// Initialize maps for submitted and interview scheduled candidates
-		Map<String, List<CandidateDto>> submittedCandidates = new HashMap<>();
-		Map<String, List<InterviewCandidateDto>> interviewScheduledCandidates = new HashMap<>();
+		// Fetch placements
+		List<Tuple> placementsList = requirementsDao.findPlacementsByJobId(jobId);
+		List<PlacementDto> placements = mapPlacements(placementsList);
 
-		// Fetch candidates for each recruiter
-		for (RecruiterInfoDto recruiter : recruiters) {
-			String recruiterId = recruiter.getRecruiterId();
-			String recruiterName = recruiter.getRecruiterName();
+		// Set submission and interview counts
+		requirementsDto.setNumberOfSubmissions(submittedCandidates.size());
+		requirementsDto.setNumberOfInterviews(interviewScheduledCandidates.size());
 
-			// Fetch submitted candidates
-			List<Tuple> assignedCandidatesList = requirementsDao.findCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
-			List<CandidateDto> assignedCandidateDtos = mapCandidates(assignedCandidatesList, recruiterName);
-			submittedCandidates.put(recruiterName, assignedCandidateDtos);
-
-			// Fetch interview scheduled candidates
-			List<Tuple> interviewCandidatesList = requirementsDao.findInterviewScheduledCandidatesByJobIdAndRecruiterId(jobId, recruiterId);
-			List<InterviewCandidateDto> interviewCandidateDtos = mapInterviewCandidates(interviewCandidatesList, recruiterName);
-			interviewScheduledCandidates.put(recruiterName, interviewCandidateDtos);
-		}
-
-		// Return DTO with recruiter details and candidate groups
-		return new RecruiterDetailsDTO(recruiters, submittedCandidates, interviewScheduledCandidates);
+		// Build final DTO
+		return new RequirementDetailsDto(requirementsDto, submittedCandidates, interviewScheduledCandidates, placements);
 	}
+
+	private RequirementsDto mapToDto(RequirementsModel requirement) {
+		RequirementsDto dto = new RequirementsDto();
+
+		dto.setJobId(requirement.getJobId());
+		dto.setJobTitle(requirement.getJobTitle());
+		dto.setClientName(requirement.getClientName());
+		dto.setJobDescription(requirement.getJobDescription());
+		dto.setJobType(requirement.getJobType());
+		dto.setLocation(requirement.getLocation());
+		dto.setJobMode(requirement.getJobMode());
+		dto.setExperienceRequired(requirement.getExperienceRequired());
+		dto.setNoticePeriod(requirement.getNoticePeriod());
+		dto.setRelevantExperience(requirement.getRelevantExperience());
+		dto.setQualification(requirement.getQualification());
+		dto.setSalaryPackage(requirement.getSalaryPackage());
+		dto.setNoOfPositions(requirement.getNoOfPositions());
+		dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
+		dto.setRecruiterIds(requirement.getRecruiterIds());
+		dto.setRecruiterName(requirement.getRecruiterName());
+		dto.setStatus(requirement.getStatus());
+		dto.setAssignedBy(requirement.getAssignedBy());
+		dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());
+
+		return dto;
+	}
+
 
 	/**
 	 * Maps Tuple data to CandidateDto objects, including recruiter name.
 	 */
-	private List<CandidateDto> mapCandidates(List<Tuple> candidatesList, String recruiterName) {
+	private List<CandidateDto> mapCandidates(List<Tuple> candidatesList) {
 		return candidatesList.stream()
 				.map(candidate -> {
 					try {
+						// Retrieve recruiter name from the Tuple
+						String recruiterName = candidate.get("recruiterName", String.class);
+
 						return new CandidateDto(
 								getTupleValue(candidate, "candidate_id"),
 								getTupleValue(candidate, "full_name"),
 								getTupleValue(candidate, "candidate_email_id"),
-								getTupleValue(candidate, "interview_status"),
 								getTupleValue(candidate, "contact_number"),
 								getTupleValue(candidate, "qualification"),
 								getTupleValue(candidate, "skills"),
-								getTupleValue(candidate, "overall_feedback")// Include recruiter name
+								getTupleValue(candidate, "overall_feedback"),
+								recruiterName  // Add recruiter name
 						);
 					} catch (Exception e) {
 						System.err.println("Error mapping candidate: " + candidate + " | Exception: " + e.getMessage());
 						return null;
 					}
 				})
-				.filter(Objects::nonNull) // Remove any null entries
+				.filter(Objects::nonNull)  // Remove any null entries
 				.collect(Collectors.toList());
 	}
+
 
 	/**
 	 * Maps Tuple data to InterviewCandidateDto objects, including recruiter name.
 	 */
-	private List<InterviewCandidateDto> mapInterviewCandidates(List<Tuple> candidatesList, String recruiterName) {
-		return candidatesList.stream()
-				.map(candidate -> {
+	private List<InterviewCandidateDto> mapInterviewCandidates(List<Tuple> interviewList) {
+		return interviewList.stream()
+				.map(interview -> {
 					try {
-						Timestamp interviewTimestamp = candidate.get("interview_date_time", Timestamp.class);
+						// Retrieve recruiter name from the Tuple
+						String recruiterName = interview.get("recruiterName", String.class);
+
+						// Format interview date-time if available
+						Timestamp interviewTimestamp = interview.get("interviewDateTime", Timestamp.class);
 						String interviewDateTime = interviewTimestamp != null
 								? interviewTimestamp.toLocalDateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
 								: null;
 
+						// Retrieve additional fields from the interview details table
+						String candidateName = interview.get("candidateName", String.class);
+						String email = interview.get("email", String.class);
+						String interviewLevel = interview.get("interviewLevel", String.class);
+
 						return new InterviewCandidateDto(
-								getTupleValue(candidate, "candidate_id"),
-								getTupleValue(candidate, "full_name"),
-								getTupleValue(candidate, "candidate_email_id"),
-								getTupleValue(candidate, "interview_status"),
-								getTupleValue(candidate, "interview_level"),
-								interviewDateTime// ✅ Use formatted date-time string//
+								getTupleValue(interview, "candidate_id"),  // Mapping candidateId
+								candidateName,                             // Mapping candidateName
+								email,                                     // Mapping email
+								interviewLevel,                            // Mapping interviewLevel
+								interviewDateTime,                         // Mapping interviewDateTime
+								recruiterName                              // Mapping recruiterName
 						);
 					} catch (Exception e) {
-						System.err.println("Error mapping interview candidate: " + candidate + " | Exception: " + e.getMessage());
+						System.err.println("Error mapping interview: " + interview + " | Exception: " + e.getMessage());
 						return null;
 					}
 				})
-				.filter(Objects::nonNull)
+				.filter(Objects::nonNull)  // Remove any null entries
 				.collect(Collectors.toList());
 	}
+
+
+	/**
+	 * Maps Tuple data to PlacementDto objects.
+	 */
+	private List<PlacementDto> mapPlacements(List<Tuple> placementsList) {
+		return placementsList.stream()
+				.map(placement -> {
+					try {
+						// Retrieve recruiter name from the Tuple
+						String recruiterName = placement.get("recruiterName", String.class);
+
+						// Retrieve other fields from the Tuple
+						String candidateName = placement.get("candidateName", String.class);
+						String email = placement.get("email", String.class);
+						String contactNumber = placement.get("contactNumber", String.class);
+						String qualification = placement.get("qualification", String.class);
+						String overallFeedback = placement.get("overallFeedback", String.class);
+
+						return new PlacementDto(
+								getTupleValue(placement, "candidate_id"),  // Mapping candidateId
+								candidateName,                             // Mapping candidateName
+								email,                                     // Mapping email
+								contactNumber,                             // Mapping contactNumber
+								qualification,                             // Mapping qualification
+								overallFeedback,                           // Mapping overallFeedback
+								recruiterName                              // Mapping recruiterName
+						);
+					} catch (Exception e) {
+						System.err.println("Error mapping placement: " + placement + " | Exception: " + e.getMessage());
+						return null;
+					}
+				})
+				.filter(Objects::nonNull)  // Remove any null entries
+				.collect(Collectors.toList());
+	}
+
+
+
 
 	/**
 	 * Safely retrieves values from Tuple, handling null cases.
