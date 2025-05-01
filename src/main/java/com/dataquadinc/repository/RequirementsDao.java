@@ -734,12 +734,6 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
                                                               @Param("startDate") LocalDateTime startDate,
                                                               @Param("endDate") LocalDateTime endDate);
 
-    @Query(value = "SELECT * FROM requirements_model r " +
-            "WHERE LOWER(r.assigned_by) = (" +
-            "   SELECT LOWER(u.user_name) FROM user_details_prod u WHERE u.user_id = :userId" +
-            ")", nativeQuery = true)
-    List<RequirementsModel> findByAssignedByUserId(@Param("userId") String userId);
-
     @Query(value = "SELECT COUNT(*) FROM user_details WHERE user_id = :userId", nativeQuery = true)
     int countByUserId(@Param("userId") String userId);
 
