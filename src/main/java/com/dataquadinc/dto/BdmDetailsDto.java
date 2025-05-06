@@ -22,4 +22,22 @@ public class BdmDetailsDto {
     private String personalEmail;
     private String status;
     private String clientName;
+
+    public BdmDetailsDto(String employeeId, String userName, String roles, String email,
+                         String designation, String joiningDate, String gender, String dob,
+                         String phoneNumber, String personalEmail, String status, String clientName) {
+        this.employeeId = employeeId;
+        this.userName = userName;
+        this.roles = roles;
+        this.email = email;
+        this.designation = designation;
+        this.joiningDate = joiningDate;
+        this.gender = gender;
+        this.dob = dob;
+        this.phoneNumber = phoneNumber;
+        this.personalEmail = personalEmail;
+        this.status = status;
+        this.clientName = clientName;
+    }
+
 }
