@@ -6,7 +6,6 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class PlacementDto {
     private String candidateId;
     private String candidateName;
