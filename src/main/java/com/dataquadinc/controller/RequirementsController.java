@@ -587,6 +587,14 @@ public class RequirementsController {
 		CandidateStatsResponse stats = service.getCandidateStats();
 		return ResponseEntity.ok(stats);
 	}
+	@GetMapping("/stats/filterByDate")
+	public ResponseEntity<CandidateStatsResponse> getCandidateStats(
+			@RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+	) {
+		CandidateStatsResponse stats = service.getCandidateStatsDateFilter(startDate,endDate);
+		return ResponseEntity.ok(stats);
+	}
 
 
 	// Fetch both Submitted Candidates and Scheduled Interviews in one API call
