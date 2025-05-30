@@ -124,7 +124,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             cd.qualification, 
             cs.skills, 
             cs.overall_feedback, 
-            cd.user_id,
+            cs.user_id,
             r.job_id, 
             r.job_title, 
             b.client_name
@@ -213,7 +213,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             SELECT COUNT(DISTINCT cd.candidate_id) 
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
         ), 0) AS numberOfSubmissions,
         
         COALESCE((
@@ -221,7 +221,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND idt.interview_date_time IS NOT NULL
         ), 0) AS numberOfInterviews,
         
@@ -230,11 +230,11 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                 FROM interview_details idt
                 JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
                 JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-                WHERE cd.user_id = u.user_id
+                WHERE cs.user_id = u.user_id
                 AND idt.interview_date_time IS NOT NULL   -- ✅ interview must be scheduled
                 AND (
                     -- CASE 1: Simple string directly 'Placed'
-                    idt.interview_status = 'Placed'
+                    idt.interview_status = 'PLACED'
                    \s
                     OR
                    \s
@@ -246,7 +246,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                                 idt.interview_status,
                                 CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
                             )
-                        ) = 'Placed'
+                        ) = 'PLACED'
                     )
                 )
             ), 0) AS numberOfPlacements,
@@ -297,7 +297,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             SELECT COUNT(*)
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
         ), 0) AS selfSubmissions,
         
         -- Self Interviews
@@ -306,7 +306,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND idt.interview_date_time >= NOW()
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -320,15 +320,15 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND (
-                idt.interview_status = 'Placed'
+                idt.interview_status = 'PLACED'
                 OR (
                     JSON_VALID(idt.interview_status)
                     AND JSON_UNQUOTE(JSON_EXTRACT(
                         idt.interview_status,
                         CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
-                    )) = 'Placed'
+                    )) = 'PLACED'
                 )
             )
         ), 0) AS selfPlacements,
@@ -351,7 +351,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id != u.user_id
+            WHERE cs.user_id != u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -367,10 +367,10 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             JOIN requirements_model r2 ON cs.job_id = r2.job_id
             WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            AND cd.user_id != u.user_id
+            AND cs.user_id != u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND (
-                idt.interview_status = 'Placed'
+                idt.interview_status = 'PLACED'
                 OR (
                     JSON_VALID(idt.interview_status)
                     AND JSON_UNQUOTE(
@@ -378,7 +378,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                             idt.interview_status,
                             CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
                         )
-                    ) = 'Placed'
+                    ) = 'PLACED'
                 )
             )
         ), 0) AS teamPlacements
@@ -672,7 +672,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
            )
        ) = 'Placed'
       )
-      OR i.interview_status = 'Placed'
+      OR i.interview_status = 'PLACED'
   )
 """, nativeQuery = true)
     List<PlacementDetailsDTO> findPlacementCandidatesByAssignedBy(@Param("username") String username);
@@ -800,7 +800,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             SELECT COUNT(*)
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND DATE(cs.profile_received_date) BETWEEN :startDate AND :endDate
         ), 0) AS selfSubmissions,
         
@@ -810,7 +810,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -824,7 +824,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND (
                 idt.interview_status = 'Placed'
@@ -857,7 +857,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id != u.user_id
+            WHERE cs.user_id != u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -873,7 +873,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             JOIN requirements_model r2 ON cs.job_id = r2.job_id
             WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            AND cd.user_id != u.user_id
+            AND cs.user_id != u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND (
                 idt.interview_status = 'Placed'
@@ -909,7 +909,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             SELECT COUNT(DISTINCT cd.candidate_id) 
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cd.user_id = u.user_id 
+            WHERE cs.user_id = u.user_id 
             AND DATE(cs.profile_received_date) BETWEEN :startDate AND :endDate
         ), 0) AS numberOfSubmissions,
         
@@ -918,7 +918,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
         ), 0) AS numberOfInterviews,
@@ -928,10 +928,10 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND (
-                idt.interview_status = 'Placed'
+                idt.interview_status = 'PLACED'
                 OR
                 (
                     JSON_VALID(idt.interview_status)
@@ -940,7 +940,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
                             idt.interview_status,
                             CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
                         )
-                    ) = 'Placed'
+                    ) = 'PLACED'
                 )
             )
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
