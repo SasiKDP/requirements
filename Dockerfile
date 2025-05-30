@@ -29,7 +29,7 @@ WORKDIR /app
 COPY --from=builder /app/target/DataquadRequirementsApi-0.0.1-SNAPSHOT.jar app.jar
 
 # Expose the port the app runs on
-EXPOSE 8111
+EXPOSE 8222
 
 # Run the JAR file
 ENTRYPOINT ["java", "-jar", "app.jar"]
