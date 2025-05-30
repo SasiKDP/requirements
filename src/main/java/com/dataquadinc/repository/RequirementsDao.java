@@ -226,30 +226,29 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         ), 0) AS numberOfInterviews,
         
             COALESCE((
-                SELECT COUNT(DISTINCT idt.interview_id)
-                FROM interview_details idt
-                JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
-                JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-                WHERE cd.user_id = u.user_id
-                AND idt.interview_date_time IS NOT NULL   -- ✅ interview must be scheduled
-                AND (
-                    -- CASE 1: Simple string directly 'Placed'
-                    idt.interview_status = 'Placed'
-                   \s
-                    OR
-                   \s
-                    -- CASE 2: Valid JSON -> latest status is 'Placed'
-                    (
-                        JSON_VALID(idt.interview_status)
-                        AND JSON_UNQUOTE(
-                            JSON_EXTRACT(
-                                idt.interview_status,
-                                CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
-                            )
-                        ) = 'Placed'
-                    )
-                )
-            ), 0) AS numberOfPlacements,
+                        SELECT COUNT(DISTINCT idt.interview_id)
+                        FROM interview_details idt
+                        JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
+                        JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+                        WHERE cd.user_id = u.user_id
+                          AND idt.interview_date_time IS NOT NULL -- ✅ interview must be scheduled
+                          AND (
+                              -- CASE 1: Direct string match
+                              idt.interview_status = 'Placed'
+            
+                              -- CASE 2: JSON with latest status = 'Placed'
+                              OR (
+                                  JSON_VALID(idt.interview_status)
+                                  AND JSON_UNQUOTE(
+                                      JSON_EXTRACT(
+                                          idt.interview_status,
+                                          CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
+                                      )
+                                  ) = 'PLACED'  -- CASE SENSITIVE match
+                              )
+                          )
+                    ), 0) AS numberOfPlacements,
+            
             
         
         COALESCE((
@@ -328,7 +327,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                     AND JSON_UNQUOTE(JSON_EXTRACT(
                         idt.interview_status,
                         CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
-                    )) = 'Placed'
+                    )) = 'PLACED'
                 )
             )
         ), 0) AS selfPlacements,
@@ -359,29 +358,33 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             )
         ), 0) AS teamInterviews,
         
-        -- Team Placements
-        COALESCE((
-            SELECT COUNT(DISTINCT idt.interview_id)
-            FROM interview_details idt
-            JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
-            JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            JOIN requirements_model r2 ON cs.job_id = r2.job_id
-            WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            AND cd.user_id != u.user_id
-            AND idt.interview_date_time IS NOT NULL
-            AND (
-                idt.interview_status = 'Placed'
-                OR (
-                    JSON_VALID(idt.interview_status)
-                    AND JSON_UNQUOTE(
-                        JSON_EXTRACT(
-                            idt.interview_status,
-                            CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
-                        )
-                    ) = 'Placed'
-                )
-            )
-        ), 0) AS teamPlacements
+   -- Team Placements
+               COALESCE((
+                   SELECT COUNT(DISTINCT idt.interview_id)
+                   FROM interview_details idt
+                   JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
+                   JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+                   JOIN requirements_model r2 ON cs.job_id = r2.job_id
+                   WHERE REPLACE(REPLACE(r2.assigned_by, '"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '"', ''), '"', '')
+                     AND cd.user_id != u.user_id
+                     AND idt.interview_date_time IS NOT NULL
+                     AND (
+                         -- Case 1: Direct string match
+                         idt.interview_status = 'PLACED'
+            
+                         -- Case 2: JSON with latest status = 'PLACED'
+                         OR (
+                             JSON_VALID(idt.interview_status)
+                             AND JSON_UNQUOTE(
+                                 JSON_EXTRACT(
+                                     idt.interview_status,
+                                     CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
+                                 )
+                             ) = 'PLACED'
+                         )
+                     )
+               ), 0) AS teamPlacements
+            
         
     FROM user_details u
     WHERE EXISTS (
