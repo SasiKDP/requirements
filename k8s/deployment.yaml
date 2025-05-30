@@ -16,7 +16,7 @@ spec:
       - name: requirement-api
         image: sandycis476/requirements:latest
         ports:
-        - containerPort: 8111
+        - containerPort: 8222
 --- 
 apiVersion: v1
 kind: Service
@@ -27,7 +27,7 @@ spec:
     app: requirement-api
   ports:
   - protocol: TCP
-    port: 8111         # Port exposed to the Ingress
-    targetPort: 8111 # Port in the application pod
+    port: 8222         # Port exposed to the Ingress
+    targetPort: 8222 # Port in the application pod
   type: ClusterIP
 
