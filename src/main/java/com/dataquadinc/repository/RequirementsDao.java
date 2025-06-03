@@ -196,7 +196,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         WHERE b.client_name = :clientName
           AND (
             (JSON_VALID(idt.interview_status) 
-             AND JSON_SEARCH(idt.interview_status, 'one', 'Placed', NULL, '$[*].status') IS NOT NULL)
+             AND JSON_SEARCH(idt.interview_status, 'one', 'PLACED', NULL, '$[*].status') IS NOT NULL)
             OR UPPER(idt.interview_status) = 'PLACED'
           )
         """, nativeQuery = true)
@@ -234,9 +234,9 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                           AND idt.interview_date_time IS NOT NULL -- ✅ interview must be scheduled
                           AND (
                               -- CASE 1: Direct string match
-                              idt.interview_status = 'Placed'
+                              idt.interview_status = 'PlACED'
             
-                              -- CASE 2: JSON with latest status = 'Placed'
+                              -- CASE 2: JSON with latest status = 'PLACED'
                               OR (
                                   JSON_VALID(idt.interview_status)
                                   AND JSON_UNQUOTE(
@@ -490,7 +490,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     WHERE u.user_id = :userId
       AND (
           (JSON_VALID(idt.interview_status) 
-           AND JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) = 'Placed')
+           AND JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) = 'PLACED')
           OR UPPER(idt.interview_status) = 'PLACED'
       )
 """, nativeQuery = true)
@@ -673,9 +673,9 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
                    '].status'
                )
            )
-       ) = 'Placed'
+       ) = 'PLACED'
       )
-      OR i.interview_status = 'Placed'
+      OR i.interview_status = 'PLACED'
   )
 """, nativeQuery = true)
     List<PlacementDetailsDTO> findPlacementCandidatesByAssignedBy(@Param("username") String username);
@@ -830,13 +830,13 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             WHERE cd.user_id = u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND (
-                idt.interview_status = 'Placed'
+                idt.interview_status = 'PLACED'
                 OR (
                     JSON_VALID(idt.interview_status)
                     AND JSON_UNQUOTE(JSON_EXTRACT(
                         idt.interview_status,
                         CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
-                    )) = 'Placed'
+                    )) = 'PLACED'
                 )
             )
         ), 0) AS selfPlacements,
@@ -877,9 +877,9 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             JOIN requirements_model r2 ON cs.job_id = r2.job_id
             WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
             AND cd.user_id != u.user_id
-            AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
+            AND DATE(idt.timestamp) BETWEEN :startDate AND :endDate
             AND (
-                idt.interview_status = 'Placed'
+                idt.interview_status = 'PLACED'
                 OR (
                     JSON_VALID(idt.interview_status)
                     AND JSON_UNQUOTE(
@@ -887,7 +887,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
                             idt.interview_status,
                             CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
                         )
-                    ) = 'Placed'
+                    ) = 'PLACED'
                 )
             )
         ), 0) AS teamPlacements
@@ -934,7 +934,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             WHERE cd.user_id = u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND (
-                idt.interview_status = 'Placed'
+                idt.interview_status = 'PLACED'
                 OR
                 (
                     JSON_VALID(idt.interview_status)
@@ -943,10 +943,10 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
                             idt.interview_status,
                             CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
                         )
-                    ) = 'Placed'
+                    ) = 'PLACED'
                 )
             )
-            AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
+            AND DATE(idt.timestamp) BETWEEN :startDate AND :endDate
         ), 0) AS numberOfPlacements,
         
         COALESCE((
