@@ -177,13 +177,23 @@ public class BDM_Controller {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
+//    @GetMapping("/bdm/details/{userId}")
+//    public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
+//        return service.getBdmClientDetails(userId);
+//    }
+
     @GetMapping("/bdm/details/{userId}")
-    public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
-        return service.getBdmClientDetails(userId);
+    public BdmClientDetailsDTO getBdmClientDetailsDateRange(@PathVariable String userId,
+                @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                 @RequestParam(value = "endDate",required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        if(startDate!=null && endDate!=null)
+            return service.getBdmClientDetailsDateRange(userId,startDate,endDate);
+        else
+            return service.getBdmClientDetails(userId);
     }
     @GetMapping("/bdm/getAll/filterByDate")
     public ResponseEntity<ResponseBean> getClientsByCreatedAtRange(
-            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("startDate" ) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
         List<BDM_Client> clients = service.getClientsByCreatedAtRange(startDate, endDate);
