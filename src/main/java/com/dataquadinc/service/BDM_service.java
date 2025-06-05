@@ -278,6 +278,61 @@ public class BDM_service {
         return new BdmClientDetailsDTO(bdmDetails, clientDetails, submissions, interviews, placements, requirements);
     }
 
+    public BdmClientDetailsDTO getBdmClientDetailsDateRange(String userId,LocalDate startDate,LocalDate endDate) {
+        log.info("🔍 Fetching BDM client details for userId: {}", userId);
+
+        // 1️⃣ Fetch BDM Details
+        List<BdmDetailsDto> bdmDetails = getBdmDetails(userId);
+        log.info("✅ Fetched {} BDM details for userId: {}", bdmDetails.size(), userId);
+
+
+        // 2️⃣ Fetch Clients onboarded by the BDM
+        List<BdmClientDto> clientDetails = getClientDetailsDateFilter(userId, startDate, endDate);
+        log.info("✅ Fetched {} client details for userId: {}", clientDetails.size(), userId);
+
+
+        // 3️⃣ Fetch Submissions for each client
+        Map<String, List<BdmSubmissionDTO>> submissions = new HashMap<>();
+        for (BdmClientDto client : clientDetails) {
+            submissions.put(client.getClientName(), getSubmissionsDateFilter(client.getClientName(),startDate,endDate));
+        }
+
+        // 4️⃣ Fetch Interviews for each client
+        Map<String, List<BdmInterviewDTO>> interviews = new HashMap<>();
+        for (BdmClientDto client : clientDetails) {
+            interviews.put(client.getClientName(), getInterviewsDateFilter(client.getClientName(),startDate,endDate));
+        }
+
+        // 5️⃣ Fetch Placements for each client
+        Map<String, List<BdmPlacementDTO>> placements = new HashMap<>();
+        for (BdmClientDto client : clientDetails) {
+            placements.put(client.getClientName(), getPlacementsDateFilter(client.getClientName(),startDate,endDate));
+        }
+
+        // 6️⃣ Fetch Requirements for each client (This section is now after client details)
+        Map<String, List<RequirementDto>> requirements = new HashMap<>();
+        for (BdmClientDto client : clientDetails) {
+            requirements.put(client.getClientName(), getRequirementsDateFilter(client.getClientName(),startDate,endDate));
+        }
+
+        // 🔢 Logging total counts across all clients
+        int totalSubmissions = submissions.values().stream().mapToInt(List::size).sum();
+        int totalInterviews = interviews.values().stream().mapToInt(List::size).sum();
+        int totalPlacements = placements.values().stream().mapToInt(List::size).sum();
+        int totalRequirements = requirements.values().stream().mapToInt(List::size).sum();
+
+        log.info("📊 Total Clients: {}", clientDetails.size());
+        log.info("📊 Total Submissions (all clients combined): {}", totalSubmissions);
+        log.info("📊 Total Interviews (all clients combined): {}", totalInterviews);
+        log.info("📊 Total Placements (all clients combined): {}", totalPlacements);
+        log.info("📊 Total Requirements (all clients combined): {}", totalRequirements);
+
+        // Return DTO with all details
+        log.info("✅ Successfully fetched all details for BDM userId: {}", userId);
+
+        return new BdmClientDetailsDTO(bdmDetails, clientDetails, submissions, interviews, placements, requirements);
+    }
+
     private List<RequirementDto> getRequirements(String clientName) {
         log.info("🔍 Fetching requirements for client: {}", clientName);
 
@@ -297,6 +352,27 @@ public class BDM_service {
                 ))
                 .collect(Collectors.toList());
     }
+
+    private List<RequirementDto> getRequirementsDateFilter(String clientName,LocalDate startDate,LocalDate endDate) {
+        log.info("🔍 Fetching requirements for client: {}", clientName);
+
+        // Fetch the requirement data for the given client from the database
+        List<Tuple> requirementTuples = requirementsDao.findRequirementsByClientNameDateFilter(clientName,startDate,endDate);
+
+        // Convert the Tuple data into RequirementDto objects
+        return requirementTuples.stream()
+                .map(tuple -> new RequirementDto(
+                        tuple.get("recruiter_name", String.class), // Ensure alias matches the query result
+                        tuple.get("client_name", String.class),
+                        tuple.get("job_id", String.class),
+                        tuple.get("job_title", String.class),
+                        tuple.get("assigned_by", String.class),
+                        tuple.get("location", String.class),
+                        tuple.get("notice_period", String.class)
+                ))
+                .collect(Collectors.toList());
+    }
+
 
 
     private List<BdmDetailsDto> getBdmDetails(String userId) {
@@ -360,6 +436,22 @@ public class BDM_service {
         return null;
     }
 
+    private List<BdmClientDto> getClientDetailsDateFilter(String userId,LocalDate startDate,LocalDate endDate) {
+        List<Tuple> clientTuples = requirementsDao.findClientsByBdmUserIdAndCreatedAtBetween(userId,startDate,endDate);
+        log.info("🔍 Fetching client details for userId: {}", userId);
+
+        return clientTuples.stream()
+                .map(tuple -> new BdmClientDto(
+                        tuple.get("id", String.class),
+                        tuple.get("client_name", String.class),
+                        tuple.get("on_boarded_by", String.class),
+                        tuple.get("client_address", String.class),
+                        cleanAndConvertToList(tuple.get("client_spoc_name", String.class)),
+                        cleanAndConvertToList(tuple.get("client_spoc_emailid", String.class)),
+                        cleanAndConvertToList(tuple.get("client_spoc_mobile_number", String.class))
+                ))
+                .collect(Collectors.toList());
+    }
 
 
     private List<BdmClientDto> getClientDetails(String userId) {
@@ -395,6 +487,26 @@ public class BDM_service {
                 .collect(Collectors.toList());
     }
 
+
+    private List<BdmSubmissionDTO> getSubmissionsDateFilter(String clientName,LocalDate startDate,LocalDate endDate) {
+        List<Tuple> submissionTuples = requirementsDao.findAllSubmissionsByClientNameAndSubmittedAtBetween(clientName,startDate,endDate);
+        log.info("🔍 Fetching submissions for client: {}", clientName);
+
+        return submissionTuples.stream()
+                .map(tuple -> new BdmSubmissionDTO(
+                        tuple.get("candidate_id", String.class),
+                        tuple.get("full_name", String.class),
+                        tuple.get("candidateEmailId", String.class), // Use exact alias from SQL
+                        tuple.get("contact_number", String.class),
+                        tuple.get("qualification", String.class),
+                        tuple.get("skills", String.class),
+                        tuple.get("overall_feedback", String.class),
+                        tuple.get("job_id", String.class),
+                        tuple.get("job_title", String.class),
+                        tuple.get("client_name", String.class)
+                ))
+                .collect(Collectors.toList());
+    }
     private List<BdmSubmissionDTO> getSubmissions(String clientName) {
         List<Tuple> submissionTuples = requirementsDao.findAllSubmissionsByClientName(clientName);
         log.info("🔍 Fetching submissions for client: {}", clientName);
@@ -440,9 +552,46 @@ public class BDM_service {
                 .collect(Collectors.toList());
     }
 
+    private List<BdmInterviewDTO> getInterviewsDateFilter(String clientName,LocalDate startDate,LocalDate endDate) {
+        List<Tuple> interviewTuples = requirementsDao.findAllInterviewsByClientNameDateFilter(clientName,startDate,endDate);
+        return interviewTuples.stream()
+                .map(tuple -> {
+                    Timestamp timestamp = tuple.get("interview_date_time", Timestamp.class);
+                    String interviewDateTimeStr = (timestamp != null)
+                            ? OffsetDateTime.ofInstant(timestamp.toInstant(), ZoneId.systemDefault())
+                            .format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                            : null;
+
+                    return new BdmInterviewDTO(
+                            tuple.get("candidate_id", String.class),  // candidateId
+                            tuple.get("full_name", String.class),     // fullName
+                            tuple.get("candidateEmailId", String.class), // email
+                            tuple.get("contact_number", String.class), // contactNumber
+                            tuple.get("qualification", String.class),  // qualification
+                            tuple.get("skills", String.class),         // skills
+                            tuple.get("interview_status", String.class), // interviewStatus
+                            tuple.get("interview_level", String.class),  // interviewLevel
+                            interviewDateTimeStr  // interviewDateTime (converted to String)
+                    );
+                })
+                .collect(Collectors.toList());
+    }
 
     private List<BdmPlacementDTO> getPlacements(String clientName) {
         List<Tuple> placementTuples = requirementsDao.findAllPlacementsByClientName(clientName);
+        return placementTuples.stream()
+                .map(tuple -> new BdmPlacementDTO(
+                        tuple.get("candidate_id", String.class),
+                        tuple.get("full_name", String.class),
+                        tuple.get("candidateEmailId", String.class), // Fix alias
+                        tuple.get("job_id", String.class),
+                        tuple.get("job_title", String.class),
+                        tuple.get("client_name", String.class)
+                ))
+                .collect(Collectors.toList());
+    }
+    private List<BdmPlacementDTO> getPlacementsDateFilter(String clientName,LocalDate startDate,LocalDate endDate) {
+        List<Tuple> placementTuples = requirementsDao.findAllPlacementsByClientNameDateFilter(clientName,startDate,endDate);
         return placementTuples.stream()
                 .map(tuple -> new BdmPlacementDTO(
                         tuple.get("candidate_id", String.class),
