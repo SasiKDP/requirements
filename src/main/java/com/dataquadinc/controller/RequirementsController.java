@@ -665,5 +665,18 @@ public class RequirementsController {
 		}
 	}
 
+	@GetMapping("/list/{userId}/filterByDate")
+	public CandidateResponseDTO getCandidateDataWithDateRange(
+			@PathVariable String userId,
+			@RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		if (startDate != null && endDate != null) {
+			return service.getCandidateDataWithDateRange(userId, startDate, endDate);
+		} else {
+			return service.getCandidateData(userId);
+		}
+	}
+
 
 }

@@ -1211,4 +1211,68 @@ public class RequirementsService {
 		return new CandidateStatsResponse(userStatsList);
 	}
 
+	public CandidateResponseDTO getCandidateDataWithDateRange(String userId, LocalDate startDate, LocalDate endDate) {
+		log.info("🔍 Fetching candidate data with date range for userId: {} | {} to {}", userId, startDate, endDate);
+
+		// 1️⃣ Fetch role and username
+		Tuple roleInfo = requirementsDao.getUserRoleAndUsername(userId);
+		String role = roleInfo.get("role", String.class);
+		String username = roleInfo.get("userName", String.class);
+		log.info("✅ Retrieved role '{}' and username '{}' for userId: {}", role, username, userId);
+
+		List<SubmittedCandidateDTO> submittedCandidates;
+		List<InterviewScheduledDTO> scheduledInterviews;
+		List<JobDetailsDTO> jobDetails;
+		List<PlacementDetailsDTO> placementDetails;
+		List<ClientDetailsDTO> clientDetails;
+		List<Tuple> employeeDetailsTuples;
+
+		// 2️⃣ Fetch date-filtered data based on role
+		if ("Teamlead".equalsIgnoreCase(role)) {
+			log.info("🧩 Teamlead role detected. Fetching data assigned by username: {} with date range.", username);
+			submittedCandidates = requirementsDao.findSubmittedCandidatesByAssignedByAndDateRange(username, startDate, endDate);
+			scheduledInterviews = requirementsDao.findScheduledInterviewsByAssignedByAndDateRange(username, startDate, endDate);
+			jobDetails = requirementsDao.findJobDetailsByAssignedByAndDateRange(username, startDate, endDate);
+			placementDetails = requirementsDao.findPlacementCandidatesByAssignedByAndDateRange(username, startDate, endDate);
+			clientDetails = requirementsDao.findClientDetailsByAssignedByAndDateRange(username, startDate, endDate);
+			employeeDetailsTuples = requirementsDao.getTeamleadDetailsByUserId(userId); // no date filter
+		} else {
+			log.info("🧩 Employee role detected. Fetching data by userId: {} with date range.", userId);
+			submittedCandidates = requirementsDao.findSubmittedCandidatesByUserIdAndDateRange(userId, startDate, endDate);
+			scheduledInterviews = requirementsDao.findScheduledInterviewsByUserIdAndDateRange(userId, startDate, endDate);
+			jobDetails = requirementsDao.findJobDetailsByUserIdAndDateRange(userId, startDate, endDate);
+			placementDetails = requirementsDao.findPlacementCandidatesByUserIdAndDateRange(userId, startDate, endDate);
+			clientDetails = requirementsDao.findClientDetailsByUserIdAndDateRange(userId, startDate, endDate);
+			employeeDetailsTuples = requirementsDao.getEmployeeDetailsByUserId(userId); // no date filter
+		}
+
+		// 3️⃣ Group the data
+		Map<String, List<SubmittedCandidateDTO>> groupedSubmissions = groupByClientName(submittedCandidates);
+		Map<String, List<InterviewScheduledDTO>> groupedInterviews = groupByClientName(scheduledInterviews);
+		Map<String, List<PlacementDetailsDTO>> groupedPlacements = groupByClientName(placementDetails);
+		Map<String, List<JobDetailsDTO>> groupedJobDetails = groupByClientName(jobDetails);
+		Map<String, List<ClientDetailsDTO>> groupedClientDetails = groupByClientName(clientDetails);
+
+		// 4️⃣ Map employee details (not date dependent)
+		List<EmployeeDetailsDTO> employeeDetails = mapEmployeeDetailsTuples(employeeDetailsTuples);
+
+		// 🔢 Logging total counts
+		log.info("📊 Filtered Submitted Candidates: {}", submittedCandidates.size());
+		log.info("📊 Filtered Scheduled Interviews: {}", scheduledInterviews.size());
+		log.info("📊 Filtered Job Details: {}", jobDetails.size());
+		log.info("📊 Filtered Placement Details: {}", placementDetails.size());
+		log.info("📊 Filtered Client Details: {}", clientDetails.size());
+
+		// 5️⃣ Return compiled DTO
+		log.info("✅ Successfully fetched and compiled date-filtered candidate data for userId: {}", userId);
+
+		return new CandidateResponseDTO(
+				groupedSubmissions,
+				groupedInterviews,
+				groupedPlacements,
+				groupedJobDetails,
+				groupedClientDetails,
+				employeeDetails
+		);
+	}
 }
