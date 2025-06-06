@@ -182,7 +182,7 @@ public class BDM_Controller {
 //        return service.getBdmClientDetails(userId);
 //    }
 
-    @GetMapping("/bdm/details/{userId}")
+    @GetMapping("/bdm/details/{userId}/filterByDate")
     public BdmClientDetailsDTO getBdmClientDetailsDateRange(@PathVariable String userId,
                 @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
                  @RequestParam(value = "endDate",required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
