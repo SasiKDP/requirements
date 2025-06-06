@@ -641,7 +641,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 
 
     @Query(value = """
-            SELECT 
+            SELECT DISTINCT
                 b.id AS clientId,  
                 b.client_name AS clientName,  
                 b.client_address AS clientAddress,  
@@ -1236,7 +1236,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             @Param("endDate") LocalDate endDate
     );
     @Query(value = """
-    SELECT 
+    SELECT DISTINCT
         b.id AS clientId,  
         b.client_name AS clientName,  
         b.client_address AS clientAddress,  
@@ -1248,7 +1248,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     JOIN job_recruiters jr ON r.job_id = jr.job_id  
     JOIN user_details u ON jr.recruiter_id = u.user_id  
     WHERE u.user_id = :userId
-      AND b.created_at BETWEEN :startDate AND :endDate
+      AND r.requirement_added_time_stamp BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<ClientDetailsDTO> findClientDetailsByUserIdAndDateRange(
             @Param("userId") String userId,
@@ -1373,7 +1373,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     );
 
     @Query(value = """
-    SELECT 
+    SELECT DISTINCT
         b.id AS clientId,  
         b.client_name AS clientName,  
         b.client_address AS clientAddress,  
@@ -1383,7 +1383,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     FROM bdm_client b
     JOIN requirements_model r ON LOWER(b.client_name) = LOWER(r.client_name)
     WHERE r.assigned_by = :assignedBy
-      AND b.created_at BETWEEN :startDate AND :endDate
+      AND r.requirement_added_time_stamp BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<ClientDetailsDTO> findClientDetailsByAssignedByAndDateRange(
             @Param("assignedBy") String assignedBy,
