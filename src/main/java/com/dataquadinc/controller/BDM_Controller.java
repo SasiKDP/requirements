@@ -177,10 +177,10 @@ public class BDM_Controller {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
-//    @GetMapping("/bdm/details/{userId}")
-//    public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
-//        return service.getBdmClientDetails(userId);
-//    }
+    @GetMapping("/bdm/details/{userId}")
+    public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
+        return service.getBdmClientDetails(userId);
+    }
 
     @GetMapping("/bdm/details/{userId}/filterByDate")
     public BdmClientDetailsDTO getBdmClientDetailsDateRange(@PathVariable String userId,
