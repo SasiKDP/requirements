@@ -163,7 +163,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             cd.qualification, 
             cs.skills, 
             cs.overall_feedback, 
-            cs.user_id,
+            cd.user_id,
             r.job_id, 
             r.job_title, 
             b.client_name
@@ -176,7 +176,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<Tuple> findAllSubmissionsByClientName(@Param("clientName") String clientName);
 
     @Query(value = """
-         SELECT DISTINCT 
+    SELECT DISTINCT 
         cd.candidate_id, 
         cd.full_name, 
         cd.candidate_email_id AS candidateEmailId, 
@@ -199,6 +199,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             @Param("clientName") String clientName,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+
 
     @Query(value = """
     SELECT 
@@ -253,24 +254,25 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         cd.qualification, 
         cs.skills, 
         CASE 
-            WHEN JSON_VALID(idt.interview_status)
-            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status'))
-            ELSE idt.interview_status
+            WHEN JSON_VALID(idt.interview_status) 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
+            ELSE idt.interview_status 
         END AS interview_status, 
-         idt.interview_level,
-         idt.interview_date_time,
+        idt.interview_level, 
+        idt.interview_date_time, 
         r.job_id, 
         r.job_title, 
         b.client_name
-            FROM interview_details idt
-               JOIN (
-            candidate_id,
-       MAX(interview_date_time) AS latest_interview_time
-                  FROM interview_details
-                   GROUP BY candidate_id
-                    ) latest ON latest.candidate_id = idt.candidate_id 
-                    AND latest.latest_interview_time = idt.interview_date_time
-                    JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
+    FROM interview_details idt
+    JOIN (
+        SELECT 
+            candidate_id, 
+            MAX(interview_date_time) AS latest_interview_time
+        FROM interview_details
+        GROUP BY candidate_id
+    ) latest ON latest.candidate_id = idt.candidate_id 
+             AND latest.latest_interview_time = idt.interview_date_time
+    JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
     JOIN candidates cd ON cs.candidate_id = cd.candidate_id
     JOIN requirements_model r ON cs.job_id = r.job_id
     LEFT JOIN bdm_client b ON r.client_name = b.client_name
@@ -278,16 +280,19 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
            OR (:clientName IS NULL AND EXISTS (
                 SELECT 1 FROM candidate_submissions cs2 
                 WHERE cs2.job_id = r.job_id
-               )))
-                 AND b.client_name IS NOT NULL\s
-                 AND idt.interview_date_time IS NOT NULL
-                 AND DATE(idt.timestamp) BETWEEN :startDate AND :endDategit
+           )))
+      AND b.client_name IS NOT NULL 
+      AND idt.interview_date_time IS NOT NULL
+      AND DATE(idt.timestamp) BETWEEN :startDate AND :endDate
     """, nativeQuery = true)
     List<Tuple> findAllInterviewsByClientNameDateFilter(
             @Param("clientName") String clientName,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+
+
 
 
     @Query(value = """
@@ -350,7 +355,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             SELECT COUNT(DISTINCT cd.candidate_id) 
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cs.user_id = u.user_id
+            WHERE cd.user_id = u.user_id
         ), 0) AS numberOfSubmissions,
         
         COALESCE((
@@ -358,7 +363,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cs.user_id = u.user_id
+            WHERE cd.user_id = u.user_id
             AND idt.interview_date_time IS NOT NULL
         ), 0) AS numberOfInterviews,
         
@@ -367,7 +372,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                         FROM interview_details idt
                         JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
                         JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-                        WHERE cs.user_id = u.user_id
+                        WHERE cd.user_id = u.user_id
                           AND idt.interview_date_time IS NOT NULL -- ✅ interview must be scheduled
                           AND (
                               -- CASE 1: Direct string match
@@ -433,7 +438,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             SELECT COUNT(*)
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cs.user_id = u.user_id
+            WHERE cd.user_id = u.user_id
         ), 0) AS selfSubmissions,
         
         -- Self Interviews
@@ -442,7 +447,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cs.user_id = u.user_id
+            WHERE cd.user_id = u.user_id
             AND idt.interview_date_time >= NOW()
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -456,7 +461,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cs.user_id = u.user_id
+            WHERE cd.user_id = u.user_id
             AND (
                 idt.interview_status = 'Placed'
                 OR (
@@ -487,7 +492,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cs.user_id != u.user_id
+            WHERE cd.user_id != u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -503,7 +508,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                    JOIN candidates cd ON cs.candidate_id = cd.candidate_id
                    JOIN requirements_model r2 ON cs.job_id = r2.job_id
                    WHERE REPLACE(REPLACE(r2.assigned_by, '"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '"', ''), '"', '')
-                     AND cs.user_id != u.user_id
+                     AND cd.user_id != u.user_id
                      AND idt.interview_date_time IS NOT NULL
                      AND (
                          -- Case 1: Direct string match
@@ -635,7 +640,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 
 
     @Query(value = """
-            SELECT 
+            SELECT DISTINCT
                 b.id AS clientId,  
                 b.client_name AS clientName,  
                 b.client_address AS clientAddress,  
@@ -940,7 +945,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             SELECT COUNT(*)
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cs.user_id = u.user_id
+            WHERE cd.user_id = u.user_id
             AND DATE(cs.profile_received_date) BETWEEN :startDate AND :endDate
         ), 0) AS selfSubmissions,
         
@@ -950,7 +955,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cs.user_id = u.user_id
+            WHERE cd.user_id = u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -964,7 +969,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cs.user_id = u.user_id
+            WHERE cd.user_id = u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND (
                 idt.interview_status = 'PLACED'
@@ -997,7 +1002,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cs.user_id != u.user_id
+            WHERE cd.user_id != u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -1013,7 +1018,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             JOIN requirements_model r2 ON cs.job_id = r2.job_id
             WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            AND cs.user_id != u.user_id
+            AND cd.user_id != u.user_id
             AND DATE(idt.timestamp) BETWEEN :startDate AND :endDate
             AND (
                 idt.interview_status = 'PLACED'
@@ -1049,7 +1054,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             SELECT COUNT(DISTINCT cd.candidate_id) 
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cs.user_id = u.user_id 
+            WHERE cd.user_id = u.user_id 
             AND DATE(cs.profile_received_date) BETWEEN :startDate AND :endDate
         ), 0) AS numberOfSubmissions,
         
@@ -1058,7 +1063,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cs.user_id = u.user_id
+            WHERE cd.user_id = u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
         ), 0) AS numberOfInterviews,
@@ -1068,7 +1073,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cs.user_id = u.user_id
+            WHERE cd.user_id = u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND (
                 idt.interview_status = 'PLACED'
@@ -1109,4 +1114,280 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     """, nativeQuery = true)
     List<Tuple> getEmployeeCandidateStats(@Param("startDate") LocalDate startDate,
                                           @Param("endDate") LocalDate endDate);
+
+
+    @Query(value = """
+    SELECT 
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        cs.skills AS skills,
+        cs.overall_feedback AS overallFeedback,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        r.client_name AS clientName
+    FROM interview_details idt
+    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id
+    JOIN candidates cd ON cd.candidate_id = cs.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    WHERE idt.user_id = :userId
+      AND cs.submitted_at BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<SubmittedCandidateDTO> findSubmittedCandidatesByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(value = """
+    SELECT 
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        cs.skills AS skills,
+        CASE 
+            WHEN JSON_VALID(idt.interview_status) = 1 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
+            ELSE idt.interview_status 
+        END AS interviewStatus,
+        idt.interview_level AS interviewLevel,
+        idt.interview_date_time AS interviewDateTime,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        idt.client_name AS clientName
+    FROM interview_details idt
+    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id
+    JOIN candidates cd ON cd.candidate_id = cs.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    WHERE idt.user_id = :userId
+      AND idt.interview_date_time IS NOT NULL
+      AND idt.client_name IS NOT NULL
+      AND idt.interview_date_time BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<InterviewScheduledDTO> findScheduledInterviewsByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(value = """
+    SELECT 
+        r.job_id AS jobId,
+        TRIM(r.job_title) AS jobTitle,
+        TRIM(r.client_name) AS clientName,
+        TRIM(BOTH '\\"' FROM r.assigned_by) AS assignedBy,
+        r.status AS status,
+        r.no_of_positions AS noOfPositions,
+        r.qualification AS qualification,
+        r.job_type AS jobType,
+        r.job_mode AS jobMode,
+        r.requirement_added_time_stamp AS postedDate
+    FROM requirements_model r
+    JOIN job_recruiters jr ON r.job_id = jr.job_id
+    JOIN user_details u ON jr.recruiter_id = u.user_id
+    WHERE u.user_id = :userId
+      AND r.requirement_added_time_stamp BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<JobDetailsDTO> findJobDetailsByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(value = """
+    SELECT 
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        cs.skills AS skills,
+        CASE 
+            WHEN JSON_VALID(idt.interview_status) 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
+            ELSE idt.interview_status 
+        END AS interviewStatus,
+        idt.interview_level AS interviewLevel,
+        idt.interview_date_time AS interviewDateTime,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        idt.client_name AS clientName
+    FROM interview_details idt
+    JOIN user_details u ON idt.user_id = u.user_id
+    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id
+    JOIN candidates cd ON cd.candidate_id = cs.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    WHERE u.user_id = :userId
+      AND (
+          (JSON_VALID(idt.interview_status) 
+           AND JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) = 'PLACED')
+          OR UPPER(idt.interview_status) = 'PLACED'
+      )
+      AND idt.timestamp BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<PlacementDetailsDTO> findPlacementCandidatesByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+    @Query(value = """
+    SELECT DISTINCT
+        b.id AS clientId,  
+        b.client_name AS clientName,  
+        b.client_address AS clientAddress,  
+        b.on_boarded_by AS onBoardedBy,  
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_name, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocName,  
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_mobile_number, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocMobileNumber
+    FROM bdm_client b
+    JOIN requirements_model r ON LOWER(b.client_name) = LOWER(r.client_name)  
+    JOIN job_recruiters jr ON r.job_id = jr.job_id  
+    JOIN user_details u ON jr.recruiter_id = u.user_id  
+    WHERE u.user_id = :userId
+      AND r.requirement_added_time_stamp BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<ClientDetailsDTO> findClientDetailsByUserIdAndDateRange(
+            @Param("userId") String userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+
+    @Query(value = """
+    SELECT 
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        cs.skills AS skills,
+        cs.overall_feedback AS overallFeedback,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        r.client_name AS clientName
+    FROM candidate_submissions cs
+    JOIN candidates cd ON cd.candidate_id = cs.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    WHERE r.assigned_by = :assignedBy
+      AND cs.submitted_at BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<SubmittedCandidateDTO> findSubmittedCandidatesByAssignedByAndDateRange(
+            @Param("assignedBy") String assignedBy,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(value = """
+    SELECT 
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        cs.skills AS skills,
+        CASE 
+            WHEN JSON_VALID(idt.interview_status) = 1 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
+            ELSE idt.interview_status 
+        END AS interviewStatus,
+        idt.interview_level AS interviewLevel,
+        idt.interview_date_time AS interviewDateTime,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        idt.client_name AS clientName
+    FROM interview_details idt
+    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id
+    JOIN candidates cd ON cd.candidate_id = cs.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    WHERE r.assigned_by = :assignedBy
+      AND idt.interview_date_time IS NOT NULL
+      AND idt.timestamp BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<InterviewScheduledDTO> findScheduledInterviewsByAssignedByAndDateRange(
+            @Param("assignedBy") String assignedBy,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+
+    @Query(value = """
+    SELECT 
+        r.job_id AS jobId,
+        TRIM(r.job_title) AS jobTitle,
+        TRIM(r.client_name) AS clientName,
+        TRIM(BOTH '\\"' FROM r.assigned_by) AS assignedBy,
+        r.status AS status,
+        r.no_of_positions AS noOfPositions,
+        r.qualification AS qualification,
+        r.job_type AS jobType,
+        r.job_mode AS jobMode,
+        r.requirement_added_time_stamp AS postedDate
+    FROM requirements_model r
+    WHERE r.assigned_by = :assignedBy
+      AND r.requirement_added_time_stamp BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<JobDetailsDTO> findJobDetailsByAssignedByAndDateRange(
+            @Param("assignedBy") String assignedBy,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(value = """
+    SELECT 
+        cd.candidate_id AS candidateId,
+        cd.full_name AS fullName,
+        cd.candidate_email_id AS candidateEmailId,
+        cd.contact_number AS contactNumber,
+        cd.qualification AS qualification,
+        cs.skills AS skills,
+        CASE 
+            WHEN JSON_VALID(idt.interview_status) 
+            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
+            ELSE idt.interview_status 
+        END AS interviewStatus,
+        idt.interview_level AS interviewLevel,
+        idt.interview_date_time AS interviewDateTime,
+        r.job_id AS jobId,
+        r.job_title AS jobTitle,
+        idt.client_name AS clientName
+    FROM interview_details idt
+    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id
+    JOIN candidates cd ON cd.candidate_id = cs.candidate_id
+    JOIN requirements_model r ON cs.job_id = r.job_id
+    WHERE r.assigned_by = :assignedBy
+      AND (
+          (JSON_VALID(idt.interview_status) 
+           AND JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) = 'PLACED')
+          OR UPPER(idt.interview_status) = 'PLACED'
+      )
+      AND idt.timestamp BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<PlacementDetailsDTO> findPlacementCandidatesByAssignedByAndDateRange(
+            @Param("assignedBy") String assignedBy,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    @Query(value = """
+    SELECT DISTINCT
+        b.id AS clientId,  
+        b.client_name AS clientName,  
+        b.client_address AS clientAddress,  
+        b.on_boarded_by AS onBoardedBy,  
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_name, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocName,  
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_mobile_number, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocMobileNumber
+    FROM bdm_client b
+    JOIN requirements_model r ON LOWER(b.client_name) = LOWER(r.client_name)
+    WHERE r.assigned_by = :assignedBy
+      AND r.requirement_added_time_stamp BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<ClientDetailsDTO> findClientDetailsByAssignedByAndDateRange(
+            @Param("assignedBy") String assignedBy,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
 }

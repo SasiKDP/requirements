@@ -36,6 +36,8 @@ import com.dataquadinc.service.RequirementsService;
 import org.springframework.web.multipart.MultipartFile;
 
 
+@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000",
+		"http://192.168.0.135:80/","http://192.168.0.135/","http://182.18.177.16:443","http://mymulya.com:443","http://localhost/","http://182.18.177.16/"})
 @RestController
 @RequestMapping("/requirements")
 //@CrossOrigin("*")
@@ -660,6 +662,19 @@ public class RequirementsController {
 			logger.error("An error occurred while fetching requirements for userId: {}", userId, ex);
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
 					.body(Collections.singletonMap("message", "An internal error occurred while fetching requirements."));
+		}
+	}
+
+	@GetMapping("/list/{userId}/filterByDate")
+	public CandidateResponseDTO getCandidateDataWithDateRange(
+			@PathVariable String userId,
+			@RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		if (startDate != null && endDate != null) {
+			return service.getCandidateDataWithDateRange(userId, startDate, endDate);
+		} else {
+			return service.getCandidateData(userId);
 		}
 	}
 

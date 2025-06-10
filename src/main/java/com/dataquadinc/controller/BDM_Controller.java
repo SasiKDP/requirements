@@ -37,8 +37,8 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-//@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000",
-//        "http://192.168.0.135:80/","http://192.168.0.135/","http://182.18.177.16:443","http://mymulya.com:443","http://localhost/","http://182.18.177.16/"})
+@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000",
+        "http://192.168.0.135:80/","http://192.168.0.135/","http://182.18.177.16:443","http://mymulya.com:443","http://localhost/","http://182.18.177.16/"})
 @RestController
 @RequestMapping("/requirements")
 public class BDM_Controller {
@@ -178,6 +178,11 @@ public class BDM_Controller {
         }
     }
     @GetMapping("/bdm/details/{userId}")
+    public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
+        return service.getBdmClientDetails(userId);
+    }
+
+    @GetMapping("/bdm/details/{userId}/filterByDate")
     public BdmClientDetailsDTO getBdmClientDetailsDateRange(@PathVariable String userId,
                                                             @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
                                                             @RequestParam(value = "endDate",required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
@@ -188,7 +193,7 @@ public class BDM_Controller {
     }
     @GetMapping("/bdm/getAll/filterByDate")
     public ResponseEntity<ResponseBean> getClientsByCreatedAtRange(
-            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("startDate" ) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
         List<BDM_Client> clients = service.getClientsByCreatedAtRange(startDate, endDate);
@@ -231,7 +236,7 @@ public class BDM_Controller {
     @GetMapping("/bdm/{userId}/filterByDate")
     public ResponseEntity<?> getRequirementsForBdmByDateRange(
             @PathVariable String userId,
-            @RequestParam("startDate" ) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
         List<RequirementsDto> requirements = service.getRequirementsByBdmUserIdAndDateRange(userId, startDate, endDate);
