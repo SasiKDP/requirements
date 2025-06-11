@@ -638,7 +638,48 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 """, nativeQuery = true)
     List<PlacementDetailsDTO> findPlacementCandidatesByUserId(@Param("userId") String userId);
 
-
+    @Query(value = """
+        SELECT 
+            u.user_id AS employeeId,
+            u.user_name AS employeeName,
+            u.email AS employeeEmail,
+            COUNT(idt.interview_id) AS totalInterviews,
+            SUM(CASE 
+                WHEN JSON_UNQUOTE(
+                    JSON_EXTRACT(
+                        idt.interview_status,
+                        CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
+                    )
+                ) = 'SELECTED' THEN 1 ELSE 0 
+            END) AS selectedInterviewsCount,
+            SUM(CASE 
+                WHEN JSON_UNQUOTE(
+                    JSON_EXTRACT(
+                        idt.interview_status,
+                        CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
+                    )
+                ) = 'SCHEDULED' THEN 1 ELSE 0 
+            END) AS scheduledInterviewsCount,
+            SUM(CASE 
+                WHEN JSON_UNQUOTE(
+                    JSON_EXTRACT(
+                        idt.interview_status,
+                        CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
+                    )
+                ) = 'REJECTED' THEN 1 ELSE 0 
+            END) AS rejectedInterviewsCount
+        FROM 
+            user_details u 
+        JOIN 
+            interview_details idt ON idt.assigned_to = u.user_id
+        JOIN 
+            user_roles ur ON u.user_id = ur.user_id
+        WHERE 
+            ur.role_id = :roleId
+        GROUP BY 
+            u.user_id, u.user_name, u.email
+        """, nativeQuery = true)
+    List< Tuple> countInterviewsByStatus(String roleId);
     @Query(value = """
             SELECT DISTINCT
                 b.id AS clientId,  
