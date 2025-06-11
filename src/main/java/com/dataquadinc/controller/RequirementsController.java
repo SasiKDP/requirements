@@ -587,6 +587,12 @@ public class RequirementsController {
 		CandidateStatsResponse stats = service.getCandidateStats();
 		return ResponseEntity.ok(stats);
 	}
+	@GetMapping("/coordinatorstats")
+
+	public ResponseEntity<List<Coordinator_DTO>> getCountCoordinatestats(){
+		List<Coordinator_DTO> stats= service.getCoordinatorStats();
+		return ResponseEntity.ok(stats);
+	}
 	@GetMapping("/stats/filterByDate")
 	public ResponseEntity<CandidateStatsResponse> getCandidateStats(
 			@RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
