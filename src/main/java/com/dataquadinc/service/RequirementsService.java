@@ -886,6 +886,26 @@ public class RequirementsService {
 		return new CandidateStatsResponse(userStatsList);
 	}
 
+	public List<Coordinator_DTO> getCoordinatorStats() {
+		List<Tuple> tuples = requirementsDao.countInterviewsByStatus("8");
+		List<Coordinator_DTO> dtoList = new ArrayList<>();
+
+		for (Tuple tuple : tuples) {
+			Coordinator_DTO dto = new Coordinator_DTO();
+
+			dto.setEmployeeId(tuple.get("employeeId", String.class));
+			dto.setEmployeeName(tuple.get("employeeName", String.class));
+			dto.setEmployeeEmail(tuple.get("employeeEmail", String.class));
+
+			dto.setGetTotalInterviews(convertToInt(tuple.get("scheduledInterviewsCount")));
+			dto.setTotalRejected(convertToInt(tuple.get("rejectedInterviewsCount")));
+			dto.setTotalSelected(convertToInt(tuple.get("selectedInterviewsCount")));
+
+			dtoList.add(dto);
+		}
+
+		return dtoList;
+	}
 
 
 	private int convertToInt(Object value) {
