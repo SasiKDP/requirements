@@ -37,7 +37,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 
 
-//@CrossOrigin("*")
+@RestController
+@RequestMapping("/requirements")
 public class RequirementsController {
 
 	@Autowired

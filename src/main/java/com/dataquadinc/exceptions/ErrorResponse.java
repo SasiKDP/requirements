@@ -1,3 +1,4 @@
+
 package com.dataquadinc.exceptions;
 
 import java.time.LocalDateTime;

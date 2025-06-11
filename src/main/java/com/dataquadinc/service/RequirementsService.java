@@ -353,13 +353,10 @@ public class RequirementsService {
 				.collect(Collectors.toList());
 
 		// 4. Return appropriate response
-		if (dtoList.isEmpty()) {
-			return new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now());
-		} else {
-			return dtoList;
-		}
-	}
 
+			return dtoList;
+
+	}
 
 	public List<RequirementsDto> getRequirementsByDateRange(LocalDate startDate, LocalDate endDate) {
 
