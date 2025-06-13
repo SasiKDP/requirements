@@ -926,19 +926,39 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         u.user_name AS employeeName,
         u.email AS employeeEmail,
         'TEAMLEAD' AS role,
-        COALESCE((
-            SELECT COUNT(DISTINCT r2.client_name)
-            FROM requirements_model r2
-            WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            AND DATE(r2.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
-        ), 0) AS numberOfClients,
+            COALESCE((
+                SELECT COUNT(DISTINCT r2.client_name)
+                FROM requirements_model r2
+                WHERE (
+                    REPLACE(REPLACE(r2.assigned_by, '\\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\\"', ''), '"', '')
+                    OR EXISTS (
+                        SELECT 1\s
+                        FROM production.job_recruiters jr
+                        WHERE jr.job_id = r2.job_id
+                          AND jr.recruiter_id = u.user_id
+                    )
+                )
+                AND DATE(r2.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
+            ), 0) AS numberOfClients,
+                       
+            
         
-        COALESCE((
-            SELECT COUNT(DISTINCT r2.job_id)
-            FROM requirements_model r2
-            WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            AND DATE(r2.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
-        ), 0) AS numberOfRequirements,
+            COALESCE((
+                SELECT COUNT(DISTINCT r2.job_id)
+                FROM requirements_model r2
+                WHERE (
+                    REPLACE(REPLACE(r2.assigned_by, '\\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\\"', ''), '"', '')
+                    OR EXISTS (
+                        SELECT 1\s
+                        FROM production.job_recruiters jr
+                        WHERE jr.job_id = r2.job_id
+                          AND jr.recruiter_id = u.user_id
+                    )
+                )
+                AND DATE(r2.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
+            ), 0) AS numberOfRequirements,
+            
+            
         
         -- Self Submissions (filter by profile_received_date)
         COALESCE((
