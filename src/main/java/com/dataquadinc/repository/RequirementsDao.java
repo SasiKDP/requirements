@@ -421,113 +421,120 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         u.user_name AS employeeName,
         u.email AS employeeEmail,
         'TEAMLEAD' AS role,
+
         COALESCE((
             SELECT COUNT(DISTINCT r2.client_name)
             FROM requirements_model r2
-            WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
+            WHERE (
+                REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
+                OR EXISTS (
+                    SELECT 1
+                    FROM production.job_recruiters jr
+                    WHERE jr.job_id = r2.job_id
+                      AND jr.recruiter_id = u.user_id
+                )
+            )
         ), 0) AS numberOfClients,
-        
+
         COALESCE((
             SELECT COUNT(DISTINCT r2.job_id)
             FROM requirements_model r2
-            WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
+            WHERE (
+                REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
+                OR EXISTS (
+                    SELECT 1
+                    FROM production.job_recruiters jr
+                    WHERE jr.job_id = r2.job_id
+                      AND jr.recruiter_id = u.user_id
+                )
+            )
         ), 0) AS numberOfRequirements,
-        
-        -- Self Submissions
+
         COALESCE((
             SELECT COUNT(*)
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
             WHERE cd.user_id = u.user_id
         ), 0) AS selfSubmissions,
-        
-        -- Self Interviews
+
         COALESCE((
             SELECT COUNT(DISTINCT idt.interview_id)
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             WHERE cd.user_id = u.user_id
-            AND idt.interview_date_time >= NOW()
-            AND cs.job_id IN (
-                SELECT job_id FROM requirements_model r2
-                WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            )
+              AND idt.interview_date_time >= NOW()
+              AND cs.job_id IN (
+                  SELECT job_id FROM requirements_model r2
+                  WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
+              )
         ), 0) AS selfInterviews,
-        
-        -- Self Placements
+
         COALESCE((
             SELECT COUNT(DISTINCT idt.interview_id)
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             WHERE cd.user_id = u.user_id
-            AND (
-                idt.interview_status = 'Placed'
-                OR (
-                    JSON_VALID(idt.interview_status)
-                    AND JSON_UNQUOTE(JSON_EXTRACT(
-                        idt.interview_status,
-                        CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
-                    )) = 'PLACED'
-                )
-            )
+              AND (
+                  idt.interview_status = 'Placed'
+                  OR (
+                      JSON_VALID(idt.interview_status)
+                      AND JSON_UNQUOTE(JSON_EXTRACT(
+                          idt.interview_status,
+                          CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
+                      )) = 'PLACED'
+                  )
+              )
         ), 0) AS selfPlacements,
-        
-        -- Team Submissions
+
         COALESCE((
             SELECT COUNT(*)
             FROM candidate_submissions cs
             JOIN requirements_model r2 ON cs.job_id = r2.job_id
             WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            AND cs.candidate_id IN (
-                SELECT candidate_id FROM candidates 
-                WHERE user_id != u.user_id
-            )
+              AND cs.candidate_id IN (
+                  SELECT candidate_id FROM candidates 
+                  WHERE user_id != u.user_id
+              )
         ), 0) AS teamSubmissions,
-        
-        -- Team Interviews
+
         COALESCE((
             SELECT COUNT(DISTINCT idt.interview_id)
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             WHERE cd.user_id != u.user_id
-            AND idt.interview_date_time IS NOT NULL
-            AND cs.job_id IN (
-                SELECT job_id FROM requirements_model r2
-                WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            )
+              AND idt.interview_date_time IS NOT NULL
+              AND cs.job_id IN (
+                  SELECT job_id FROM requirements_model r2
+                  WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
+              )
         ), 0) AS teamInterviews,
-        
-   -- Team Placements
-               COALESCE((
-                   SELECT COUNT(DISTINCT idt.interview_id)
-                   FROM interview_details idt
-                   JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
-                   JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-                   JOIN requirements_model r2 ON cs.job_id = r2.job_id
-                   WHERE REPLACE(REPLACE(r2.assigned_by, '"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '"', ''), '"', '')
-                     AND cd.user_id != u.user_id
-                     AND idt.interview_date_time IS NOT NULL
-                     AND (
-                         -- Case 1: Direct string match
-                         idt.interview_status = 'PLACED'
-            
-                         -- Case 2: JSON with latest status = 'PLACED'
-                         OR (
-                             JSON_VALID(idt.interview_status)
-                             AND JSON_UNQUOTE(
-                                 JSON_EXTRACT(
-                                     idt.interview_status,
-                                     CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
-                                 )
-                             ) = 'PLACED'
-                         )
-                     )
-               ), 0) AS teamPlacements
-            
-        
+
+        COALESCE((
+            SELECT COUNT(DISTINCT idt.interview_id)
+            FROM interview_details idt
+            JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
+            JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+            JOIN requirements_model r2 ON cs.job_id = r2.job_id
+            WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
+              AND cd.user_id != u.user_id
+              AND idt.interview_date_time IS NOT NULL
+              AND (
+                  idt.interview_status = 'PLACED'
+                  OR (
+                      JSON_VALID(idt.interview_status)
+                      AND JSON_UNQUOTE(
+                          JSON_EXTRACT(
+                              idt.interview_status,
+                              CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
+                          )
+                      ) = 'PLACED'
+                  )
+              )
+        ), 0) AS teamPlacements
+
     FROM user_details u
     WHERE EXISTS (
         SELECT 1 FROM user_roles ur 
@@ -537,6 +544,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     GROUP BY u.user_id, u.user_name, u.email
 """, nativeQuery = true)
     List<Tuple> getTeamleadCandidateStats();
+
 
 
     @Query(value = """
@@ -967,109 +975,108 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         u.user_name AS employeeName,
         u.email AS employeeEmail,
         'TEAMLEAD' AS role,
-            COALESCE((
-                SELECT COUNT(DISTINCT r2.client_name)
-                FROM requirements_model r2
-                WHERE (
-                    REPLACE(REPLACE(r2.assigned_by, '\\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\\"', ''), '"', '')
-                    OR EXISTS (
-                        SELECT 1\s
-                        FROM production.job_recruiters jr
-                        WHERE jr.job_id = r2.job_id
-                          AND jr.recruiter_id = u.user_id
-                    )
-                )
-                AND DATE(r2.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
-            ), 0) AS numberOfClients,
-            
         
-            COALESCE((
-                SELECT COUNT(DISTINCT r2.job_id)
-                FROM requirements_model r2
-                WHERE (
-                    REPLACE(REPLACE(r2.assigned_by, '\\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\\"', ''), '"', '')
-                    OR EXISTS (
-                        SELECT 1\s
-                        FROM production.job_recruiters jr
-                        WHERE jr.job_id = r2.job_id
-                          AND jr.recruiter_id = u.user_id
-                    )
+        COALESCE((
+            SELECT COUNT(DISTINCT r2.client_name)
+            FROM requirements_model r2
+            WHERE (
+                REPLACE(REPLACE(r2.assigned_by, '\\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\\"', ''), '"', '')
+                OR EXISTS (
+                    SELECT 1
+                    FROM production.job_recruiters jr
+                    WHERE jr.job_id = r2.job_id
+                      AND jr.recruiter_id = u.user_id
                 )
-                AND DATE(r2.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
-            ), 0) AS numberOfRequirements,
-            
+            )
+            AND DATE(r2.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
+        ), 0) AS numberOfClients,
         
-        -- Self Submissions (filter by profile_received_date)
+        COALESCE((
+            SELECT COUNT(DISTINCT r2.job_id)
+            FROM requirements_model r2
+            WHERE (
+                REPLACE(REPLACE(r2.assigned_by, '\\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\\"', ''), '"', '')
+                OR EXISTS (
+                    SELECT 1
+                    FROM production.job_recruiters jr
+                    WHERE jr.job_id = r2.job_id
+                      AND jr.recruiter_id = u.user_id
+                )
+            )
+            AND DATE(r2.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
+        ), 0) AS numberOfRequirements,
+        
+        -- Self Submissions filtered by profile_received_date
         COALESCE((
             SELECT COUNT(*)
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
             WHERE cd.user_id = u.user_id
-            AND DATE(cs.profile_received_date) BETWEEN :startDate AND :endDate
+              AND DATE(cs.profile_received_date) BETWEEN :startDate AND :endDate
         ), 0) AS selfSubmissions,
         
-        -- Self Interviews (filter by interview_date_time)
+        -- Self Interviews filtered by interview_date_time
         COALESCE((
             SELECT COUNT(DISTINCT idt.interview_id)
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             WHERE cd.user_id = u.user_id
-            AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
-            AND cs.job_id IN (
-                SELECT job_id FROM requirements_model r2
-                WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            )
+              AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
+              AND cs.job_id IN (
+                  SELECT job_id FROM requirements_model r2
+                  WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
+              )
         ), 0) AS selfInterviews,
         
-        -- Self Placements (filter by created_at)
+        -- Self Placements filtered by interview_date_time
         COALESCE((
             SELECT COUNT(DISTINCT idt.interview_id)
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             WHERE cd.user_id = u.user_id
-            AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
-            AND (
-                idt.interview_status = 'PLACED'
-                OR (
-                    JSON_VALID(idt.interview_status)
-                    AND JSON_UNQUOTE(JSON_EXTRACT(
-                        idt.interview_status,
-                        CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
-                    )) = 'PLACED'
-                )
-            )
+              AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
+              AND (
+                  idt.interview_status = 'PLACED'
+                  OR (
+                      JSON_VALID(idt.interview_status)
+                      AND JSON_UNQUOTE(JSON_EXTRACT(
+                          idt.interview_status,
+                          CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
+                      )) = 'PLACED'
+                  )
+              )
         ), 0) AS selfPlacements,
         
-        -- Team Submissions (filter by profile_received_date)
+        -- Team Submissions filtered by profile_received_date
         COALESCE((
             SELECT COUNT(*)
             FROM candidate_submissions cs
             JOIN requirements_model r2 ON cs.job_id = r2.job_id
             WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            AND DATE(cs.profile_received_date) BETWEEN :startDate AND :endDate
-            AND cs.candidate_id IN (
-                SELECT candidate_id FROM candidates 
-                WHERE user_id != u.user_id
-            )
+              AND DATE(cs.profile_received_date) BETWEEN :startDate AND :endDate
+              AND cs.candidate_id IN (
+                  SELECT candidate_id FROM candidates 
+                  WHERE user_id != u.user_id
+              )
         ), 0) AS teamSubmissions,
         
-        -- Team Interviews (filter by interview_date_time)
+        -- Team Interviews filtered by interview_date_time
         COALESCE((
             SELECT COUNT(DISTINCT idt.interview_id)
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             WHERE cd.user_id != u.user_id
-            AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
-            AND cs.job_id IN (
-                SELECT job_id FROM requirements_model r2
-                WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            )
+              AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
+              AND cs.job_id IN (
+                  SELECT job_id FROM requirements_model r2
+                  WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
+              )
         ), 0) AS teamInterviews,
         
-        -- Team Placements (filter by created_at)
+        -- Team Placements filtered by interview_details.timestamp (or use interview_date_time if timestamp unavailable)
         COALESCE((
             SELECT COUNT(DISTINCT idt.interview_id)
             FROM interview_details idt
@@ -1077,20 +1084,20 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             JOIN requirements_model r2 ON cs.job_id = r2.job_id
             WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            AND cd.user_id != u.user_id
-            AND DATE(idt.timestamp) BETWEEN :startDate AND :endDate
-            AND (
-                idt.interview_status = 'PLACED'
-                OR (
-                    JSON_VALID(idt.interview_status)
-                    AND JSON_UNQUOTE(
-                        JSON_EXTRACT(
-                            idt.interview_status,
-                            CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
-                        )
-                    ) = 'PLACED'
-                )
-            )
+              AND cd.user_id != u.user_id
+              AND DATE(idt.timestamp) BETWEEN :startDate AND :endDate
+              AND (
+                  idt.interview_status = 'PLACED'
+                  OR (
+                      JSON_VALID(idt.interview_status)
+                      AND JSON_UNQUOTE(
+                          JSON_EXTRACT(
+                              idt.interview_status,
+                              CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
+                          )
+                      ) = 'PLACED'
+                  )
+              )
         ), 0) AS teamPlacements
         
     FROM user_details u
@@ -1103,6 +1110,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
 """, nativeQuery = true)
     List<Tuple> getTeamleadCandidateStats(@Param("startDate") LocalDate startDate,
                                           @Param("endDate") LocalDate endDate);
+
     @Query(value = """
     SELECT 
         u.user_id AS employeeId,
