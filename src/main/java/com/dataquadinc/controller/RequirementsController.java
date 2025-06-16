@@ -582,7 +582,7 @@ public class RequirementsController {
 
 	@GetMapping("/stats")
 	public ResponseEntity<CandidateStatsResponse> getCandidateStats() {
-		CandidateStatsResponse stats = service.getCandidateStats();
+		CandidateStatsResponse stats = service.getCandidateStatsLast30Days();
 		return ResponseEntity.ok(stats);
 	}
 	@GetMapping("/coordinatorstats")
