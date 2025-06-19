@@ -836,7 +836,7 @@ public class RequirementsService {
 
 	public CandidateStatsResponse getCandidateStatsLast30Days() {
 		LocalDate endDate = LocalDate.now();
-		LocalDate startDate = endDate.minusDays(30);
+		LocalDate startDate = endDate.withDayOfMonth(1);
 
 		List<UserStatsDTO> userStatsList = new ArrayList<>();
 
