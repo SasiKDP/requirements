@@ -569,8 +569,18 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         cs.skills AS skills,
         CASE 
             WHEN JSON_VALID(idt.interview_status) = 1 
-            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
-            ELSE idt.interview_status 
+              AND JSON_LENGTH(idt.interview_status) > 0
+            THEN JSON_UNQUOTE(
+                JSON_EXTRACT(
+                    idt.interview_status,
+                    CONCAT(
+                        '$[',
+                        CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                        '].status'
+                    )
+                )
+            )
+            ELSE idt.interview_status
         END AS interviewStatus,
         idt.interview_level AS interviewLevel,
         idt.interview_date_time AS interviewDateTime,
@@ -586,6 +596,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
       AND idt.client_name IS NOT NULL
 """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByUserId(@Param("userId") String userId);
+
 
     @Query(value = """
     SELECT 
@@ -779,8 +790,18 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         s.skills AS skills,
         CASE 
             WHEN JSON_VALID(i.interview_status) = 1 
-            THEN JSON_UNQUOTE(JSON_EXTRACT(i.interview_status, '$[0].status')) 
-            ELSE i.interview_status 
+              AND JSON_LENGTH(i.interview_status) > 0
+            THEN JSON_UNQUOTE(
+                JSON_EXTRACT(
+                    i.interview_status,
+                    CONCAT(
+                        '$[',
+                        CAST(JSON_LENGTH(i.interview_status) - 1 AS CHAR),
+                        '].status'
+                    )
+                )
+            )
+            ELSE i.interview_status
         END AS interviewStatus,
         i.interview_level AS interviewLevel,
         i.interview_date_time AS interviewDateTime,
@@ -795,6 +816,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
       AND i.interview_date_time IS NOT NULL
 """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByAssignedBy(@Param("username") String username);
+
 
     @Query(value = """
     SELECT 
@@ -1212,10 +1234,34 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         cs.skills AS skills,
         CASE 
             WHEN JSON_VALID(idt.interview_status) = 1 
-            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
-            ELSE idt.interview_status 
+              AND JSON_LENGTH(idt.interview_status) > 0
+            THEN JSON_UNQUOTE(
+                JSON_EXTRACT(
+                    idt.interview_status,
+                    CONCAT(
+                        '$[',
+                        CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                        '].status'
+                    )
+                )
+            )
+            ELSE NULL
         END AS interviewStatus,
-        idt.interview_level AS interviewLevel,
+        CASE 
+            WHEN JSON_VALID(idt.interview_status) = 1 
+              AND JSON_LENGTH(idt.interview_status) > 0
+            THEN JSON_UNQUOTE(
+                JSON_EXTRACT(
+                    idt.interview_status,
+                    CONCAT(
+                        '$[',
+                        CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                        '].interviewLevel'
+                    )
+                )
+            )
+            ELSE NULL
+        END AS interviewLevel,
         idt.interview_date_time AS interviewDateTime,
         r.job_id AS jobId,
         r.job_title AS jobTitle,
@@ -1234,6 +1280,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
 
     @Query(value = """
     SELECT 
@@ -1351,10 +1398,34 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         cs.skills AS skills,
         CASE 
             WHEN JSON_VALID(idt.interview_status) = 1 
-            THEN JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) 
-            ELSE idt.interview_status 
+              AND JSON_LENGTH(idt.interview_status) > 0
+            THEN JSON_UNQUOTE(
+                JSON_EXTRACT(
+                    idt.interview_status,
+                    CONCAT(
+                        '$[',
+                        CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                        '].status'
+                    )
+                )
+            )
+            ELSE NULL
         END AS interviewStatus,
-        idt.interview_level AS interviewLevel,
+        CASE 
+            WHEN JSON_VALID(idt.interview_status) = 1 
+              AND JSON_LENGTH(idt.interview_status) > 0
+            THEN JSON_UNQUOTE(
+                JSON_EXTRACT(
+                    idt.interview_status,
+                    CONCAT(
+                        '$[',
+                        CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                        '].interviewLevel'
+                    )
+                )
+            )
+            ELSE NULL
+        END AS interviewLevel,
         idt.interview_date_time AS interviewDateTime,
         r.job_id AS jobId,
         r.job_title AS jobTitle,
@@ -1365,7 +1436,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     JOIN requirements_model r ON cs.job_id = r.job_id
     WHERE r.assigned_by = :assignedBy
       AND idt.interview_date_time IS NOT NULL
-      AND idt.timestamp BETWEEN :startDate AND :endDate
+      AND idt.interview_date_time BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByAssignedByAndDateRange(
             @Param("assignedBy") String assignedBy,
