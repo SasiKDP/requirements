@@ -992,8 +992,8 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         'TEAMLEAD' AS role,
 
         COALESCE((
-            SELECT COUNT(DISTINCT r2.client_name)
-            FROM requirements_model r2
+            SELECT COUNT(DISTINCT b.id)
+            FROM requirements_model r2 join bdm_client b on r2.client_name = b.client_name
             WHERE (
                 REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
                 OR EXISTS (
@@ -1003,6 +1003,9 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
                       AND jr.recruiter_id = u.user_id
                 )
             )
+            AND b.client_name = r2.client_name
+            AND DATE(r2.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
+
         ), 0) AS numberOfClients,
 
         COALESCE((
@@ -1017,6 +1020,8 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
                       AND jr.recruiter_id = u.user_id
                 )
             )
+            AND DATE(r2.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
+            
         ), 0) AS numberOfRequirements,           
             
         
@@ -1026,7 +1031,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
             WHERE cd.user_id = u.user_id
-            AND DATE(cs.profile_received_date) BETWEEN :startDate AND :endDate
+            AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
         ), 0) AS selfSubmissions,
         
         -- Self Interviews (filter by interview_date_time)
@@ -1131,19 +1136,19 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         u.email AS employeeEmail,
         r.name AS role,
         COALESCE((
-            SELECT COUNT(DISTINCT cd.candidate_id) 
+            SELECT COUNT(DISTINCT cs.submission_id) 
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cd.user_id = u.user_id 
-            AND DATE(cs.profile_received_date) BETWEEN :startDate AND :endDate
+            WHERE cs.user_id = u.user_id 
+            AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
         ), 0) AS numberOfSubmissions,
         
         COALESCE((
-            SELECT COUNT(DISTINCT idt.interview_id)
+            SELECT COUNT(idt.interview_id)
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE idt.user_id = u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
         ), 0) AS numberOfInterviews,
@@ -1153,7 +1158,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND (
                 idt.interview_status = 'PLACED'
@@ -1208,11 +1213,10 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         r.job_id AS jobId,
         r.job_title AS jobTitle,
         r.client_name AS clientName
-    FROM interview_details idt
-    JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id
+    FROM candidate_submissions cs 
     JOIN candidates cd ON cd.candidate_id = cs.candidate_id
     JOIN requirements_model r ON cs.job_id = r.job_id
-    WHERE idt.user_id = :userId
+    WHERE cs.user_id = :userId
       AND cs.submitted_at BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<SubmittedCandidateDTO> findSubmittedCandidatesByUserIdAndDateRange(
@@ -1348,17 +1352,26 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_name, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocName,  
         REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_mobile_number, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocMobileNumber
     FROM bdm_client b
-    JOIN requirements_model r ON LOWER(b.client_name) = LOWER(r.client_name)  
-    JOIN job_recruiters jr ON r.job_id = jr.job_id  
-    JOIN user_details u ON jr.recruiter_id = u.user_id  
-    WHERE u.user_id = :userId
-      AND r.requirement_added_time_stamp BETWEEN :startDate AND :endDate
+    JOIN requirements_model r ON LOWER(b.client_name) = LOWER(r.client_name)
+    JOIN user_details u ON u.user_id = :userId
+    WHERE (
+        TRIM(BOTH '\"' FROM r.assigned_by) = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
+        OR EXISTS (
+            SELECT 1
+            FROM job_recruiters jr
+            WHERE jr.job_id = r.job_id
+              AND jr.recruiter_id = u.user_id
+        )
+    )
+    AND DATE(r.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<ClientDetailsDTO> findClientDetailsByUserIdAndDateRange(
             @Param("userId") String userId,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+
 
 
     @Query(value = """
@@ -1376,14 +1389,20 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     FROM candidate_submissions cs
     JOIN candidates cd ON cd.candidate_id = cs.candidate_id
     JOIN requirements_model r ON cs.job_id = r.job_id
-    WHERE r.assigned_by = :assignedBy
-      AND cs.submitted_at BETWEEN :startDate AND :endDate
+    JOIN user_details u ON cs.user_id = u.user_id
+    WHERE (
+        TRIM(BOTH '\"' FROM r.assigned_by) = :assignedBy
+        OR u.user_name = :assignedBy
+    )
+    AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<SubmittedCandidateDTO> findSubmittedCandidatesByAssignedByAndDateRange(
             @Param("assignedBy") String assignedBy,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+
 
     @Query(value = """
     SELECT 
@@ -1443,11 +1462,11 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
 
 
     @Query(value = """
-    SELECT 
+    SELECT DISTINCT
         r.job_id AS jobId,
         TRIM(r.job_title) AS jobTitle,
         TRIM(r.client_name) AS clientName,
-        TRIM(BOTH '\\"' FROM r.assigned_by) AS assignedBy,
+        TRIM(BOTH '\"' FROM r.assigned_by) AS assignedBy,
         r.status AS status,
         r.no_of_positions AS noOfPositions,
         r.qualification AS qualification,
@@ -1455,14 +1474,25 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         r.job_mode AS jobMode,
         r.requirement_added_time_stamp AS postedDate
     FROM requirements_model r
-    WHERE r.assigned_by = :assignedBy
-      AND r.requirement_added_time_stamp BETWEEN :startDate AND :endDate
+    WHERE (
+        REPLACE(REPLACE(r.assigned_by, '\"', ''), '\"', '') = REPLACE(REPLACE(:assignedBy, '\"', ''), '\"', '')
+        OR EXISTS (
+            SELECT 1
+            FROM job_recruiters jr
+            JOIN user_details u ON jr.recruiter_id = u.user_id
+            WHERE jr.job_id = r.job_id
+              AND REPLACE(REPLACE(u.user_name, '\"', ''), '\"', '') = REPLACE(REPLACE(:assignedBy, '\"', ''), '\"', '')
+        )
+    )
+    AND DATE(r.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<JobDetailsDTO> findJobDetailsByAssignedByAndDateRange(
             @Param("assignedBy") String assignedBy,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+
 
     @Query(value = """
     SELECT 
@@ -1510,13 +1540,23 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_mobile_number, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocMobileNumber
     FROM bdm_client b
     JOIN requirements_model r ON LOWER(b.client_name) = LOWER(r.client_name)
-    WHERE r.assigned_by = :assignedBy
-      AND r.requirement_added_time_stamp BETWEEN :startDate AND :endDate
+    WHERE (
+        REPLACE(REPLACE(r.assigned_by, '\"', ''), '\"', '') = REPLACE(REPLACE(:assignedBy, '\"', ''), '\"', '')
+        OR EXISTS (
+            SELECT 1
+            FROM job_recruiters jr
+            JOIN user_details u ON jr.recruiter_id = u.user_id
+            WHERE jr.job_id = r.job_id
+              AND REPLACE(REPLACE(u.user_name, '\"', ''), '\"', '') = REPLACE(REPLACE(:assignedBy, '\"', ''), '\"', '')
+        )
+    )
+    AND DATE(r.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<ClientDetailsDTO> findClientDetailsByAssignedByAndDateRange(
             @Param("assignedBy") String assignedBy,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
 
 }

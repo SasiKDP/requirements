@@ -610,6 +610,8 @@ public class RequirementsController {
 	}
 
 
+
+
 	@GetMapping("/teamleadrequirements/{id}")
 	public List<RequirementsDto> getRequirementsByAssignedBy(@PathVariable("id") String id) {
 		List<RequirementsDto> requirements = service.getRequirementsByAssignedBy(id);

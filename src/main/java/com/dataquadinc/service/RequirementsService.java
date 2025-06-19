@@ -838,8 +838,10 @@ public class RequirementsService {
 	}
 
 	public CandidateStatsResponse getCandidateStatsLast30Days() {
+
 		LocalDate endDate = LocalDate.now();
-		LocalDate startDate = endDate.minusDays(30);
+		LocalDate startDate = LocalDate.now().withDayOfMonth(1); // First day of this month
+
 
 		List<UserStatsDTO> userStatsList = new ArrayList<>();
 
@@ -941,6 +943,22 @@ public class RequirementsService {
 		String username = roleInfo.get("userName", String.class);
 		log.info("✅ Retrieved role '{}' and username '{}' for userId: {}", role, username, userId);
 
+		LocalDate endDate = LocalDate.now();
+		LocalDate startDate = LocalDate.now().withDayOfMonth(1); // First day of this month
+
+
+
+		// 💥 First check: Null check for input dates
+		if (startDate == null || endDate == null) {
+			throw new DateRangeValidationException("Start date and End date must not be null.");
+		}
+
+		// 💥 Second check: End date must not be before start date
+		if (endDate.isBefore(startDate)) {
+			throw new DateRangeValidationException("End date cannot be before start date.");
+		}
+
+
 		List<SubmittedCandidateDTO> submittedCandidates;
 		List<InterviewScheduledDTO> scheduledInterviews;
 		List<JobDetailsDTO> jobDetails;
@@ -951,19 +969,19 @@ public class RequirementsService {
 		// 2️⃣ Fetch data based on role
 		if ("Teamlead".equalsIgnoreCase(role)) {
 			log.info("🧩 User is a Teamlead. Fetching data assigned by username: {}", username);
-			submittedCandidates = requirementsDao.findSubmittedCandidatesByAssignedBy(username);
-			scheduledInterviews = requirementsDao.findScheduledInterviewsByAssignedBy(username);
-			jobDetails = requirementsDao.findJobDetailsByAssignedBy(username);
-			placementDetails = requirementsDao.findPlacementCandidatesByAssignedBy(username);
-			clientDetails = requirementsDao.findClientDetailsByAssignedBy(username);
+			submittedCandidates = requirementsDao.findSubmittedCandidatesByAssignedByAndDateRange(username, startDate, endDate);
+			scheduledInterviews = requirementsDao.findScheduledInterviewsByAssignedByAndDateRange(username, startDate, endDate);
+			jobDetails = requirementsDao.findJobDetailsByAssignedByAndDateRange(username, startDate, endDate);
+			placementDetails = requirementsDao.findPlacementCandidatesByAssignedByAndDateRange(username, startDate, endDate);
+			clientDetails = requirementsDao.findClientDetailsByAssignedByAndDateRange(username, startDate, endDate);
 			employeeDetailsTuples = requirementsDao.getTeamleadDetailsByUserId(userId);
 		} else {
 			log.info("🧩 User is an individual contributor. Fetching data by userId: {}", userId);
-			submittedCandidates = requirementsDao.findSubmittedCandidatesByUserId(userId);
-			scheduledInterviews = requirementsDao.findScheduledInterviewsByUserId(userId);
-			jobDetails = requirementsDao.findJobDetailsByUserId(userId);
-			placementDetails = requirementsDao.findPlacementCandidatesByUserId(userId);
-			clientDetails = requirementsDao.findClientDetailsByUserId(userId);
+			submittedCandidates = requirementsDao.findSubmittedCandidatesByUserIdAndDateRange(userId, startDate, endDate);
+			scheduledInterviews = requirementsDao.findScheduledInterviewsByUserIdAndDateRange(userId, startDate, endDate);
+			jobDetails = requirementsDao.findJobDetailsByUserIdAndDateRange(userId, startDate, endDate);
+			placementDetails = requirementsDao.findPlacementCandidatesByUserIdAndDateRange(userId, startDate, endDate);
+			clientDetails = requirementsDao.findClientDetailsByUserIdAndDateRange(userId, startDate, endDate);
 			employeeDetailsTuples = requirementsDao.getEmployeeDetailsByUserId(userId);
 		}
 
@@ -978,6 +996,8 @@ public class RequirementsService {
 		// 4️⃣ Mapping employee details
 		log.info("🛠️ Mapping employee details for userId: {}", userId);
 		List<EmployeeDetailsDTO> employeeDetails = mapEmployeeDetailsTuples(employeeDetailsTuples);
+
+		log.info("📆 Date Range: From {} to {}", startDate, endDate);
 
 		// 🔢 Logging total counts
 		log.info("📊 Total Submitted Candidates: {}", submittedCandidates.size());
@@ -995,6 +1015,7 @@ public class RequirementsService {
 				groupedJobDetails, groupedClientDetails, employeeDetails
 		);
 	}
+
 
 
 	// Generic method to group a list by normalized client name

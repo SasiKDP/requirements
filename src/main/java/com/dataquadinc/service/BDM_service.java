@@ -224,6 +224,10 @@ public class BDM_service {
     }
 
     public BdmClientDetailsDTO getBdmClientDetails(String userId) {
+
+        LocalDate endDate=LocalDate.now();
+        LocalDate startDate=endDate.withDayOfMonth(1);
+
         log.info("🔍 Fetching BDM client details for userId: {}", userId);
 
         // 1️⃣ Fetch BDM Details
@@ -232,26 +236,26 @@ public class BDM_service {
 
 
         // 2️⃣ Fetch Clients onboarded by the BDM
-        List<BdmClientDto> clientDetails = getClientDetails(userId);
+        List<BdmClientDto> clientDetails = getClientDetails(userId, startDate, endDate);
         log.info("✅ Fetched {} client details for userId: {}", clientDetails.size(), userId);
 
 
         // 3️⃣ Fetch Submissions for each client
         Map<String, List<BdmSubmissionDTO>> submissions = new HashMap<>();
         for (BdmClientDto client : clientDetails) {
-            submissions.put(client.getClientName(), getSubmissions(client.getClientName()));
+            submissions.put(client.getClientName(), getSubmissionsDateFilter(client.getClientName(),startDate,endDate));
         }
 
         // 4️⃣ Fetch Interviews for each client
         Map<String, List<BdmInterviewDTO>> interviews = new HashMap<>();
         for (BdmClientDto client : clientDetails) {
-            interviews.put(client.getClientName(), getInterviews(client.getClientName()));
+            interviews.put(client.getClientName(), getInterviewsDateFilter(client.getClientName(), startDate, endDate));
         }
 
         // 5️⃣ Fetch Placements for each client
         Map<String, List<BdmPlacementDTO>> placements = new HashMap<>();
         for (BdmClientDto client : clientDetails) {
-            placements.put(client.getClientName(), getPlacements(client.getClientName()));
+            placements.put(client.getClientName(), getPlacementsDateFilter(client.getClientName(), startDate, endDate));
         }
 
         // 6️⃣ Fetch Requirements for each client (This section is now after client details)
@@ -265,6 +269,10 @@ public class BDM_service {
         int totalInterviews = interviews.values().stream().mapToInt(List::size).sum();
         int totalPlacements = placements.values().stream().mapToInt(List::size).sum();
         int totalRequirements = requirements.values().stream().mapToInt(List::size).sum();
+
+        System.out.println(String.format(
+                "Fetched BDM Count from %s to %s",
+                startDate, endDate));
 
         log.info("📊 Total Clients: {}", clientDetails.size());
         log.info("📊 Total Submissions (all clients combined): {}", totalSubmissions);
@@ -319,6 +327,8 @@ public class BDM_service {
         int totalInterviews = interviews.values().stream().mapToInt(List::size).sum();
         int totalPlacements = placements.values().stream().mapToInt(List::size).sum();
         int totalRequirements = requirements.values().stream().mapToInt(List::size).sum();
+
+
 
         log.info("📊 Total Clients: {}", clientDetails.size());
         log.info("📊 Total Submissions (all clients combined): {}", totalSubmissions);
@@ -450,8 +460,8 @@ public class BDM_service {
     }
 
 
-    private List<BdmClientDto> getClientDetails(String userId) {
-        List<Tuple> clientTuples = requirementsDao.findClientsByBdmUserId(userId);
+    private List<BdmClientDto> getClientDetails(String userId ,LocalDate startDate, LocalDate endDate) {
+        List<Tuple> clientTuples = requirementsDao.findClientsByBdmUserIdAndCreatedAtBetween(userId ,startDate, endDate);
         log.info("🔍 Fetching client details for userId: {}", userId);
 
         return clientTuples.stream()
@@ -502,8 +512,8 @@ public class BDM_service {
                 ))
                 .collect(Collectors.toList());
     }
-    private List<BdmSubmissionDTO> getSubmissions(String clientName) {
-        List<Tuple> submissionTuples = requirementsDao.findAllSubmissionsByClientName(clientName);
+    private List<BdmSubmissionDTO> getSubmissions(String clientName, LocalDate startDate, LocalDate endDate) {
+        List<Tuple> submissionTuples = requirementsDao.findAllSubmissionsByClientNameAndSubmittedAtBetween(clientName, startDate, endDate);
         log.info("🔍 Fetching submissions for client: {}", clientName);
 
         return submissionTuples.stream()
