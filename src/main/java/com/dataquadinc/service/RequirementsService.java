@@ -837,11 +837,14 @@ public class RequirementsService {
 		}
 	}
 
-	public CandidateStatsResponse getCandidateStats() {
+	public CandidateStatsResponse getCandidateStatsLast30Days() {
+		LocalDate endDate = LocalDate.now();
+		LocalDate startDate = endDate.minusDays(30);
+
 		List<UserStatsDTO> userStatsList = new ArrayList<>();
 
-		// 👤 Employee Stats
-		List<Tuple> employeeStats = requirementsDao.getEmployeeCandidateStats();
+		// 👤 Employee Stats with last 30 days filter
+		List<Tuple> employeeStats = requirementsDao.getEmployeeCandidateStats(startDate, endDate);
 		userStatsList.addAll(employeeStats.stream()
 				.map(tuple -> {
 					UserStatsDTO dto = new UserStatsDTO();
@@ -860,8 +863,8 @@ public class RequirementsService {
 				}).collect(Collectors.toList())
 		);
 
-		// 👨‍🏫 Teamlead Stats
-		List<Tuple> teamleadStats = requirementsDao.getTeamleadCandidateStats();
+		// 👨‍🏫 Teamlead Stats with last 30 days filter
+		List<Tuple> teamleadStats = requirementsDao.getTeamleadCandidateStats(startDate, endDate);
 		userStatsList.addAll(teamleadStats.stream()
 				.map(tuple -> {
 					UserStatsDTO dto = new UserStatsDTO();
@@ -883,8 +886,15 @@ public class RequirementsService {
 				}).collect(Collectors.toList())
 		);
 
+		// Log the summary info at the end
+		System.out.println(String.format(
+				"Fetched Employee and Teamlead Count from %s to %s. Total records retrieved: %d",
+				startDate, endDate, userStatsList.size()
+		));
+
 		return new CandidateStatsResponse(userStatsList);
 	}
+
 
 
 	public List<Coordinator_DTO> getCoordinatorStats() {
