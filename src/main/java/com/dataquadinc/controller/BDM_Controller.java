@@ -122,7 +122,7 @@ public class BDM_Controller {
                     .body(ResponseBean.errorResponse("Invalid JSON Format", "Error in JSON structure: " + e.getMessage()));
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ResponseBean.errorResponse("JSON Parsing Error", "Could not parse client data."));
+                    .body(ResponseBean.errorResponse("JSON Parsing Error", "Could not parse client data."+e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ResponseBean.errorResponse("Unexpected Error", "Something went wrong: " + e.getMessage()));
@@ -227,7 +227,7 @@ public class BDM_Controller {
             logger.debug("Found {} requirements for userId: {}", requirements.size(), userId);
             return new ResponseEntity<>(requirements, HttpStatus.OK);
         } catch (Exception ex) {
-            logger.error("An unexpected error occurred while fetching requirements for userId: {}", userId, ex);
+            logger.error("An unexpected error occurred while fetching requirements for userId: {}", userId, ex.getMessage());
             // Handle unexpected exceptions
             return new ResponseEntity<>(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "An unexpected error occurred", LocalDateTime.now()), HttpStatus.INTERNAL_SERVER_ERROR);
         }

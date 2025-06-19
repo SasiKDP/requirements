@@ -133,11 +133,11 @@ public class RequirementsController {
 
 		} catch (IllegalArgumentException e) {
 			// Handle specific validation error
-			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
+			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"+e.getMessage()));
 		} catch (Exception e) {
 			// General exception handling
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"));
+					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"+e.getMessage()));
 		}
 	}
 
@@ -351,7 +351,7 @@ public class RequirementsController {
 
 				} catch (Exception e) {
 					// Log the full exception stack trace for better error diagnosis
-					logger.error("Failed to send email to recruiter {} for job {}. Error: {}", recruiterId, requirement.getJobTitle(), e.getMessage(), e);
+					logger.error("Failed to send email to recruiter {} for job {}. Error: {}"+e.getMessage(), recruiterId, requirement.getJobTitle(), e.getMessage(), e);
 					allEmailsSentSuccessfully = false;
 				}
 			}
@@ -399,15 +399,15 @@ public class RequirementsController {
 
 		} catch (NoJobsAssignedToRecruiterException ex) {
 			// Log and return 404 with error message
-			logger.error("No jobs found for recruiterId: {} between {} and {}", recruiterId, startDate, endDate);
+			logger.error("No jobs found for recruiterId: {} between {} and {}", recruiterId, startDate, endDate,ex.getMessage());
 			return ResponseEntity.status(HttpStatus.NOT_FOUND)
 					.body(Collections.singletonMap("message", ex.getMessage()));
 
 		} catch (Exception ex) {
 			// Log and return 500 with generic error message
-			logger.error("An error occurred while fetching jobs for recruiterId: {}", recruiterId, ex);
+			logger.error("An error occurred while fetching jobs for recruiterId: {}", recruiterId, ex.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(Collections.singletonMap("message", "An internal error occurred while fetching recruiter jobs."));
+					.body(Collections.singletonMap("message", "An internal error occurred while fetching recruiter jobs."+ex.getMessage()));
 		}
 	}
 
@@ -533,10 +533,10 @@ public class RequirementsController {
 			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
 
 		} catch (IllegalArgumentException e) {
-			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
+			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"+e.getMessage()));
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"));
+					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"+e.getMessage()));
 		}
 	}
 
@@ -654,14 +654,14 @@ public class RequirementsController {
 			return ResponseEntity.ok(requirements);
 
 		} catch (AssignedByNotFoundException ex) {
-			logger.error("User ID not found: {} between {} and {}", userId, startDate, endDate);
+			logger.error("User ID not found: {} between {} and {}", userId, startDate, endDate,ex.getMessage());
 			return ResponseEntity.status(HttpStatus.NOT_FOUND)
 					.body(Collections.singletonMap("message", ex.getMessage()));
 
 		} catch (Exception ex) {
-			logger.error("An error occurred while fetching requirements for userId: {}", userId, ex);
+			logger.error("An error occurred while fetching requirements for userId: {}", userId, ex.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(Collections.singletonMap("message", "An internal error occurred while fetching requirements."));
+					.body(Collections.singletonMap("message", "An internal error occurred while fetching requirements."+ex.getMessage()));
 		}
 	}
 

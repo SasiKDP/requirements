@@ -218,14 +218,14 @@ public class RequirementsService {
 								cleanedRecruiterId, model.getJobId());
 					}
 				} catch (Exception e) {
-					logger.error("Error processing recruiter {} for job ID: {}. Error: {}",
+					logger.error("Error processing recruiter {} for job ID: {}. Error: {}"+e.getMessage(),
 							recruiterId, model.getJobId(), e.getMessage(), e);
 				}
 			}
 
 			logger.info("Completed email sending process for job ID: {}", model.getJobId());
 		} catch (Exception e) {
-			logger.error("Critical error in sending emails to recruiters for job ID: {}. Error: {}",
+			logger.error("Critical error in sending emails to recruiters for job ID: {}. Error: {}"+e.getMessage(),
 					model.getJobId(), e.getMessage(), e);
 			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage(), e);
 		}
@@ -588,8 +588,8 @@ public class RequirementsService {
 			// Return success response
 			return new ResponseBean(true, "Updated Successfully", null, null);
 		} catch (Exception e) {
-			logger.error("Error updating requirement", e);
-			return new ResponseBean(false, "Error updating requirement", "Internal Server Error", null);
+			logger.error("Error updating requirement", e.getMessage());
+			return new ResponseBean(false, "Error updating requirement"+e.getMessage(), "Internal Server Error", null);
 		}
 	}
 
@@ -623,8 +623,8 @@ public class RequirementsService {
 				return null;
 			}
 		} catch (Exception e) {
-			logger.error("Error fetching recruiter username", e);
-			throw new RuntimeException("Error fetching recruiter username", e);
+			logger.error("Error fetching recruiter username", e.getMessage());
+			throw new RuntimeException("Error fetching recruiter username"+e.getMessage(), e);
 		}
 	}
 
