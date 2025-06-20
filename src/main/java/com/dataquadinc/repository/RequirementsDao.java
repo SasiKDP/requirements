@@ -130,7 +130,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<Tuple> findRequirementsByClientName(@Param("clientName") String clientName);
 
     @Query(value = """
-        SELECT u.user_name AS recruiter_name, 
+        SELECT DISTINCT u.user_name AS recruiter_name, 
                r.client_name, 
                r.job_id, 
                r.job_title, 

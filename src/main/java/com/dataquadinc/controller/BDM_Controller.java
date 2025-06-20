@@ -1,10 +1,7 @@
 
 package com.dataquadinc.controller;
 
-import com.dataquadinc.dto.BDM_Dto;
-import com.dataquadinc.dto.BdmClientDetailsDTO;
-import com.dataquadinc.dto.RequirementsDto;
-import com.dataquadinc.dto.ResponseBean;
+import com.dataquadinc.dto.*;
 import com.dataquadinc.exceptions.ErrorResponse;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
@@ -177,6 +174,29 @@ public class BDM_Controller {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
+
+    @GetMapping("/bdmlist")
+    public ResponseEntity<List<BdmEmployeeDTO>> getBdmEmployees() {
+        List<BdmEmployeeDTO> bdmEmployees = service.getAllBdmEmployees();
+        if (bdmEmployees.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        }
+        return new ResponseEntity<>(bdmEmployees, HttpStatus.OK);
+    }
+
+
+    @GetMapping("/bdmlist/filterByDate")
+    public ResponseEntity<List<BdmEmployeeDTO>> getBdmEmployeesDateFilter(
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        List<BdmEmployeeDTO> bdmEmployees = service.getAllBdmEmployeesDateFilter(startDate,endDate);
+        if (bdmEmployees.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        }
+        return new ResponseEntity<>(bdmEmployees, HttpStatus.OK);
+    }
+
     @GetMapping("/bdm/details/{userId}")
     public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
         return service.getBdmClientDetails(userId);
