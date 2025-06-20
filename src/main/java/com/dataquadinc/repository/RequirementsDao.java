@@ -110,24 +110,27 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<Tuple> findJobsByBdmUserId(@Param("userId") String userId);
 
     @Query(value = """
-            SELECT u.user_name AS recruiter_name, 
-                   r.client_name, 
-                   r.job_id, 
-                   r.job_title, 
-                   r.assigned_by, 
-                   r.location, 
-                   r.notice_period
-            FROM requirements_model r
-            JOIN job_recruiters jr 
-                ON r.job_id = jr.job_id
-            JOIN user_details u 
-                ON jr.recruiter_id = u.user_id
-            JOIN bdm_client b 
-                ON TRIM(UPPER(r.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin
-            WHERE TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(:clientName)) COLLATE utf8mb4_bin
-            AND r.job_id IS NOT NULL
-            """, nativeQuery = true)
+    SELECT 
+        r.job_id,
+        MAX(TRIM(r.client_name)) AS client_name,
+        MAX(TRIM(r.job_title)) AS job_title,
+        MAX(TRIM(r.assigned_by)) AS assigned_by,
+        MAX(TRIM(r.location)) AS location,
+        MAX(TRIM(r.notice_period)) AS notice_period,
+        GROUP_CONCAT(DISTINCT u.user_name) AS recruiter_name -- All recruiters under this job
+    FROM requirements_model r
+    JOIN job_recruiters jr 
+        ON r.job_id = jr.job_id
+    JOIN user_details u 
+        ON jr.recruiter_id = u.user_id
+    JOIN bdm_client b 
+        ON TRIM(UPPER(r.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin
+    WHERE TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(:clientName)) COLLATE utf8mb4_bin
+      AND r.job_id IS NOT NULL
+    GROUP BY r.job_id, r.client_name
+    """, nativeQuery = true)
     List<Tuple> findRequirementsByClientName(@Param("clientName") String clientName);
+
 
     @Query(value = """
         SELECT DISTINCT u.user_name AS recruiter_name, 
