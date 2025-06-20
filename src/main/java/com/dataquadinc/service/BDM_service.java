@@ -6,6 +6,7 @@ import com.dataquadinc.exceptions.DateRangeValidationException;
 import com.dataquadinc.exceptions.ResourceNotFoundException;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
+import com.dataquadinc.repository.BdmEmployeeProjection;
 import com.dataquadinc.repository.RequirementsDao;
 import jakarta.persistence.Tuple;
 import org.slf4j.Logger;
@@ -218,6 +219,128 @@ public class BDM_service {
     }
 
 
+    // ✅ 1. Method with startDate and endDate passed
+    public List<BdmEmployeeDTO> getAllBdmEmployeesDateFilter(LocalDate startDate, LocalDate endDate) {
+        logger.info("📅 Fetching BDM employee stats from {} to {}", startDate, endDate);
+
+        List<BdmEmployeeProjection> bdmUsers = repository.findAllBdmEmployees();
+        logger.info("👥 Total BDM employees found: {}", bdmUsers.size());
+
+        List<BdmEmployeeDTO> result = new ArrayList<>();
+
+        for (BdmEmployeeProjection user : bdmUsers) {
+            String userId = user.getUserId();
+            String userName = user.getUserName();
+
+            logger.info("➡️ Processing BDM: {} (ID: {})", userName, userId);
+
+            long clientCount = repository.countClientsByUserIdAndDateRange(userId, startDate, endDate);
+            List<String> clientNames = repository.findClientNamesByUserIdAndDateRange(userId, startDate, endDate);
+
+            logger.info("📦 Clients for {}: {} | Count: {}", userName, clientNames, clientCount);
+
+            long submissionCount = 0;
+            long interviewCount = 0;
+            long placementCount = 0;
+            long requirementsCount = 0;
+
+            for (String client : clientNames) {
+                logger.debug("🔍 Client: {}", client);
+
+                long subCount = repository.countAllSubmissionsByClientNameAndDateRange(client, startDate, endDate);
+                long intCount = repository.countAllInterviewsByClientNameAndDateRange(client, startDate, endDate);
+                long plcCount = repository.countAllPlacementsByClientNameAndDateRange(client, startDate, endDate);
+                long reqCount = repository.countRequirementsByClientNameAndDateRange(client, startDate, endDate);
+
+                logger.debug("📑 Submissions: {}, Interviews: {}, Placements: {}, Requirements: {}",
+                        subCount, intCount, plcCount, reqCount);
+
+                submissionCount += subCount;
+                interviewCount += intCount;
+                placementCount += plcCount;
+                requirementsCount += reqCount;
+            }
+
+            result.add(new BdmEmployeeDTO(
+                    userId,
+                    userName,
+                    user.getRoleName(),
+                    user.getEmail(),
+                    user.getStatus(),
+                    clientCount,
+                    requirementsCount,
+                    submissionCount,
+                    interviewCount,
+                    placementCount
+            ));
+        }
+
+        logger.info("✅ BDM stats generation completed.");
+        return result;
+    }
+
+    // ✅ 2. Method for current month (auto sets date range)
+    public List<BdmEmployeeDTO> getAllBdmEmployees() {
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate = endDate.withDayOfMonth(1);
+
+        logger.info("🗓️ Defaulting to current month: {} to {}", startDate, endDate);
+
+        List<BdmEmployeeProjection> bdmUsers = repository.findAllBdmEmployees();
+        logger.info("👥 Total BDM employees found: {}", bdmUsers.size());
+
+        List<BdmEmployeeDTO> result = new ArrayList<>();
+
+        for (BdmEmployeeProjection user : bdmUsers) {
+            String userId = user.getUserId();
+            String userName = user.getUserName();
+
+            logger.info("➡️ Processing BDM: {} (ID: {})", userName, userId);
+
+            long clientCount = repository.countClientsByUserIdAndDateRange(userId, startDate, endDate);
+            List<String> clientNames = repository.findClientNamesByUserIdAndDateRange(userId, startDate, endDate);
+
+            logger.info("📦 Clients for {}: {} | Count: {}", userName, clientNames, clientCount);
+
+            long submissionCount = 0;
+            long interviewCount = 0;
+            long placementCount = 0;
+            long requirementsCount = 0;
+
+            for (String client : clientNames) {
+                logger.debug("🔍 Client: {}", client);
+
+                long subCount = repository.countAllSubmissionsByClientNameAndDateRange(client, startDate, endDate);
+                long intCount = repository.countAllInterviewsByClientNameAndDateRange(client, startDate, endDate);
+                long plcCount = repository.countAllPlacementsByClientNameAndDateRange(client, startDate, endDate);
+                long reqCount = repository.countRequirementsByClientNameAndDateRange(client, startDate, endDate);
+
+                logger.debug("📑 Submissions: {}, Interviews: {}, Placements: {}, Requirements: {}",
+                        subCount, intCount, plcCount, reqCount);
+
+                submissionCount += subCount;
+                interviewCount += intCount;
+                placementCount += plcCount;
+                requirementsCount += reqCount;
+            }
+
+            result.add(new BdmEmployeeDTO(
+                    userId,
+                    userName,
+                    user.getRoleName(),
+                    user.getEmail(),
+                    user.getStatus(),
+                    clientCount,
+                    requirementsCount,
+                    submissionCount,
+                    interviewCount,
+                    placementCount
+            ));
+        }
+
+        logger.info("✅ Current month BDM stats generation completed.");
+        return result;
+    }
 
     public void deleteClient(String id) {
         repository.deleteById(id);
