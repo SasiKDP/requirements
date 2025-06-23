@@ -1344,11 +1344,18 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     JOIN candidates cd ON cd.candidate_id = cs.candidate_id
     JOIN requirements_model r ON cs.job_id = r.job_id
     WHERE u.user_id = :userId
-      AND (
-          (JSON_VALID(idt.interview_status) 
-           AND JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) = 'PLACED')
-          OR UPPER(idt.interview_status) = 'PLACED'
-      )
+       (
+                        (JSON_VALID(idt.interview_status)\s
+                         AND JSON_UNQUOTE(JSON_EXTRACT(
+                              idt.interview_status,
+                              CONCAT(
+                                '$[',
+                                CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                                '].status'
+                              )
+                         )) = 'PLACED')
+                        OR UPPER(idt.interview_status) = 'PLACED'
+                    )
       AND idt.timestamp BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<PlacementDetailsDTO> findPlacementCandidatesByUserIdAndDateRange(
@@ -1465,6 +1472,19 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     JOIN requirements_model r ON cs.job_id = r.job_id
     WHERE r.assigned_by = :assignedBy
       AND idt.interview_date_time IS NOT NULL
+        AND (
+             JSON_VALID(idt.interview_status) = 1
+             AND JSON_UNQUOTE(
+                 JSON_EXTRACT(
+                      idt.interview_status,
+                          CONCAT(
+                              '$[',
+                                  CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                              '].status'
+                         )
+                )
+            ) = 'PLACED'
+        )
       AND idt.interview_date_time BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByAssignedByAndDateRange(
