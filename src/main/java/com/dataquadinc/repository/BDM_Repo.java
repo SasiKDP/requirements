@@ -42,11 +42,53 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
     List<BDM_Client> getClientsByCreatedAtRange(@Param("startDate") LocalDateTime startDate,
                                                 @Param("endDate") LocalDateTime endDate);
 
+//    @Query(value = """
+//    SELECT
+//        r.job_id AS job_id,
+//        r.job_title AS job_title,
+//        r.client_name AS client_name,
+//        r.job_description AS job_description,
+//        r.job_description_blob AS job_description_blob,
+//        r.job_type AS job_type,
+//        r.location AS location,
+//        r.job_mode AS job_mode,
+//        r.experience_required AS experience_required,
+//        r.notice_period AS notice_period,
+//        r.relevant_experience AS relevant_experience,
+//        r.qualification AS qualification,
+//        r.salary_package AS salary_package,
+//        r.no_of_positions AS no_of_positions,
+//        r.requirement_added_time_stamp AS requirement_added_time_stamp,
+//        GROUP_CONCAT(jr.recruiter_id) AS recruiter_id,
+//        r.status AS status,
+//        GROUP_CONCAT(u2.user_name) AS recruiter_name,
+//        r.assigned_by AS assigned_by
+//    FROM requirements_model r
+//    JOIN bdm_client b
+//        ON TRIM(UPPER(r.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin
+//    JOIN user_details u
+//        ON b.on_boarded_by = u.user_name
+//    LEFT JOIN job_recruiters jr
+//        ON jr.job_id = r.job_id
+//    LEFT JOIN user_details u2
+//        ON jr.recruiter_id = u2.user_id
+//    WHERE u.user_id = :userId
+//      AND r.assigned_by = u.user_name
+//      AND r.requirement_added_time_stamp >= :startDateTime
+//      AND r.requirement_added_time_stamp <= :endDateTime
+//    GROUP BY r.job_id
+//""", nativeQuery = true)
+//    List<Tuple> findRequirementsByBdmUserIdAndDateRange(
+//            @Param("userId") String userId,
+//            @Param("startDateTime") LocalDateTime startDateTime,
+//            @Param("endDateTime") LocalDateTime endDateTime
+//    );
+
     @Query(value = """
     SELECT 
         r.job_id AS job_id,
         r.job_title AS job_title,
-        r.client_name AS client_name,
+        SUBSTRING_INDEX(r.client_name, '__', 1) AS client_name,
         r.job_description AS job_description,
         r.job_description_blob AS job_description_blob,
         r.job_type AS job_type,
@@ -65,7 +107,7 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
         r.assigned_by AS assigned_by
     FROM requirements_model r
     JOIN bdm_client b 
-        ON TRIM(UPPER(r.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin
+        ON TRIM(UPPER(SUBSTRING_INDEX(r.client_name, '__', 1))) COLLATE utf8mb4_bin = TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin
     JOIN user_details u 
         ON b.on_boarded_by = u.user_name
     LEFT JOIN job_recruiters jr 
@@ -73,6 +115,7 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
     LEFT JOIN user_details u2 
         ON jr.recruiter_id = u2.user_id
     WHERE u.user_id = :userId
+      AND r.assigned_by = u.user_name
       AND r.requirement_added_time_stamp >= :startDateTime
       AND r.requirement_added_time_stamp <= :endDateTime
     GROUP BY r.job_id
@@ -82,6 +125,7 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
             @Param("startDateTime") LocalDateTime startDateTime,
             @Param("endDateTime") LocalDateTime endDateTime
     );
+
 
     @Query("SELECT b FROM BDM_Client b")
     List<BDM_Client> getClients();
