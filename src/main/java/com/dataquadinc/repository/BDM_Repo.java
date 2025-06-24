@@ -61,6 +61,9 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
     WHERE u.user_id = :userId
       AND r.requirement_added_time_stamp >= :startDateTime
       AND r.requirement_added_time_stamp <= :endDateTime
+      AND r.status  IN ('Submitted','In Progress')
+            OR r.status IN ('In Progress')
+                  
     GROUP BY r.job_id
 """, nativeQuery = true)
     List<Tuple> findRequirementsByBdmUserIdAndDateRange(

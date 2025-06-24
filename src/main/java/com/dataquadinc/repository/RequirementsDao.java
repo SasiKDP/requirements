@@ -737,10 +737,14 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             """, nativeQuery = true)
     Integer getNumberOfInterviewsByJobId(@Param("jobId") String jobId);
 
-
-    // RequirementsDao.java
-    @Query("SELECT r FROM RequirementsModel r WHERE DATE(r.requirementAddedTimeStamp) BETWEEN :startDate AND :endDate")
+    @Query("SELECT r FROM RequirementsModel r WHERE DATE(r.requirementAddedTimeStamp) BETWEEN :startDate AND :endDate ")
     List<RequirementsModel> findByRequirementAddedTimeStampBetween(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+    // RequirementsDao.java
+    @Query("SELECT r FROM RequirementsModel r WHERE DATE(r.requirementAddedTimeStamp) BETWEEN :startDate AND :endDate  AND (r.status='Submitted' OR  r.status ='In Progress') ")
+    List<RequirementsModel> findByRequirementAddedTimeStampDateBetween(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
@@ -928,15 +932,17 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     @Query(value = "SELECT user_name FROM user_details WHERE user_id = :userId", nativeQuery = true)
     String findUserNameByUserId(@Param("userId") String userId);
 
-
     @Query(value = "SELECT * FROM requirements_model " +
             "WHERE assigned_by = :assignedBy " +
-            "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate", nativeQuery = true)
+            "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate " +
+            "AND status IN ('Submitted','In Progress') OR status = 'In Progress'", nativeQuery = true)
     List<RequirementsModel> findJobsAssignedByNameAndDateRange(
             @Param("assignedBy") String assignedBy,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );
+
+
 
 
     @Query(value = """
