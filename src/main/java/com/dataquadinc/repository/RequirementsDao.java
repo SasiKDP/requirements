@@ -759,6 +759,13 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             @Param("endDate") LocalDate endDate
     );
 
+
+    @Query("SELECT r FROM RequirementsModel r WHERE DATE(r.requirementAddedTimeStamp) BETWEEN :startDate AND :endDate  AND (r.status='Submitted' OR  r.status ='In Progress') ")
+    List<RequirementsModel> findByRequirementAddedTimeStampDateBetween(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
     @Query(value = "SELECT * FROM requirements_model WHERE status <> 'Closed'", nativeQuery = true)
     List<RequirementsModel> findAllActiveRequirements();
 
@@ -956,7 +963,8 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
 
     @Query(value = "SELECT * FROM requirements_model " +
             "WHERE assigned_by = :assignedBy " +
-            "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate", nativeQuery = true)
+            "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate " +
+            "AND status IN ('Submitted','In Progress') OR status = 'In Progress'", nativeQuery = true)
     List<RequirementsModel> findJobsAssignedByNameAndDateRange(
             @Param("assignedBy") String assignedBy,
             @Param("startDate") LocalDateTime startDate,
@@ -1528,6 +1536,36 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
 
 
     @Query(value = """
+    SELECT DISTINCT
+        b.id AS clientId,  
+        b.client_name AS clientName,  
+        b.client_address AS clientAddress,  
+        b.on_boarded_by AS onBoardedBy,  
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_name, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocName,  
+        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_mobile_number, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocMobileNumber
+    FROM bdm_client b
+    JOIN requirements_model r ON LOWER(b.client_name) = LOWER(r.client_name)
+    WHERE (
+        REPLACE(REPLACE(r.assigned_by, '\"', ''), '\"', '') = REPLACE(REPLACE(:assignedBy, '\"', ''), '\"', '')
+        OR EXISTS (
+            SELECT 1
+            FROM job_recruiters jr
+            JOIN user_details u ON jr.recruiter_id = u.user_id
+            WHERE jr.job_id = r.job_id
+              AND REPLACE(REPLACE(u.user_name, '\"', ''), '\"', '') = REPLACE(REPLACE(:assignedBy, '\"', ''), '\"', '')
+        )
+    )
+    AND DATE(r.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
+""", nativeQuery = true)
+    List<ClientDetailsDTO> findClientDetailsByAssignedByAndDateRange(
+            @Param("assignedBy") String assignedBy,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+
+
+    @Query(value = """
     SELECT 
         cd.candidate_id AS candidateId,
         cd.full_name AS fullName,
@@ -1560,11 +1598,18 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     JOIN candidates cd ON cd.candidate_id = cs.candidate_id
     JOIN requirements_model r ON cs.job_id = r.job_id
     WHERE r.assigned_by = :assignedBy
-      AND (
-          (JSON_VALID(idt.interview_status) 
-           AND JSON_UNQUOTE(JSON_EXTRACT(idt.interview_status, '$[0].status')) = 'PLACED')
-          OR UPPER(idt.interview_status) = 'PLACED'
-      )
+    AND (
+          (JSON_VALID(idt.interview_status)\s
+            AND JSON_UNQUOTE(JSON_EXTRACT(
+                idt.interview_status,
+                    CONCAT(
+                            '$[',
+                                CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                            '].status'
+                           )
+                )) = 'PLACED')
+           OR UPPER(idt.interview_status) = 'PLACED'
+        )
       AND idt.timestamp BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<PlacementDetailsDTO> findPlacementCandidatesByAssignedByAndDateRange(
@@ -1574,29 +1619,27 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     );
 
     @Query(value = """
-    SELECT DISTINCT
-        b.id AS clientId,  
-        b.client_name AS clientName,  
-        b.client_address AS clientAddress,  
-        b.on_boarded_by AS onBoardedBy,  
-        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_name, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocName,  
-        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(JSON_UNQUOTE(JSON_EXTRACT(b.client_spoc_mobile_number, '$')), '[\"', ''), '\"]', ''), '\\\\"', ''), '\\\\', ''), '"', '') AS clientSpocMobileNumber
-    FROM bdm_client b
-    JOIN requirements_model r ON LOWER(b.client_name) = LOWER(r.client_name)
-    WHERE (
-        REPLACE(REPLACE(r.assigned_by, '\"', ''), '\"', '') = REPLACE(REPLACE(:assignedBy, '\"', ''), '\"', '')
-        OR EXISTS (
-            SELECT 1
-            FROM job_recruiters jr
-            JOIN user_details u ON jr.recruiter_id = u.user_id
-            WHERE jr.job_id = r.job_id
-              AND REPLACE(REPLACE(u.user_name, '\"', ''), '\"', '') = REPLACE(REPLACE(:assignedBy, '\"', ''), '\"', '')
-        )
-    )
-    AND DATE(r.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
+    SELECT 
+        ur.user_id AS recruiterId,
+        ur.user_name AS recruiterName,
+        r.job_id AS jobId,
+        COALESCE(b.on_boarded_by, 'N/A') AS bdm,
+        COALESCE(r.assigned_by, 'N/A') AS teamlead,
+        r.job_title AS technology,
+        DATE_FORMAT(r.requirement_added_time_stamp, '%Y-%m-%d') AS postedDate,
+        COUNT(DISTINCT cs.submission_id) AS numberOfSubmissions
+    FROM requirements_model r
+    LEFT JOIN job_recruiters jr ON r.job_id = jr.job_id
+    LEFT JOIN user_details ur ON jr.recruiter_id = ur.user_id
+    LEFT JOIN bdm_client b ON r.client_name = b.client_name
+    LEFT JOIN candidate_submissions cs 
+        ON r.job_id = cs.job_id
+           AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
+    WHERE (r.status = 'In Progress' OR r.status = 'Submitted')
+      AND DATE(r.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
+    GROUP BY ur.user_id, ur.user_name, r.job_id, b.on_boarded_by, r.assigned_by, r.job_title, DATE(r.requirement_added_time_stamp)
 """, nativeQuery = true)
-    List<ClientDetailsDTO> findClientDetailsByAssignedByAndDateRange(
-            @Param("assignedBy") String assignedBy,
+    List<Object[]> findInProgressRequirementsByDateRange(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );

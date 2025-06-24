@@ -1326,4 +1326,51 @@ public class RequirementsService {
 				employeeDetails
 		);
 	}
+
+	public List<InProgressRequirementDTO> getInProgressRequirements(LocalDate startDate, LocalDate endDate) {
+		log.info("🔍 Fetching 'In Progress' requirements between {} and {}", startDate, endDate);
+
+		List<Object[]> results = requirementsDao.findInProgressRequirementsByDateRange(startDate, endDate);
+		log.debug("✅ Raw DB results fetched: {}", results.size());
+
+		List<InProgressRequirementDTO> dtos = new ArrayList<>();
+
+		for (Object[] row : results) {
+			try {
+				String recruiterId = (String) row[0];
+				String recruiterName = (String) row[1];
+				String jobId = (String) row[2];
+				String bdmName = (String) row[3];
+				String teamlead = (String) row[4];
+				String technologies = (String) row[5];
+				Object rawDate = row[6];
+				LocalDate postedDate = null;
+
+				if (rawDate instanceof String dateStr) {
+					postedDate = LocalDate.parse(dateStr); // Must be in yyyy-MM-dd format
+				} else {
+					log.warn("⚠️ Unexpected postedDate type: {}", rawDate != null ? rawDate.getClass().getName() : "null");
+				}
+
+				long numberOfSubmissions = row[7] != null ? ((Number) row[7]).longValue() : 0;
+
+				dtos.add(new InProgressRequirementDTO(
+						recruiterId,
+						recruiterName,
+						jobId,
+						bdmName,
+						teamlead,
+						technologies,
+						postedDate,
+						numberOfSubmissions
+				));
+			} catch (Exception ex) {
+				log.error("❌ Error mapping row to DTO: {}", Arrays.toString(row), ex);
+			}
+		}
+
+		log.info("✅ Successfully mapped {} simplified In Progress requirements.", dtos.size());
+		return dtos;
+	}
+
 }

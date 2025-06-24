@@ -687,4 +687,36 @@ public class RequirementsController {
 	}
 
 
+	@GetMapping("/inprogress")
+	public ResponseEntity<List<InProgressRequirementDTO>> getInProgressRequirements(
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		if (startDate == null || endDate == null) {
+			LocalDate today = LocalDate.now();
+			startDate = today;
+			endDate = today;
+			logger.info("StartDate or EndDate not provided. Using today's date: {}", today);
+		}
+
+		List<InProgressRequirementDTO> result = service.getInProgressRequirements(startDate, endDate);
+		return ResponseEntity.ok(result);
+	}
+
+	@GetMapping("/inprogress/filterByDate")
+	public ResponseEntity<List<InProgressRequirementDTO>> getInProgressRequirementsWithDateRange(
+			@RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		if (startDate != null && endDate != null) {
+			logger.info("📅 Fetching In Progress requirements from {} to {}", startDate, endDate);
+			return ResponseEntity.ok(service.getInProgressRequirements(startDate, endDate));
+		} else {
+			// Default to today if no dates provided
+			LocalDate today = LocalDate.now();
+			logger.info("📅 No date range provided. Fetching for today: {}", today);
+			return ResponseEntity.ok(service.getInProgressRequirements(today, today));
+		}
+	}
+
 }
