@@ -165,7 +165,7 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
     );
 
     @Query(value = """
-    SELECT COUNT(*) 
+    SELECT COUNT(*)
     FROM interview_details idt
     JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
     JOIN requirements_model r ON cs.job_id = r.job_id
