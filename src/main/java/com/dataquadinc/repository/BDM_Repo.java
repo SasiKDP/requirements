@@ -88,7 +88,7 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
     SELECT 
         r.job_id AS job_id,
         r.job_title AS job_title,
-        SUBSTRING_INDEX(r.client_name, '__', 1) AS client_name,
+        r.client_name AS client_name,
         r.job_description AS job_description,
         r.job_description_blob AS job_description_blob,
         r.job_type AS job_type,
@@ -107,7 +107,7 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
         r.assigned_by AS assigned_by
     FROM requirements_model r
     JOIN bdm_client b 
-        ON TRIM(UPPER(SUBSTRING_INDEX(r.client_name, '__', 1))) COLLATE utf8mb4_bin = TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin
+        ON TRIM(UPPER(r.client_name)) COLLATE utf8mb4_bin = TRIM(UPPER(b.client_name)) COLLATE utf8mb4_bin
     JOIN user_details u 
         ON b.on_boarded_by = u.user_name
     LEFT JOIN job_recruiters jr 
@@ -115,9 +115,12 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
     LEFT JOIN user_details u2 
         ON jr.recruiter_id = u2.user_id
     WHERE u.user_id = :userId
-      AND r.assigned_by = u.user_name
       AND r.requirement_added_time_stamp >= :startDateTime
       AND r.requirement_added_time_stamp <= :endDateTime
+      AND r.status  IN ('Submitted','In Progress')
+            OR r.status IN ('In Progress')
+            
+                  
     GROUP BY r.job_id
 """, nativeQuery = true)
     List<Tuple> findRequirementsByBdmUserIdAndDateRange(
