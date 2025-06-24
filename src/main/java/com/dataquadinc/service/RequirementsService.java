@@ -314,8 +314,8 @@ public class RequirementsService {
 
 		// 2. Fetch data from repository
 		List<RequirementsModel> requirementsList =
-				requirementsDao.findByRequirementAddedTimeStampBetween(startOfMonth, endOfMonth);
-
+//				requirementsDao.findByRequirementAddedTimeStampBetween(startOfMonth, endOfMonth);
+               requirementsDao.findByRequirementAddedTimeStampDateBetween(startOfMonth,endOfMonth);
 		// 3. Convert to DTOs
 		List<RequirementsDto> dtoList = requirementsList.stream()
 				.map(requirement -> {
