@@ -759,6 +759,13 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             @Param("endDate") LocalDate endDate
     );
 
+
+    @Query("SELECT r FROM RequirementsModel r WHERE DATE(r.requirementAddedTimeStamp) BETWEEN :startDate AND :endDate  AND (r.status='Submitted' OR  r.status ='In Progress') ")
+    List<RequirementsModel> findByRequirementAddedTimeStampDateBetween(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
     @Query(value = "SELECT * FROM requirements_model WHERE status <> 'Closed'", nativeQuery = true)
     List<RequirementsModel> findAllActiveRequirements();
 
@@ -956,7 +963,8 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
 
     @Query(value = "SELECT * FROM requirements_model " +
             "WHERE assigned_by = :assignedBy " +
-            "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate", nativeQuery = true)
+            "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate " +
+            "AND status IN ('Submitted','In Progress') OR status = 'In Progress'", nativeQuery = true)
     List<RequirementsModel> findJobsAssignedByNameAndDateRange(
             @Param("assignedBy") String assignedBy,
             @Param("startDate") LocalDateTime startDate,
