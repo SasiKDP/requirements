@@ -314,7 +314,7 @@ public class RequirementsService {
 
 		// 2. Fetch data from repository
 		List<RequirementsModel> requirementsList =
-				requirementsDao.findByRequirementAddedTimeStampBetween(startOfMonth, endOfMonth);
+				requirementsDao.findByRequirementAdded(startOfMonth, endOfMonth);
 
 		// 3. Convert to DTOs
 		List<RequirementsDto> dtoList = requirementsList.stream()
@@ -469,7 +469,7 @@ public class RequirementsService {
 		LocalDateTime endDateTime = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
 		// 🔍 Fetch jobs for recruiter within current month
-		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterIdAndDateRange(
+		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterId(
 				recruiterId, startDateTime, endDateTime);
 
 
@@ -1103,9 +1103,7 @@ public class RequirementsService {
 		LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
 		// 4. Fetch requirements
-		List<RequirementsModel> requirements = requirementsDao.findJobsAssignedByNameAndDateRange(
-				assignedBy, startOfMonth, endOfMonth
-		);
+		List<RequirementsModel> requirements = requirementsDao.findJobsAssignedByName(assignedBy, startOfMonth, endOfMonth);
 
 		// 5. Logging
 		logger.info("Fetched {} requirements for user ID '{}' (assigned_by='{}') for current month {} to {}",
