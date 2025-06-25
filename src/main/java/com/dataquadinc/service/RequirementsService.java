@@ -116,6 +116,7 @@ public class RequirementsService {
 		if (model.getJobId() == null || model.getJobId().isEmpty()) {
 			model.setStatus("In Progress");
 			model.setRequirementAddedTimeStamp(LocalDateTime.now());
+			model.setUpdatedAt(LocalDateTime.now());
 			requirementsDao.save(model);
 		} else {
 			// Throw exception if the jobId already exists
@@ -573,6 +574,7 @@ public class RequirementsService {
 			existingRequirement.setRecruiterIds(requirementsDto.getRecruiterIds());
 			existingRequirement.setRecruiterName(requirementsDto.getRecruiterName());
 			existingRequirement.setAssignedBy(requirementsDto.getAssignedBy());
+			existingRequirement.setUpdatedAt(LocalDateTime.now());
 			if (requirementsDto.getStatus() != null) existingRequirement.setStatus(requirementsDto.getStatus());
 
 

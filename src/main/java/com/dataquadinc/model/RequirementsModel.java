@@ -77,6 +77,15 @@ public class RequirementsModel {
     private Set<String> recruiterName;
     private String assignedBy;
 
+    private LocalDateTime updatedAt;
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 
     public byte[] getJobDescriptionBlob() {
         return jobDescriptionBlob;
