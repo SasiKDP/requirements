@@ -769,7 +769,7 @@ public class BDM_service {
         LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
         // ✅ Use the updated native query
-        List<Tuple> results = repo.findRequirementsByBdmUserIdAndDateRange(userId, startOfMonth, endOfMonth);
+        List<Tuple> results = repo.findRequirementsByBdmUserId(userId);
 
         List<RequirementsDto> dtos = results.stream().map(tuple -> {
             RequirementsDto dto = new RequirementsDto();

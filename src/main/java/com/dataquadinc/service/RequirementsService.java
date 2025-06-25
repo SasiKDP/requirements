@@ -315,7 +315,9 @@ public class RequirementsService {
 
 		// 2. Fetch data from repository
 		List<RequirementsModel> requirementsList =
-				requirementsDao.findByRequirementAdded(startOfMonth, endOfMonth);
+				requirementsDao.findByRequirementAdded();
+
+		logger.info("Fetched no of Requirements {}",requirementsList.size());
 
 		// 3. Convert to DTOs
 		List<RequirementsDto> dtoList = requirementsList.stream()
@@ -472,7 +474,7 @@ public class RequirementsService {
 		// 🔍 Fetch jobs for recruiter within current month
 		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterId(
 				recruiterId, startDateTime, endDateTime);
-
+         logger.info("Number of Requirements {}",jobsByRecruiterId.size());
 
 
 		// 🔁 Map to DTOs

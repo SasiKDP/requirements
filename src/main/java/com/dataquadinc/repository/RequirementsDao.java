@@ -760,11 +760,8 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     );
 
 
-    @Query("SELECT r FROM RequirementsModel r WHERE DATE(r.requirementAddedTimeStamp) BETWEEN :startDate AND :endDate  AND r.status IN ('Submitted','In Progress') OR r.status IN ('In Progress') ")
-    List<RequirementsModel> findByRequirementAdded(
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate
-    );
+    @Query("SELECT r FROM RequirementsModel r WHERE r.status IN ('Submitted','In Progress')")
+    List<RequirementsModel> findByRequirementAdded();
 
     @Query(value = "SELECT * FROM requirements_model WHERE status <> 'Closed'", nativeQuery = true)
     List<RequirementsModel> findAllActiveRequirements();
@@ -954,8 +951,11 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
 
     @Query("SELECT r FROM RequirementsModel r " +
             "WHERE :recruiterId MEMBER OF r.recruiterIds " +
-            "AND r.requirementAddedTimeStamp BETWEEN :startDate AND :endDate " +
-            "AND (r.status IN ('Submitted', 'In Progress')) OR r.status IN ('In Progress')")
+            "AND (" +
+            "   (r.requirementAddedTimeStamp BETWEEN :startDate AND :endDate AND r.status IN ('Submitted', 'In Progress')) " +
+            "   OR " +
+            "   (r.requirementAddedTimeStamp NOT BETWEEN :startDate AND :endDate AND r.status = 'In Progress')" +
+            ")")
     List<RequirementsModel> findJobsByRecruiterId(
             @Param("recruiterId") String recruiterId,
             @Param("startDate") LocalDateTime startDate,
@@ -977,15 +977,19 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );
-    @Query(value = "SELECT * FROM requirements_model " +
-            "WHERE assigned_by = :assignedBy " +
-            "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate " +
-            "AND status IN ('Submitted','In Progress') OR status = 'In Progress'", nativeQuery = true)
+    @Query("SELECT r FROM RequirementsModel r " +
+            "WHERE r.assignedBy = :assignedBy " +
+            "AND (" +
+            "   (r.requirementAddedTimeStamp BETWEEN :startDate AND :endDate AND r.status IN ('Submitted', 'In Progress')) " +
+            "   OR " +
+            "   (r.requirementAddedTimeStamp NOT BETWEEN :startDate AND :endDate AND r.status IN ('In Progress', 'Submitted'))" +
+            ")")
     List<RequirementsModel> findJobsAssignedByName(
             @Param("assignedBy") String assignedBy,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );
+
 
 
     @Query(value = """
