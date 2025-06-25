@@ -186,7 +186,7 @@ public class BDM_service {
             if (dto.getClientSpocLinkedin() != null) existingClient.setClientSpocLinkedin(dto.getClientSpocLinkedin());
             if (dto.getClientSpocMobileNumber() != null) existingClient.setClientSpocMobileNumber(dto.getClientSpocMobileNumber());
             if(dto.getPositionType()!=null)existingClient.setPositionType(dto.getPositionType());
-
+            if(dto.getSupportingCustomers()!=null)existingClient.setSupportingCustomers(dto.getSupportingCustomers());
             try {
                 if (files != null && !files.isEmpty()) {
                     // Ensure the uploads directory exists

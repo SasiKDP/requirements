@@ -760,8 +760,8 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     );
 
 
-    @Query("SELECT r FROM RequirementsModel r WHERE DATE(r.requirementAddedTimeStamp) BETWEEN :startDate AND :endDate  AND (r.status='Submitted' OR  r.status ='In Progress') ")
-    List<RequirementsModel> findByRequirementAddedTimeStampDateBetween(
+    @Query("SELECT r FROM RequirementsModel r WHERE DATE(r.requirementAddedTimeStamp) BETWEEN :startDate AND :endDate  AND r.status IN ('Submitted','In Progress') OR r.status IN ('In Progress') ")
+    List<RequirementsModel> findByRequirementAdded(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
@@ -952,6 +952,14 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
                                                               @Param("startDate") LocalDateTime startDate,
                                                               @Param("endDate") LocalDateTime endDate);
 
+    @Query("SELECT r FROM RequirementsModel r " +
+            "WHERE :recruiterId MEMBER OF r.recruiterIds " +
+            "AND r.requirementAddedTimeStamp BETWEEN :startDate AND :endDate " +
+            "AND (r.status IN ('Submitted', 'In Progress')) OR r.status IN ('In Progress')")
+    List<RequirementsModel> findJobsByRecruiterId(
+            @Param("recruiterId") String recruiterId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
     @Query(value = "SELECT COUNT(*) FROM user_details WHERE user_id = :userId", nativeQuery = true)
     int countByUserId(@Param("userId") String userId);
 
@@ -963,9 +971,17 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
 
     @Query(value = "SELECT * FROM requirements_model " +
             "WHERE assigned_by = :assignedBy " +
+            "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate ", nativeQuery = true)
+    List<RequirementsModel> findJobsAssignedByNameAndDateRange(
+            @Param("assignedBy") String assignedBy,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
+    @Query(value = "SELECT * FROM requirements_model " +
+            "WHERE assigned_by = :assignedBy " +
             "AND requirement_added_time_stamp BETWEEN :startDate AND :endDate " +
             "AND status IN ('Submitted','In Progress') OR status = 'In Progress'", nativeQuery = true)
-    List<RequirementsModel> findJobsAssignedByNameAndDateRange(
+    List<RequirementsModel> findJobsAssignedByName(
             @Param("assignedBy") String assignedBy,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
