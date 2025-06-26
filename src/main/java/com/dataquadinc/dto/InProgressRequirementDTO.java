@@ -18,5 +18,6 @@ public class InProgressRequirementDTO {
     private String teamlead;
     private String technology;
     private LocalDate postedDate;
+    private LocalDate requirementUpdatedDate;
     private long numberOfSubmissions;
 }

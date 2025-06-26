@@ -1647,6 +1647,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         COALESCE(r.assigned_by, 'N/A') AS teamlead,
         r.job_title AS technology,
         DATE_FORMAT(r.requirement_added_time_stamp, '%Y-%m-%d') AS postedDate,
+        DATE_FORMAT(r.updated_at, '%Y-%m-%d') AS updatedDate,
         COUNT(DISTINCT cs.submission_id) AS numberOfSubmissions
     FROM requirements_model r
     LEFT JOIN job_recruiters jr ON r.job_id = jr.job_id
@@ -1656,8 +1657,8 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         ON r.job_id = cs.job_id
            AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
     WHERE (r.status = 'In Progress' OR r.status = 'Submitted')
-      AND DATE(r.requirement_added_time_stamp) BETWEEN :startDate AND :endDate
-    GROUP BY ur.user_id, ur.user_name, r.job_id, b.on_boarded_by, r.assigned_by, r.job_title, DATE(r.requirement_added_time_stamp)
+      AND DATE(r.updated_at) BETWEEN :startDate AND :endDate
+    GROUP BY ur.user_id, ur.user_name, r.job_id, b.on_boarded_by, r.assigned_by, r.job_title, DATE(r.updated_at)
 """, nativeQuery = true)
     List<Object[]> findInProgressRequirementsByDateRange(
             @Param("startDate") LocalDate startDate,
