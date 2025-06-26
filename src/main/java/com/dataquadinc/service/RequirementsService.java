@@ -1345,16 +1345,22 @@ public class RequirementsService {
 				String bdmName = (String) row[3];
 				String teamlead = (String) row[4];
 				String technologies = (String) row[5];
-				Object rawDate = row[6];
+				Object rawPostedDate = row[6];
+				Object rawUpdatedDate=row[7];
 				LocalDate postedDate = null;
+				LocalDate requirementUpdatedDate=null;
 
-				if (rawDate instanceof String dateStr) {
+				if (rawPostedDate instanceof String dateStr) {
 					postedDate = LocalDate.parse(dateStr); // Must be in yyyy-MM-dd format
 				} else {
-					log.warn("⚠️ Unexpected postedDate type: {}", rawDate != null ? rawDate.getClass().getName() : "null");
+					log.warn("⚠️ Unexpected postedDate type: {}", rawPostedDate != null ? rawPostedDate.getClass().getName() : "null");
 				}
-
-				long numberOfSubmissions = row[7] != null ? ((Number) row[7]).longValue() : 0;
+				if (rawUpdatedDate instanceof String dateStr) {
+					requirementUpdatedDate = LocalDate.parse(dateStr); // Must be in yyyy-MM-dd format
+				} else {
+					log.warn("⚠️ Unexpected postedDate type: {}", rawUpdatedDate != null ? rawUpdatedDate.getClass().getName() : "null");
+				}
+				long numberOfSubmissions = row[8] != null ? ((Number) row[8]).longValue() : 0;
 
 				dtos.add(new InProgressRequirementDTO(
 						recruiterId,
@@ -1364,6 +1370,7 @@ public class RequirementsService {
 						teamlead,
 						technologies,
 						postedDate,
+						requirementUpdatedDate,
 						numberOfSubmissions
 				));
 			} catch (Exception ex) {
