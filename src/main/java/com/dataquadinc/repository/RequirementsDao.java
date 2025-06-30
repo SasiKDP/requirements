@@ -653,47 +653,53 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     List<PlacementDetailsDTO> findPlacementCandidatesByUserId(@Param("userId") String userId);
 
     @Query(value = """
-        SELECT 
-            u.user_id AS employeeId,
-            u.user_name AS employeeName,
-            u.email AS employeeEmail,
-            COUNT(idt.interview_id) AS totalInterviews,
-            SUM(CASE 
-                WHEN JSON_UNQUOTE(
-                    JSON_EXTRACT(
-                        idt.interview_status,
-                        CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
-                    )
-                ) = 'SELECTED' THEN 1 ELSE 0 
-            END) AS selectedInterviewsCount,
-            SUM(CASE 
-                WHEN JSON_UNQUOTE(
-                    JSON_EXTRACT(
-                        idt.interview_status,
-                        CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
-                    )
-                ) = 'SCHEDULED' THEN 1 ELSE 0 
-            END) AS scheduledInterviewsCount,
-            SUM(CASE 
-                WHEN JSON_UNQUOTE(
-                    JSON_EXTRACT(
-                        idt.interview_status,
-                        CONCAT('$[', JSON_LENGTH(idt.interview_status)-1, '].status')
-                    )
-                ) = 'REJECTED' THEN 1 ELSE 0 
-            END) AS rejectedInterviewsCount
-        FROM 
-            user_details u 
-        JOIN 
-            interview_details idt ON idt.assigned_to = u.user_id
-        JOIN 
-            user_roles ur ON u.user_id = ur.user_id
-        WHERE 
-            ur.role_id = :roleId
-        GROUP BY 
-            u.user_id, u.user_name, u.email
-        """, nativeQuery = true)
-    List< Tuple> countInterviewsByStatus(String roleId);
+    SELECT 
+        u.user_id AS employeeId,
+        u.user_name AS employeeName,
+        u.email AS employeeEmail,
+        COUNT(DISTINCT CASE\s
+            WHEN latest_status.interviewLevel = 'INTERNAL' THEN idt.interview_id
+            ELSE NULL
+        END) AS totalInterviews,            
+            
+        SUM(CASE 
+            WHEN latest_status.status = 'SELECTED' AND latest_status.interviewLevel = 'INTERNAL' 
+            THEN 1 ELSE 0 
+        END) AS selectedInterviewsCount,
+
+        SUM(CASE 
+            WHEN latest_status.status = 'REJECTED' AND latest_status.interviewLevel = 'INTERNAL' 
+            THEN 1 ELSE 0 
+        END) AS rejectedInterviewsCount,
+
+        SUM(CASE 
+            WHEN latest_status.status = 'SCHEDULED' AND latest_status.interviewLevel = 'INTERNAL' 
+            THEN 1 ELSE 0 
+        END) AS scheduledInterviewsCount
+
+    FROM user_details u
+    JOIN interview_details idt ON idt.assigned_to = u.user_id
+    JOIN user_roles ur ON u.user_id = ur.user_id
+
+    -- Latest JSON object only
+    JOIN JSON_TABLE(
+        JSON_EXTRACT(
+            idt.interview_status,
+            CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, ']')
+        ),
+        '$' COLUMNS (
+            status VARCHAR(50) PATH '$.status',
+            interviewLevel VARCHAR(50) PATH '$.interviewLevel'
+        )
+    ) AS latest_status ON TRUE
+
+    WHERE ur.role_id = :roleId
+    GROUP BY u.user_id, u.user_name, u.email
+    """, nativeQuery = true)
+    List<Tuple> countInterviewsByStatus(String roleId);
+
+
+
     @Query(value = """
             SELECT DISTINCT
                 b.id AS clientId,  

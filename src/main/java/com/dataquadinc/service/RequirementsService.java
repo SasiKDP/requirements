@@ -914,7 +914,8 @@ public class RequirementsService {
 			dto.setEmployeeName(tuple.get("employeeName", String.class));
 			dto.setEmployeeEmail(tuple.get("employeeEmail", String.class));
 
-			dto.setGetTotalInterviews(convertToInt(tuple.get("scheduledInterviewsCount")));
+			dto.setGetTotalInterviews(convertToInt(tuple.get("totalInterviews")));
+			dto.setTotalScheduled(convertToInt(tuple.get("scheduledInterviewsCount")));
 			dto.setTotalRejected(convertToInt(tuple.get("rejectedInterviewsCount")));
 			dto.setTotalSelected(convertToInt(tuple.get("selectedInterviewsCount")));
 
