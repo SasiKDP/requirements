@@ -1649,6 +1649,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         ur.user_id AS recruiterId,
         ur.user_name AS recruiterName,
         r.job_id AS jobId,
+        r.client_name as clientName,
         COALESCE(b.on_boarded_by, 'N/A') AS bdm,
         COALESCE(r.assigned_by, 'N/A') AS teamlead,
         r.job_title AS technology,
