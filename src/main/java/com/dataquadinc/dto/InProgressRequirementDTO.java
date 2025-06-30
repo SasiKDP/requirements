@@ -14,6 +14,7 @@ public class InProgressRequirementDTO {
     private String recruiterId;
     private String recruiterName;
     private String jobId;
+    private String clientName;
     private String bdm;
     private String teamlead;
     private String technology;

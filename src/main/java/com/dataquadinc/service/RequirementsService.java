@@ -914,7 +914,8 @@ public class RequirementsService {
 			dto.setEmployeeName(tuple.get("employeeName", String.class));
 			dto.setEmployeeEmail(tuple.get("employeeEmail", String.class));
 
-			dto.setGetTotalInterviews(convertToInt(tuple.get("scheduledInterviewsCount")));
+			dto.setGetTotalInterviews(convertToInt(tuple.get("totalInterviews")));
+			dto.setTotalScheduled(convertToInt(tuple.get("scheduledInterviewsCount")));
 			dto.setTotalRejected(convertToInt(tuple.get("rejectedInterviewsCount")));
 			dto.setTotalSelected(convertToInt(tuple.get("selectedInterviewsCount")));
 
@@ -1342,30 +1343,36 @@ public class RequirementsService {
 				String recruiterId = (String) row[0];
 				String recruiterName = (String) row[1];
 				String jobId = (String) row[2];
-				String bdmName = (String) row[3];
-				String teamlead = (String) row[4];
-				String technologies = (String) row[5];
-				Object rawPostedDate = row[6];
-				Object rawUpdatedDate=row[7];
+				String clientName = (String) row[3];
+				String bdmName = (String) row[4];
+				String teamlead = (String) row[5];
+				String technologies = (String) row[6];
+				Object rawPostedDate = row[7];
+				Object rawUpdatedDate = row[8];
+				Object rawNumberOfSubmissions = row[9];
+
 				LocalDate postedDate = null;
-				LocalDate requirementUpdatedDate=null;
+				LocalDate requirementUpdatedDate = null;
 
 				if (rawPostedDate instanceof String dateStr) {
-					postedDate = LocalDate.parse(dateStr); // Must be in yyyy-MM-dd format
+					postedDate = LocalDate.parse(dateStr);
 				} else {
 					log.warn("⚠️ Unexpected postedDate type: {}", rawPostedDate != null ? rawPostedDate.getClass().getName() : "null");
 				}
+
 				if (rawUpdatedDate instanceof String dateStr) {
-					requirementUpdatedDate = LocalDate.parse(dateStr); // Must be in yyyy-MM-dd format
+					requirementUpdatedDate = LocalDate.parse(dateStr);
 				} else {
-					log.warn("⚠️ Unexpected postedDate type: {}", rawUpdatedDate != null ? rawUpdatedDate.getClass().getName() : "null");
+					log.warn("⚠️ Unexpected updatedDate type: {}", rawUpdatedDate != null ? rawUpdatedDate.getClass().getName() : "null");
 				}
-				long numberOfSubmissions = row[8] != null ? ((Number) row[8]).longValue() : 0;
+
+				long numberOfSubmissions = rawNumberOfSubmissions != null ? ((Number) rawNumberOfSubmissions).longValue() : 0;
 
 				dtos.add(new InProgressRequirementDTO(
 						recruiterId,
 						recruiterName,
 						jobId,
+						clientName,
 						bdmName,
 						teamlead,
 						technologies,
