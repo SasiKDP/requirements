@@ -50,7 +50,6 @@ public class RequirementsService {
 	private static final Logger log = LoggerFactory.getLogger(BDM_service.class);
 
 
-
 	@Transactional
 	public RequirementAddedResponse createRequirement(RequirementsDto requirementsDto) throws IOException {
 		// Map DTO to model
@@ -219,14 +218,14 @@ public class RequirementsService {
 								cleanedRecruiterId, model.getJobId());
 					}
 				} catch (Exception e) {
-					logger.error("Error processing recruiter {} for job ID: {}. Error: {}"+e.getMessage(),
+					logger.error("Error processing recruiter {} for job ID: {}. Error: {}" + e.getMessage(),
 							recruiterId, model.getJobId(), e.getMessage(), e);
 				}
 			}
 
 			logger.info("Completed email sending process for job ID: {}", model.getJobId());
 		} catch (Exception e) {
-			logger.error("Critical error in sending emails to recruiters for job ID: {}. Error: {}"+e.getMessage(),
+			logger.error("Critical error in sending emails to recruiters for job ID: {}. Error: {}" + e.getMessage(),
 					model.getJobId(), e.getMessage(), e);
 			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage(), e);
 		}
@@ -317,7 +316,7 @@ public class RequirementsService {
 		List<RequirementsModel> requirementsList =
 				requirementsDao.findByRequirementAdded();
 
-		logger.info("Fetched no of Requirements {}",requirementsList.size());
+		logger.info("Fetched no of Requirements {}", requirementsList.size());
 
 		// 3. Convert to DTOs
 		List<RequirementsDto> dtoList = requirementsList.stream()
@@ -414,7 +413,6 @@ public class RequirementsService {
 	}
 
 
-
 	public RequirementsDto getRequirementDetailsById(String jobId) {
 		RequirementsModel requirement = requirementsDao.findById(jobId)
 				.orElseThrow(() -> new RequirementNotFoundException("Requirement Not Found with Id : " + jobId));
@@ -474,7 +472,7 @@ public class RequirementsService {
 		// 🔍 Fetch jobs for recruiter within current month
 		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterId(
 				recruiterId, startDateTime, endDateTime);
-         logger.info("Number of Requirements {}",jobsByRecruiterId.size());
+		logger.info("Number of Requirements {}", jobsByRecruiterId.size());
 
 
 		// 🔁 Map to DTOs
@@ -526,7 +524,6 @@ public class RequirementsService {
 				})
 				.collect(Collectors.toList());
 	}
-
 
 
 	@Transactional
@@ -593,7 +590,7 @@ public class RequirementsService {
 			return new ResponseBean(true, "Updated Successfully", null, null);
 		} catch (Exception e) {
 			logger.error("Error updating requirement", e.getMessage());
-			return new ResponseBean(false, "Error updating requirement"+e.getMessage(), "Internal Server Error", null);
+			return new ResponseBean(false, "Error updating requirement" + e.getMessage(), "Internal Server Error", null);
 		}
 	}
 
@@ -628,7 +625,7 @@ public class RequirementsService {
 			}
 		} catch (Exception e) {
 			logger.error("Error fetching recruiter username", e.getMessage());
-			throw new RuntimeException("Error fetching recruiter username"+e.getMessage(), e);
+			throw new RuntimeException("Error fetching recruiter username" + e.getMessage(), e);
 		}
 	}
 
@@ -667,6 +664,7 @@ public class RequirementsService {
 
 		return recruiters;
 	}
+
 	public RequirementDetailsDto getRequirementDetailsByJobId(String jobId) {
 		// Fetch the requirement
 		RequirementsModel requirement = requirementsDao.findByJobId(jobId)
@@ -827,8 +825,6 @@ public class RequirementsService {
 	}
 
 
-
-
 	/**
 	 * Safely retrieves values from Tuple, handling null cases.
 	 */
@@ -902,7 +898,6 @@ public class RequirementsService {
 	}
 
 
-
 	public List<Coordinator_DTO> getCoordinatorStats() {
 		List<Tuple> tuples = requirementsDao.countInterviewsByStatus("8");
 		List<Coordinator_DTO> dtoList = new ArrayList<>();
@@ -950,7 +945,6 @@ public class RequirementsService {
 
 		LocalDate endDate = LocalDate.now();
 		LocalDate startDate = LocalDate.now().withDayOfMonth(1); // First day of this month
-
 
 
 		// 💥 First check: Null check for input dates
@@ -1022,7 +1016,6 @@ public class RequirementsService {
 	}
 
 
-
 	// Generic method to group a list by normalized client name
 	private <T> Map<String, List<T>> groupByClientName(List<T> list) {
 		return list.stream()
@@ -1083,7 +1076,6 @@ public class RequirementsService {
 		}
 		return employeeDetails;
 	}
-
 
 
 	// helper method to check if alias exists in tuple
@@ -1216,11 +1208,11 @@ public class RequirementsService {
 		return dtoList;
 	}
 
-	public CandidateStatsResponse getCandidateStatsDateFilter(LocalDate startDate,LocalDate endDate) {
+	public CandidateStatsResponse getCandidateStatsDateFilter(LocalDate startDate, LocalDate endDate) {
 		List<UserStatsDTO> userStatsList = new ArrayList<>();
 
 		// 👤 Employee Stats
-		List<Tuple> employeeStats = requirementsDao.getEmployeeCandidateStats(startDate,endDate);
+		List<Tuple> employeeStats = requirementsDao.getEmployeeCandidateStats(startDate, endDate);
 		userStatsList.addAll(employeeStats.stream()
 				.map(tuple -> {
 					UserStatsDTO dto = new UserStatsDTO();
@@ -1240,7 +1232,7 @@ public class RequirementsService {
 		);
 
 		// 👨‍🏫 Teamlead Stats
-		List<Tuple> teamleadStats = requirementsDao.getTeamleadCandidateStats(startDate,endDate);
+		List<Tuple> teamleadStats = requirementsDao.getTeamleadCandidateStats(startDate, endDate);
 		userStatsList.addAll(teamleadStats.stream()
 				.map(tuple -> {
 					UserStatsDTO dto = new UserStatsDTO();
@@ -1389,4 +1381,51 @@ public class RequirementsService {
 		return dtos;
 	}
 
+	public String sendInProgressEmail(String userId,List<InProgressRequirementDTO> requirements) {
+
+		String recruiterName = requirementsDao.findUserNameByUserId(userId); // This should be available in the service
+         if(recruiterName.isEmpty() || recruiterName==null){
+			 throw new UserNotFoundException("No User Found with User Id :"+userId);
+		 }
+		// Log recruiter ID and fetched email
+		logger.info("Fetched recruiterId: {}", userId);
+		String subject="InProgress Stats - "+recruiterName;
+		emailService.sendEmail("putluruarunkumarreddy13@gmail.com",subject,buildEmailBody(requirements,recruiterName));
+
+		return "Email Sent Successfully";
+	}
+
+	private String buildEmailBody(List<InProgressRequirementDTO> requirements, String recruiterName) {
+		StringBuilder sb = new StringBuilder();
+
+		sb.append("<h3>In Progress Jobs for Recruiter: ").append(recruiterName).append("</h3>");
+		sb.append("<p>Total Jobs: ").append(requirements.size()).append("</p>");
+
+		sb.append("<table style='border-collapse: collapse; width: 100%;' border='1' cellspacing='0' cellpadding='8'>");
+		sb.append("<thead style='background-color: #f2f2f2;'>");
+		sb.append("<tr>")
+				.append("<th>BDM</th>")
+				.append("<th>Team Lead</th>")
+				.append("<th>Job ID</th>")
+				.append("<th>Client</th>")
+				.append("<th>Technologies</th>")
+				.append("<th>Submissions</th>")
+				.append("</tr>");
+		sb.append("</thead><tbody>");
+
+		for (InProgressRequirementDTO req : requirements) {
+			sb.append("<tr>")
+					.append("<td>").append(Optional.ofNullable(req.getBdm()).orElse("-")).append("</td>")
+					.append("<td>").append(Optional.ofNullable(req.getTeamlead()).orElse("-")).append("</td>")
+					.append("<td>").append(Optional.ofNullable(req.getJobId()).orElse("-")).append("</td>")
+					.append("<td>").append(Optional.ofNullable(req.getClientName()).orElse("-")).append("</td>")
+					.append("<td>").append(Optional.ofNullable(req.getTechnology()).orElse("-")).append("</td>")
+					.append("<td>").append(req.getNumberOfSubmissions()).append("</td>")
+					.append("</tr>");
+		}
+
+		sb.append("</tbody></table>");
+
+		return sb.toString();
+	}
 }

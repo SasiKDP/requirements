@@ -1672,5 +1672,5 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             @Param("endDate") LocalDate endDate
     );
 
-
 }
+
