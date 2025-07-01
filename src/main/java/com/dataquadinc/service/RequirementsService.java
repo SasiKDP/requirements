@@ -233,18 +233,18 @@ public class RequirementsService {
 
 	// Update constructEmailBody method to use recruiterName instead of fetching separately
 	private String constructEmailBody(RequirementsModel model, String recruiterName) {
-		return "Dear " + recruiterName + ",\n\n" +
-				"I hope you are doing well.\n\n" +
-				"You have been assigned a new job requirement. Please find the details below:\n\n" +
-				"▶ Job Title: " + model.getJobTitle() + "\n" +
-				"▶ Client: " + model.getClientName() + "\n" +
-				"▶ Location: " + model.getLocation() + "\n" +
-				"▶ Job Type: " + model.getJobType() + "\n" +
-				"▶ Experience Required: " + model.getExperienceRequired() + " years\n" +
-				"▶ Assigned By: " + model.getAssignedBy() + "\n\n" +
-				"Please review the details and proceed with the necessary actions. Additional information is available on your dashboard.\n\n" +
-				"If you have any questions or need further clarification, feel free to reach out.\n\n" +
-				"Best regards,\n" +
+		return "Dear " + recruiterName + ",<br><br>" +
+				"I hope you are doing well.<br><br>" +
+				"You have been assigned a new job requirement. Please find the details below:<br><br>" +
+				"▶ <b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"▶ <b>Client:</b> " + model.getClientName() + "<br>" +
+				"▶ <b>Location:</b> " + model.getLocation() + "<br>" +
+				"▶ <b>Job Type:</b> " + model.getJobType() + "<br>" +
+				"▶ <b>Experience Required:</b> " + model.getExperienceRequired() + " years<br>" +
+				"▶ <b>Assigned By:</b> " + model.getAssignedBy() + "<br><br>" +
+				"Please review the details and proceed with the necessary actions. Additional information is available on your dashboard.<br><br>" +
+				"If you have any questions or need further clarification, feel free to reach out.<br><br>" +
+				"Best regards,<br>" +
 				"Dataquad";
 	}
 
@@ -1389,8 +1389,8 @@ public class RequirementsService {
 		 }
 		// Log recruiter ID and fetched email
 		logger.info("Fetched recruiterId: {}", userId);
-		String subject="InProgress Stats - "+recruiterName;
-		emailService.sendEmail("putluruarunkumarreddy13@gmail.com",subject,buildEmailBody(requirements,recruiterName));
+		String subject="InProgress Stats - "+recruiterName+" "+LocalDate.now();
+		emailService.sendEmail("madhan@dataqinc.com",subject,buildEmailBody(requirements,recruiterName));
 
 		return "Email Sent Successfully";
 	}
