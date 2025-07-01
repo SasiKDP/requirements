@@ -330,18 +330,19 @@ public class RequirementsController {
 					// Prepare the email subject and body
 					String subject = "New Job Assignment: " + requirement.getJobTitle();
 
-					String body = "Dear " + recruiterName + ",\n\n" +
-							"I hope this message finds you well. \n\n" +
-							"You have been assigned a new job requirement, and the details are outlined below:  \n\n" +
-							"Job Title: " + requirement.getJobTitle() + "\n" +
-							"Client: " + requirement.getClientName() + "\n" +
-							"Location: " + requirement.getLocation() + "\n" +
-							"Job Type: " + requirement.getJobType() + "\n" +
-							"Experience Required: " + requirement.getExperienceRequired() + " years\n\n" +
-							"Assigned By: " + requirement.getAssignedBy() + "\n\n" + // Added Assigned By field
-							"Please take a moment to review the details and proceed with the necessary actions. Additional information can be accessed via your dashboard.\n\n" +
-							"If you have any questions or require further clarification, feel free to reach out.\n\n" +
-							"Best Regards,\nDataquad";
+					String body = "Dear " + recruiterName + ",<br><br>" +
+							"I hope you are doing well.<br><br>" +
+							"You have been assigned a new job requirement. Please find the details below:<br><br>" +
+							"▶ <b>Job Title:</b> " + requirement.getJobTitle() + "<br>" +
+							"▶ <b>Client:</b> " + requirement.getClientName() + "<br>" +
+							"▶ <b>Location:</b> " + requirement.getLocation() + "<br>" +
+							"▶ <b>Job Type:</b> " + requirement.getJobType() + "<br>" +
+							"▶ <b>Experience Required:</b> " + requirement.getExperienceRequired() + " years<br>" +
+							"▶ <b>Assigned By:</b> " + requirement.getAssignedBy() + "<br><br>" +
+							"Please review the details and proceed with the necessary actions. Additional information is available on your dashboard.<br><br>" +
+							"If you have any questions or need further clarification, feel free to reach out.<br><br>" +
+							"Best regards,<br>" +
+							"Dataquad";
 
 					// Send email to the recruiter
 					emailService.sendEmail(recruiterEmail, subject, body);
