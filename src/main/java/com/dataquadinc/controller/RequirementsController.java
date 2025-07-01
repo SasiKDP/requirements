@@ -719,4 +719,10 @@ public class RequirementsController {
 		}
 	}
 
+	@PostMapping("/sendInprogressEmail/{userId}")
+	public ResponseEntity<String> sendEmail(@PathVariable String userId,@RequestBody List<InProgressRequirementDTO> dto){
+
+       return new ResponseEntity<>(service.sendInProgressEmail(userId,dto),HttpStatus.OK);
+	}
+
 }
