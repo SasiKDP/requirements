@@ -960,7 +960,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             "AND (" +
             "   (r.requirementAddedTimeStamp BETWEEN :startDate AND :endDate AND r.status IN ('Submitted', 'In Progress')) " +
             "   OR " +
-            "   (r.requirementAddedTimeStamp NOT BETWEEN :startDate AND :endDate AND r.status = 'In Progress')" +
+            "   (r.requirementAddedTimeStamp NOT BETWEEN :startDate AND :endDate AND r.status IN ('Submitted', 'In Progress'))" +
             ")")
     List<RequirementsModel> findJobsByRecruiterId(
             @Param("recruiterId") String recruiterId,
