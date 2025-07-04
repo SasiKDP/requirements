@@ -1325,7 +1325,9 @@ public class RequirementsService {
 	public List<InProgressRequirementDTO> getInProgressRequirements(LocalDate startDate, LocalDate endDate) {
 		log.info("🔍 Fetching 'In Progress' requirements between {} and {}", startDate, endDate);
 
-		List<Object[]> results = requirementsDao.findInProgressRequirementsByDateRange(startDate, endDate);
+		boolean isToday = startDate.equals(endDate) && startDate.equals(LocalDate.now());
+
+		List<Object[]> results = requirementsDao.findInProgressRequirementsByDateRange(startDate, endDate,isToday);
 		log.debug("✅ Raw DB results fetched: {}", results.size());
 
 		List<InProgressRequirementDTO> dtos = new ArrayList<>();
