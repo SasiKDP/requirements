@@ -1342,7 +1342,7 @@ public class RequirementsService {
 				String teamlead = (String) row[5];
 				String technologies = (String) row[6];
 				Object rawPostedDate = row[7];
-				Object rawUpdatedDate = row[8];
+				Object rawUpdatedDateTime = row[8];
 				Object rawNumberOfSubmissions = row[9];
 
 				LocalDate postedDate = null;
@@ -1354,10 +1354,11 @@ public class RequirementsService {
 					log.warn("⚠️ Unexpected postedDate type: {}", rawPostedDate != null ? rawPostedDate.getClass().getName() : "null");
 				}
 
-				if (rawUpdatedDate instanceof String dateStr) {
-					requirementUpdatedDate = LocalDate.parse(dateStr);
+				LocalDateTime updatedDateTime = null;
+				if (rawUpdatedDateTime instanceof String dateStr) {
+					updatedDateTime = LocalDateTime.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 				} else {
-					log.warn("⚠️ Unexpected updatedDate type: {}", rawUpdatedDate != null ? rawUpdatedDate.getClass().getName() : "null");
+					log.warn("⚠️ Unexpected updatedDateTime type: {}", rawUpdatedDateTime);
 				}
 
 				long numberOfSubmissions = rawNumberOfSubmissions != null ? ((Number) rawNumberOfSubmissions).longValue() : 0;
@@ -1371,7 +1372,7 @@ public class RequirementsService {
 						teamlead,
 						technologies,
 						postedDate,
-						requirementUpdatedDate,
+						updatedDateTime,
 						numberOfSubmissions
 				));
 			} catch (Exception ex) {

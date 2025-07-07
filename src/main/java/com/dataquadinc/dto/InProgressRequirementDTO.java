@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -19,6 +20,6 @@ public class InProgressRequirementDTO {
     private String teamlead;
     private String technology;
     private LocalDate postedDate;
-    private LocalDate requirementUpdatedDate;
+    private LocalDateTime updatedDateTime;
     private long numberOfSubmissions;
 }

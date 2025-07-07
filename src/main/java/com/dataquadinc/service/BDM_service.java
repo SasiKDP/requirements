@@ -122,15 +122,26 @@ public class BDM_service {
         if (!repo.findByClientName(dto.getClientName()).isEmpty()) {
             throw new ClientAlreadyExistsException("Client Name '" + dto.getClientName() + "' already exists.");
         }
+
         BDM_Client entity = convertToEntity(dto);
         entity.setId(generateCustomId()); // Generate custom ID
 
+        // ✅ Set assignedBy logic
+        String createdBy = dto.getOnBoardedBy();
+        String assignedTo = dto.getAssignedTo();
+
+        if (assignedTo != null && !assignedTo.isBlank()) {
+            entity.setOnBoardedBy(assignedTo);  // assigned to someone selected
+        } else {
+            entity.setOnBoardedBy(createdBy);   // assigned to creator
+        }
+
+        // ✅ File upload
         Path uploadDir = Paths.get("uploads");
         if (!Files.exists(uploadDir)) {
             Files.createDirectories(uploadDir);
         }
 
-        // Store only file names
         List<String> fileNames = new ArrayList<>();
         if (files != null && !files.isEmpty()) {
             for (MultipartFile file : files) {
@@ -144,13 +155,12 @@ public class BDM_service {
                 }
             }
         }
+
         entity.setSupportingDocuments(fileNames);  // ✅ Store file names in DB
 
         entity = repo.save(entity); // Save client in DB
         return convertToDTO(entity);
     }
-
-
 
     public List<BDM_Dto>getAllClients() {
 
@@ -173,9 +183,18 @@ public class BDM_service {
     public Optional<BDM_Dto> updateClient(String id, BDM_Dto dto, List<MultipartFile> files) {
         return repository.findById(id).map(existingClient -> {
 
-            // Update fields only if they are not null in dto
+            // 🔁 Assignment logic
+            String createdBy = dto.getOnBoardedBy();   // Person updating
+            String assignedTo = dto.getAssignedTo();   // Optional person reassigned to
+
+            if (assignedTo != null && !assignedTo.isBlank()) {
+                existingClient.setOnBoardedBy(assignedTo);  // Set to assigned person
+            } else if (createdBy != null && !createdBy.isBlank()) {
+                existingClient.setOnBoardedBy(createdBy);   // Set to updater if not reassigned
+            }
+
+            // 🔁 Update only non-null fields
             if (dto.getClientName() != null) existingClient.setClientName(dto.getClientName());
-            if (dto.getOnBoardedBy() != null) existingClient.setOnBoardedBy(dto.getOnBoardedBy());
             if (dto.getClientAddress() != null) existingClient.setClientAddress(dto.getClientAddress());
             if (dto.getNetPayment() != 0) existingClient.setNetPayment(dto.getNetPayment());
             if (dto.getGst() != 0.0) existingClient.setGst(dto.getGst());
@@ -185,11 +204,12 @@ public class BDM_service {
             if (dto.getClientSpocEmailid() != null) existingClient.setClientSpocEmailid(dto.getClientSpocEmailid());
             if (dto.getClientSpocLinkedin() != null) existingClient.setClientSpocLinkedin(dto.getClientSpocLinkedin());
             if (dto.getClientSpocMobileNumber() != null) existingClient.setClientSpocMobileNumber(dto.getClientSpocMobileNumber());
-            if(dto.getPositionType()!=null)existingClient.setPositionType(dto.getPositionType());
-            if(dto.getSupportingCustomers()!=null)existingClient.setSupportingCustomers(dto.getSupportingCustomers());
+            if (dto.getPositionType() != null) existingClient.setPositionType(dto.getPositionType());
+            if (dto.getSupportingCustomers() != null) existingClient.setSupportingCustomers(dto.getSupportingCustomers());
+
+            // 🔁 File uploads
             try {
                 if (files != null && !files.isEmpty()) {
-                    // Ensure the uploads directory exists
                     Path uploadDir = Paths.get("uploads");
                     if (!Files.exists(uploadDir)) {
                         Files.createDirectories(uploadDir);
@@ -202,16 +222,14 @@ public class BDM_service {
                             String fileName = file.getOriginalFilename();
                             fileNames.add(fileName);
 
-                            // Save the file to disk
                             Path filePath = uploadDir.resolve(fileName);
                             Files.write(filePath, file.getBytes());
                         }
                     }
-                    existingClient.setSupportingDocuments(fileNames);  // ✅ Store only file names
+                    existingClient.setSupportingDocuments(fileNames);
                 }
-
             } catch (IOException e) {
-                e.printStackTrace();
+                e.printStackTrace();  // Optionally convert to RuntimeException if needed
             }
 
             return convertToDTO(repository.save(existingClient));

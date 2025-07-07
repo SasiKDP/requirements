@@ -30,6 +30,8 @@ public class BDM_Dto {
     private List<String> clientSpocLinkedin;
     private List<String> clientSpocMobileNumber;
     private String onBoardedBy;
+    private String assignedTo;
+
 
     @JsonIgnore // Prevents file data from being included in API responses
     private byte[] documentData;
@@ -152,6 +154,14 @@ public class BDM_Dto {
 
     public void setOnBoardedBy(String onBoardedBy) {
         this.onBoardedBy = onBoardedBy;
+    }
+
+    public String getAssignedTo() {
+        return assignedTo;
+    }
+
+    public void setAssignedTo(String assignedTo) {
+        this.assignedTo = assignedTo;
     }
 
     public byte[] getDocumentData() {
