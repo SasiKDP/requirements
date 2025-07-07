@@ -5,11 +5,9 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -1327,62 +1325,98 @@ public class RequirementsService {
 
 		boolean isToday = startDate.equals(endDate) && startDate.equals(LocalDate.now());
 
-		List<Object[]> results = requirementsDao.findInProgressRequirementsByDateRange(startDate, endDate,isToday);
+		List<Object[]> results = requirementsDao.findInProgressRequirementsByDateRange(startDate, endDate, isToday);
 		log.debug("✅ Raw DB results fetched: {}", results.size());
 
 		List<InProgressRequirementDTO> dtos = new ArrayList<>();
 
 		for (Object[] row : results) {
 			try {
-				String recruiterId = (String) row[0];
-				String recruiterName = (String) row[1];
-				String jobId = (String) row[2];
-				String clientName = (String) row[3];
-				String bdmName = (String) row[4];
-				String teamlead = (String) row[5];
-				String technologies = (String) row[6];
-				Object rawPostedDate = row[7];
-				Object rawUpdatedDateTime = row[8];
-				Object rawNumberOfSubmissions = row[9];
-
-				LocalDate postedDate = null;
-				LocalDate requirementUpdatedDate = null;
-
-				if (rawPostedDate instanceof String dateStr) {
-					postedDate = LocalDate.parse(dateStr);
-				} else {
-					log.warn("⚠️ Unexpected postedDate type: {}", rawPostedDate != null ? rawPostedDate.getClass().getName() : "null");
+				InProgressRequirementDTO dto = mapRowToDTO(row);
+				if (dto != null) {
+					dtos.add(dto);
 				}
-
-				LocalDateTime updatedDateTime = null;
-				if (rawUpdatedDateTime instanceof String dateStr) {
-					updatedDateTime = LocalDateTime.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-				} else {
-					log.warn("⚠️ Unexpected updatedDateTime type: {}", rawUpdatedDateTime);
-				}
-
-				long numberOfSubmissions = rawNumberOfSubmissions != null ? ((Number) rawNumberOfSubmissions).longValue() : 0;
-
-				dtos.add(new InProgressRequirementDTO(
-						recruiterId,
-						recruiterName,
-						jobId,
-						clientName,
-						bdmName,
-						teamlead,
-						technologies,
-						postedDate,
-						updatedDateTime,
-						numberOfSubmissions
-				));
 			} catch (Exception ex) {
 				log.error("❌ Error mapping row to DTO: {}", Arrays.toString(row), ex);
 			}
 		}
 
 		log.info("✅ Successfully mapped {} simplified In Progress requirements.", dtos.size());
+
+		dtos.sort(
+				Comparator.comparing(
+						InProgressRequirementDTO::getUpdatedDateTime,
+						Comparator.nullsLast(Comparator.reverseOrder())
+				)
+		);
+
 		return dtos;
 	}
+
+	private InProgressRequirementDTO mapRowToDTO(Object[] row) {
+		String recruiterId = (String) row[0];
+		String recruiterName = (String) row[1];
+		String jobId = (String) row[2];
+		String clientName = (String) row[3];
+		String bdmName = (String) row[4];
+		String teamlead = (String) row[5];
+		String technologies = (String) row[6];
+		Object rawPostedDate = row[7];
+		Object rawUpdatedDateTime = row[8];
+		Object rawNumberOfSubmissions = row[9];
+
+		LocalDate postedDate = parseToLocalDate(rawPostedDate);
+		LocalDateTime updatedDateTime = parseToLocalDateTime(rawUpdatedDateTime);
+
+		// Optional: Convert to IST (only if needed — if DB stores UTC timestamps)
+		if (updatedDateTime != null) {
+			updatedDateTime = updatedDateTime.atZone(ZoneId.of("UTC"))
+					.withZoneSameInstant(ZoneId.of("Asia/Kolkata"))
+					.toLocalDateTime();
+		}
+
+		long numberOfSubmissions = rawNumberOfSubmissions != null ? ((Number) rawNumberOfSubmissions).longValue() : 0;
+
+		return new InProgressRequirementDTO(
+				recruiterId,
+				recruiterName,
+				jobId,
+				clientName,
+				bdmName,
+				teamlead,
+				technologies,
+				postedDate,
+				updatedDateTime,
+				numberOfSubmissions
+		);
+	}
+
+	private LocalDate parseToLocalDate(Object obj) {
+		if (obj instanceof String str) {
+			try {
+				return LocalDate.parse(str);
+			} catch (DateTimeParseException e) {
+				log.warn("⚠️ Error parsing LocalDate: {}", str, e);
+			}
+		} else if (obj instanceof LocalDate date) {
+			return date;
+		}
+		return null;
+	}
+
+	private LocalDateTime parseToLocalDateTime(Object obj) {
+		if (obj instanceof String str) {
+			try {
+				return LocalDateTime.parse(str, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+			} catch (DateTimeParseException e) {
+				log.warn("⚠️ Error parsing LocalDateTime: {}", str, e);
+			}
+		} else if (obj instanceof LocalDateTime dateTime) {
+			return dateTime;
+		}
+		return null;
+	}
+
 
 	public String sendInProgressEmail(String userId,List<InProgressRequirementDTO> requirements) {
 
