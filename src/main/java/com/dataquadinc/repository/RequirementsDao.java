@@ -1644,41 +1644,108 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             @Param("endDate") LocalDate endDate
     );
 
+//    @Query(value = """
+//    SELECT
+//        ur.user_id AS recruiterId,
+//        ur.user_name AS recruiterName,
+//        r.job_id AS jobId,
+//        r.client_name as clientName,
+//        COALESCE(b.on_boarded_by, 'N/A') AS bdm,
+//        COALESCE(r.assigned_by, 'N/A') AS teamlead,
+//        r.job_title AS technology,
+//        DATE_FORMAT(r.requirement_added_time_stamp, '%Y-%m-%d') AS postedDate,
+//        DATE_FORMAT(r.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedDateTime,
+//                                                                                 (
+//            SELECT COUNT(DISTINCT cs.submission_id)
+//            FROM candidate_submissions cs
+//            WHERE cs.job_id = r.job_id
+//              AND cs.user_id = ur.user_id
+//              AND (
+//                :isToday = true AND DATE(cs.submitted_at) = CURRENT_DATE
+//                OR :isToday = false AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
+//              )
+//        ) AS numberOfSubmissions
+//    FROM requirements_model r
+//    LEFT JOIN job_recruiters jr ON r.job_id = jr.job_id
+//    LEFT JOIN user_details ur ON jr.recruiter_id = ur.user_id
+//    LEFT JOIN bdm_client b ON r.client_name = b.client_name
+//    WHERE (r.status = 'In Progress' OR r.status = 'Submitted')
+//      AND DATE(r.updated_at) BETWEEN :startDate AND :endDate
+//    GROUP BY ur.user_id, ur.user_name, r.job_id, b.on_boarded_by, r.assigned_by, r.job_title, DATE(r.updated_at)
+//""", nativeQuery = true)
+//    List<Object[]> findInProgressRequirementsByDateRange(
+//            @Param("startDate") LocalDate startDate,
+//            @Param("endDate") LocalDate endDate,
+//            @Param("isToday") boolean isToday
+//    );
+
     @Query(value = """
+(
+    -- Part 1: EMPLOYEES with no active assigned jobs
+    SELECT DISTINCT
+        ud.user_id AS recruiterId,
+        ud.user_name AS recruiterName,
+        NULL AS jobId,
+        NULL AS clientName,
+        NULL AS bdm,
+        NULL AS teamlead,
+        NULL AS technology,
+        NULL AS postedDate,
+        NULL AS updatedDateTime,
+        0 AS numberOfSubmissions
+    FROM user_details ud
+    JOIN user_roles ur ON ud.user_id = ur.user_id
+    JOIN roles rl ON ur.role_id = rl.id
+    WHERE rl.name = 'EMPLOYEE'
+      AND NOT EXISTS (
+          SELECT 1
+          FROM job_recruiters jr
+          JOIN requirements_model r ON r.job_id = jr.job_id
+          WHERE jr.recruiter_id = ud.user_id
+            AND r.status IN ('In Progress', 'Submitted')
+            AND DATE(r.updated_at) BETWEEN :startDate AND :endDate
+      )
+)
+UNION ALL
+(
+    -- Part 2: EMPLOYEES with active jobs
     SELECT 
-        ur.user_id AS recruiterId,
-        ur.user_name AS recruiterName,
+        ud.user_id AS recruiterId,
+        ud.user_name AS recruiterName,
         r.job_id AS jobId,
         r.client_name as clientName,
         COALESCE(b.on_boarded_by, 'N/A') AS bdm,
         COALESCE(r.assigned_by, 'N/A') AS teamlead,
         r.job_title AS technology,
         DATE_FORMAT(r.requirement_added_time_stamp, '%Y-%m-%d') AS postedDate,
-        DATE_FORMAT(r.updated_at, '%Y-%m-%d') AS updatedDate,
+        DATE_FORMAT(r.updated_at, '%Y-%m-%d %H:%i:%s') AS updatedDateTime,
         (
             SELECT COUNT(DISTINCT cs.submission_id)
             FROM candidate_submissions cs
             WHERE cs.job_id = r.job_id
-              AND cs.user_id = ur.user_id
+              AND cs.user_id = ud.user_id
               AND (
-                :isToday = true AND DATE(cs.submitted_at) = CURRENT_DATE
-                OR :isToday = false AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
+                (:isToday = true AND DATE(cs.submitted_at) = CURRENT_DATE)
+                OR (:isToday = false AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate)
               )
         ) AS numberOfSubmissions
-    FROM requirements_model r
-    LEFT JOIN job_recruiters jr ON r.job_id = jr.job_id
-    LEFT JOIN user_details ur ON jr.recruiter_id = ur.user_id
+    FROM user_details ud
+    JOIN user_roles ur ON ud.user_id = ur.user_id
+    JOIN roles rl ON ur.role_id = rl.id
+    JOIN job_recruiters jr ON jr.recruiter_id = ud.user_id
+    JOIN requirements_model r ON jr.job_id = r.job_id
     LEFT JOIN bdm_client b ON r.client_name = b.client_name
-    WHERE (r.status = 'In Progress' OR r.status = 'Submitted')
+    WHERE rl.name = 'EMPLOYEE'
+      AND r.status IN ('In Progress', 'Submitted')
       AND DATE(r.updated_at) BETWEEN :startDate AND :endDate
-    GROUP BY ur.user_id, ur.user_name, r.job_id, b.on_boarded_by, r.assigned_by, r.job_title, DATE(r.updated_at)
+)
+ORDER BY recruiterName
 """, nativeQuery = true)
     List<Object[]> findInProgressRequirementsByDateRange(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate,
             @Param("isToday") boolean isToday
     );
-
 
 }
 
