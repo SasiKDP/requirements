@@ -18,7 +18,7 @@ public class InProgressEmailScheduler {
         this.requirementsService = requirementsService;
     }
 
-    @Scheduled(cron = "0 0 18 * * ?")  // ⏰ Every day at 10 AM
+    @Scheduled(cron = "0 0 18 * * ?")
     public void sendDailyInProgressReportEmail() {
         try {
             // 🔍 Get requirements from today

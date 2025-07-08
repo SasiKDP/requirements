@@ -231,19 +231,48 @@ public class RequirementsService {
 
 	// Update constructEmailBody method to use recruiterName instead of fetching separately
 	private String constructEmailBody(RequirementsModel model, String recruiterName) {
+		String status = model.getStatus() != null ? model.getStatus().toLowerCase() : "inprogress";
+		switch (status) {
+			case "hold":
+				return constructHoldEmailBody(model, recruiterName);
+			case "closed":
+				return constructClosedEmailBody(model, recruiterName);
+			default:
+				return constructInProgressEmailBody(model, recruiterName);
+		}
+	}
+
+	private String constructInProgressEmailBody(RequirementsModel model, String recruiterName) {
 		return "Dear " + recruiterName + ",<br><br>" +
-				"I hope you are doing well.<br><br>" +
 				"You have been assigned a new job requirement. Please find the details below:<br><br>" +
-				"▶ <b>Job Title:</b> " + model.getJobTitle() + "<br>" +
-				"▶ <b>Client:</b> " + model.getClientName() + "<br>" +
-				"▶ <b>Location:</b> " + model.getLocation() + "<br>" +
-				"▶ <b>Job Type:</b> " + model.getJobType() + "<br>" +
-				"▶ <b>Experience Required:</b> " + model.getExperienceRequired() + " years<br>" +
-				"▶ <b>Assigned By:</b> " + model.getAssignedBy() + "<br><br>" +
-				"Please review the details and proceed with the necessary actions. Additional information is available on your dashboard.<br><br>" +
-				"If you have any questions or need further clarification, feel free to reach out.<br><br>" +
-				"Best regards,<br>" +
-				"Dataquad";
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br>" +
+				"<b>Job Type:</b> " + model.getJobType() + "<br>" +
+				"<b>Experience Required:</b> " + model.getExperienceRequired() + " years<br>" +
+				"<b>Assigned By:</b> " + model.getAssignedBy() + "<br><br>" +
+				"Please start working on this requirement immediately. Check your dashboard for more details.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+	private String constructHoldEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",<br><br>" +
+				"The following job requirement is currently on hold:<br><br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br><br>" +
+				"No further action is required at this moment. You will be notified once it's resumed.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+	private String constructClosedEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",<br><br>" +
+				"This is to inform you that the following job requirement has been <b>closed</b>:<br><br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br><br>" +
+				"No further submissions are needed. Thank you for your efforts.<br><br>" +
+				"Regards,<br>Dataquad";
 	}
 
 

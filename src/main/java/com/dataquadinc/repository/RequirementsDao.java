@@ -1178,11 +1178,33 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         u.email AS employeeEmail,
         r.name AS role,
         COALESCE((
-            SELECT COUNT(DISTINCT cs.submission_id) 
-            FROM candidates cd
-            JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cs.user_id = u.user_id 
-            AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
+                SELECT COUNT(DISTINCT cs.submission_id)
+                FROM candidates cd
+                JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
+                LEFT JOIN interview_details idt ON idt.candidate_id = cd.candidate_id AND idt.job_id = cs.job_id
+                WHERE cs.user_id = u.user_id\s
+                AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
+                AND NOT (
+                    idt.interview_date_time IS NOT NULL
+                    AND (
+                        -- Handle both raw text and JSON array formats
+                        (
+                            idt.interview_level = 'Internal'
+                            AND (
+                                idt.interview_status = 'REJECTED'
+                                OR (
+                                    JSON_VALID(idt.interview_status)
+                                    AND JSON_UNQUOTE(
+                                        JSON_EXTRACT(
+                                            idt.interview_status,
+                                            CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
+                                        )
+                                    ) = 'REJECTED'
+                                )
+                            )
+                        )
+                    )
+                )
         ), 0) AS numberOfSubmissions,
         
         COALESCE((
