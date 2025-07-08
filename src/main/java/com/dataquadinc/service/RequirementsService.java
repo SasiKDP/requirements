@@ -1469,10 +1469,12 @@ public class RequirementsService {
 				? buildTeamleadWiseEmail(requirements)
 				: buildRecruiterWiseEmail(requirements, recruiterName);
 
-		List<String> recipients = List.of(
-				"vsrikanth@dataqinc.com",
-				"madhan@dataqinc.com"
-		);
+		// ✅ Fetch all director emails from DB
+		List<String> recipients = requirementsDao.findEmailsByDesignationIgnoreCase("director");
+
+		if (recipients.isEmpty()) {
+			throw new RuntimeException("No recipients found with designation = 'director'");
+		}
 
 		for (String email : recipients) {
 			emailService.sendEmail(email, subject, html);

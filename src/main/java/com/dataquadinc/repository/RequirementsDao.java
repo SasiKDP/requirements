@@ -974,6 +974,11 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     @Query(value = "SELECT user_name FROM user_details WHERE user_id = :userId", nativeQuery = true)
     String findUserNameByUserId(@Param("userId") String userId);
 
+    @Query(value = "SELECT email FROM user_details WHERE LOWER(designation) = LOWER(:designation)", nativeQuery = true)
+    List<String> findEmailsByDesignationIgnoreCase(@Param("designation") String designation);
+
+
+
 
     @Query(value = "SELECT * FROM requirements_model " +
             "WHERE assigned_by = :assignedBy " +
