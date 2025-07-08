@@ -1715,7 +1715,13 @@ UNION ALL
         ud.user_name AS recruiterName,
         r.job_id AS jobId,
         r.client_name as clientName,
-        COALESCE(b.on_boarded_by, 'N/A') AS bdm,
+        COALESCE((
+              SELECT b.on_boarded_by\s
+              FROM bdm_client b\s
+              WHERE FIND_IN_SET(b.client_name, REPLACE(r.client_name, '_', ',')) > 0
+              ORDER BY FIELD(b.client_name, SUBSTRING_INDEX(r.client_name, '_', 1)) DESC
+              LIMIT 1
+        ), 'N/A') AS bdm,
         COALESCE(r.assigned_by, 'N/A') AS teamlead,
         r.job_title AS technology,
         DATE_FORMAT(r.requirement_added_time_stamp, '%Y-%m-%d') AS postedDate,

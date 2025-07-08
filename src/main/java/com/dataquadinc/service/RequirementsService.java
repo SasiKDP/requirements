@@ -1418,24 +1418,151 @@ public class RequirementsService {
 	}
 
 
-	public String sendInProgressEmail(String userId,List<InProgressRequirementDTO> requirements) {
+	public String sendInProgressEmail(String userId, List<InProgressRequirementDTO> requirements) {
+		String recruiterName;
 
-		String recruiterName = requirementsDao.findUserNameByUserId(userId); // This should be available in the service
-         if(recruiterName.isEmpty() || recruiterName==null){
-			 throw new UserNotFoundException("No User Found with User Id :"+userId);
-		 }
-		// Log recruiter ID and fetched email
-		logger.info("Fetched recruiterId: {}", userId);
-		String subject="InProgress Stats - "+recruiterName+" "+LocalDate.now();
-		emailService.sendEmail("madhan@dataqinc.com",subject,buildEmailBody(requirements,recruiterName));
+		// ✅ If userId is null or "null", treat it as request for all recruiters
+		if (userId == null || "null".equalsIgnoreCase(userId)) {
+			recruiterName = "All Recruiters";
 
-		return "Email Sent Successfully";
+			// 🔁 If no requirements provided, fetch from DB
+			if (requirements == null) {
+				LocalDate today = LocalDate.now();
+				requirements = getInProgressRequirements(today, today);
+			}
+
+		} else {
+			recruiterName = requirementsDao.findUserNameByUserId(userId);
+			if (recruiterName == null || recruiterName.isEmpty()) {
+				throw new UserNotFoundException("No User Found with User Id: " + userId);
+			}
+
+			if (requirements == null) {
+				throw new IllegalArgumentException("❌ Recruiter-specific email requires data in request body.");
+			}
+
+			// 🔍 Filter only this recruiter's data
+			requirements = requirements.stream()
+					.filter(r -> userId.equals(r.getRecruiterId()))
+					.collect(Collectors.toList()); // ✅ returns modifiable list
+		}
+
+		// 🚫 Handle case where no requirements found
+		if (requirements == null || requirements.isEmpty()) {
+			return "⚠️ No InProgress data found for: " + recruiterName;
+		}
+
+		logger.info("📨 Preparing to send InProgress email for: {}", recruiterName);
+
+		// ✅ Sort by teamlead name, then updatedDateTime desc
+		requirements.sort(Comparator
+				.comparing((InProgressRequirementDTO dto) ->
+						Optional.ofNullable(dto.getTeamlead()).orElse("zzzzzz"), String.CASE_INSENSITIVE_ORDER)
+				.thenComparing(InProgressRequirementDTO::getUpdatedDateTime,
+						Comparator.nullsLast(Comparator.reverseOrder()))
+		);
+
+		String subject = "InProgress Stats - " + recruiterName + " " + LocalDate.now();
+
+		// 📧 Use teamlead grouping only for "All Recruiters"
+		String html = (userId == null || "null".equalsIgnoreCase(userId))
+				? buildTeamleadWiseEmail(requirements)
+				: buildRecruiterWiseEmail(requirements, recruiterName);
+
+		List<String> recipients = List.of(
+				"vsrikanth@dataqinc.com",
+				"madhan@dataqinc.com"
+		);
+
+		for (String email : recipients) {
+			emailService.sendEmail(email, subject, html);
+		}
+		return "✅ Email Sent Successfully for: " + recruiterName;
 	}
 
-	private String buildEmailBody(List<InProgressRequirementDTO> requirements, String recruiterName) {
+
+
+	private String buildTeamleadWiseEmail(List<InProgressRequirementDTO> requirements) {
 		StringBuilder sb = new StringBuilder();
 
-		sb.append("<h3>In Progress Jobs for Recruiter: ").append(recruiterName).append("</h3>");
+		sb.append("<h2>In Progress Submission Report</h2>");
+		sb.append("<p><strong>Generated For:</strong> All Recruiters</p>");
+		sb.append("<p><strong>Total Jobs:</strong> ").append(requirements.size()).append("</p><br>");
+
+		// 🔍 Filter out entries with blank/null teamlead
+		List<InProgressRequirementDTO> filtered = requirements.stream()
+				.filter(r -> r.getTeamlead() != null && !r.getTeamlead().isBlank())
+				.toList();
+
+		// 🔄 Group by teamlead
+		Map<String, List<InProgressRequirementDTO>> groupedByTeamlead = filtered.stream()
+				.collect(Collectors.groupingBy(InProgressRequirementDTO::getTeamlead));
+
+		// 📌 Sort teamleads alphabetically
+		List<String> sortedTeamleads = new ArrayList<>(groupedByTeamlead.keySet());
+		sortedTeamleads.sort(String.CASE_INSENSITIVE_ORDER);
+
+		for (String teamlead : sortedTeamleads) {
+			List<InProgressRequirementDTO> teamleadRequirements = groupedByTeamlead.get(teamlead);
+
+			long distinctRecruiters = teamleadRequirements.stream()
+					.map(InProgressRequirementDTO::getRecruiterId)
+					.filter(Objects::nonNull)
+					.distinct()
+					.count();
+
+			long distinctJobs = teamleadRequirements.stream()
+					.map(InProgressRequirementDTO::getJobId)
+					.filter(Objects::nonNull)
+					.distinct()
+					.count();
+
+			long totalSubmissions = teamleadRequirements.stream()
+					.mapToLong(InProgressRequirementDTO::getNumberOfSubmissions)
+					.sum();
+
+			// ⬇️ Section Header
+			sb.append("<h3>Team Lead: ").append(teamlead).append("</h3>");
+			sb.append("<p>👤 Recruiters: ").append(distinctRecruiters)
+					.append(" | 📌 Jobs: ").append(distinctJobs)
+					.append(" | 📥 Submissions: ").append(totalSubmissions)
+					.append("</p>");
+
+			// ⬇️ Table
+			sb.append("<table style='border-collapse: collapse; width: 100%; margin-bottom: 30px;' border='1' cellspacing='0' cellpadding='8'>");
+			sb.append("<thead style='background-color: #f2f2f2;'>")
+					.append("<tr>")
+					.append("<th>Recruiter</th>")
+					.append("<th>BDM</th>")
+					.append("<th>Job ID</th>")
+					.append("<th>Client</th>")
+					.append("<th>Technologies</th>")
+					.append("<th>Submissions</th>")
+					.append("</tr>")
+					.append("</thead><tbody>");
+
+			for (InProgressRequirementDTO req : teamleadRequirements) {
+				sb.append("<tr>")
+						.append("<td>").append(Optional.ofNullable(req.getRecruiterName()).orElse("-")).append("</td>")
+						.append("<td>").append(Optional.ofNullable(req.getBdm()).orElse("-")).append("</td>")
+						.append("<td>").append(Optional.ofNullable(req.getJobId()).orElse("-")).append("</td>")
+						.append("<td>").append(Optional.ofNullable(req.getClientName()).orElse("-")).append("</td>")
+						.append("<td>").append(Optional.ofNullable(req.getTechnology()).orElse("-")).append("</td>")
+						.append("<td>").append(req.getNumberOfSubmissions()).append("</td>")
+						.append("</tr>");
+			}
+
+			sb.append("</tbody></table>");
+		}
+
+		return sb.toString();
+	}
+
+
+	private String buildRecruiterWiseEmail(List<InProgressRequirementDTO> requirements, String recruiterName) {
+		StringBuilder sb = new StringBuilder();
+
+		sb.append("<h3>In Progress Submission Report for Recruiter: ").append(recruiterName).append("</h3>");
 		sb.append("<p>Total Jobs: ").append(requirements.size()).append("</p>");
 
 		sb.append("<table style='border-collapse: collapse; width: 100%;' border='1' cellspacing='0' cellpadding='8'>");
@@ -1465,4 +1592,5 @@ public class RequirementsService {
 
 		return sb.toString();
 	}
+
 }
