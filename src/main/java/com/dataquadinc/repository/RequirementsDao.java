@@ -974,6 +974,11 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     @Query(value = "SELECT user_name FROM user_details WHERE user_id = :userId", nativeQuery = true)
     String findUserNameByUserId(@Param("userId") String userId);
 
+    @Query(value = "SELECT email FROM user_details WHERE LOWER(designation) = LOWER(:designation)", nativeQuery = true)
+    List<String> findEmailsByDesignationIgnoreCase(@Param("designation") String designation);
+
+
+
 
     @Query(value = "SELECT * FROM requirements_model " +
             "WHERE assigned_by = :assignedBy " +
@@ -1173,11 +1178,33 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         u.email AS employeeEmail,
         r.name AS role,
         COALESCE((
-            SELECT COUNT(DISTINCT cs.submission_id) 
-            FROM candidates cd
-            JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cs.user_id = u.user_id 
-            AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
+                SELECT COUNT(DISTINCT cs.submission_id)
+                FROM candidates cd
+                JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
+                LEFT JOIN interview_details idt ON idt.candidate_id = cd.candidate_id AND idt.job_id = cs.job_id
+                WHERE cs.user_id = u.user_id\s
+                AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
+                AND NOT (
+                    idt.interview_date_time IS NOT NULL
+                    AND (
+                        -- Handle both raw text and JSON array formats
+                        (
+                            idt.interview_level = 'Internal'
+                            AND (
+                                idt.interview_status = 'REJECTED'
+                                OR (
+                                    JSON_VALID(idt.interview_status)
+                                    AND JSON_UNQUOTE(
+                                        JSON_EXTRACT(
+                                            idt.interview_status,
+                                            CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
+                                        )
+                                    ) = 'REJECTED'
+                                )
+                            )
+                        )
+                    )
+                )
         ), 0) AS numberOfSubmissions,
         
         COALESCE((
@@ -1715,7 +1742,13 @@ UNION ALL
         ud.user_name AS recruiterName,
         r.job_id AS jobId,
         r.client_name as clientName,
-        COALESCE(b.on_boarded_by, 'N/A') AS bdm,
+        COALESCE((
+              SELECT b.on_boarded_by\s
+              FROM bdm_client b\s
+              WHERE FIND_IN_SET(b.client_name, REPLACE(r.client_name, '_', ',')) > 0
+              ORDER BY FIELD(b.client_name, SUBSTRING_INDEX(r.client_name, '_', 1)) DESC
+              LIMIT 1
+        ), 'N/A') AS bdm,
         COALESCE(r.assigned_by, 'N/A') AS teamlead,
         r.job_title AS technology,
         DATE_FORMAT(r.requirement_added_time_stamp, '%Y-%m-%d') AS postedDate,

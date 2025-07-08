@@ -721,9 +721,22 @@ public class RequirementsController {
 	}
 
 	@PostMapping("/sendInprogressEmail/{userId}")
-	public ResponseEntity<String> sendEmail(@PathVariable String userId,@RequestBody List<InProgressRequirementDTO> dto){
+	public ResponseEntity<String> sendEmail(
+			@PathVariable String userId,
+			@RequestBody(required = false) List<InProgressRequirementDTO> dto) {
 
-       return new ResponseEntity<>(service.sendInProgressEmail(userId,dto),HttpStatus.OK);
+		if ("null".equalsIgnoreCase(userId)) {
+			// Case 1: userId is "null" → fetch all data internally
+			return ResponseEntity.ok(service.sendInProgressEmail(null, null));
+		}
+
+		if (dto == null || dto.isEmpty()) {
+			return ResponseEntity.badRequest().body("❌ Request body is required for recruiter-specific email.");
+		}
+
+		// Case 2: userId present → use provided list
+		return ResponseEntity.ok(service.sendInProgressEmail(userId, dto));
 	}
+
 
 }
