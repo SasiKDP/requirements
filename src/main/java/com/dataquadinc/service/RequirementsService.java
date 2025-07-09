@@ -184,6 +184,11 @@ public class RequirementsService {
 					String cleanedRecruiterId = cleanRecruiterId(recruiterId);
 					logger.debug("Processing recruiter with ID: {} (cleaned ID: {})", recruiterId, cleanedRecruiterId);
 
+					// 🔍 Detect if it's an update
+					boolean isUpdate = model.getUpdatedAt() != null &&
+							model.getRequirementAddedTimeStamp() != null &&
+							!model.getUpdatedAt().isEqual(model.getRequirementAddedTimeStamp());
+
 					// Fetch recruiter email and username from the database
 					Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
 
@@ -193,8 +198,29 @@ public class RequirementsService {
 
 						if (recruiterEmail != null && !recruiterEmail.isEmpty()) {
 							// Construct and send email
-							String subject = "New Job Assignment: " + model.getJobTitle();
-							String text = constructEmailBody(model, recruiterName);
+                            String status = model.getStatus() != null ? model.getStatus().toLowerCase() : "inprogress";
+							String subject;
+							String text;
+
+							if (isUpdate) {
+								subject = "Requirement Updated: " + model.getJobTitle();
+								text = constructUpdatedEmailBody(model, recruiterName);
+							} else {
+								switch (status) {
+									case "hold":
+										subject = "Job On Hold: " + model.getJobTitle();
+										text = constructHoldEmailBody(model, recruiterName);
+										break;
+									case "closed":
+										subject = "Job Closed: " + model.getJobTitle();
+										text = constructClosedEmailBody(model, recruiterName);
+										break;
+									default:
+										subject = "New Job Assignment: " + model.getJobTitle();
+										text = constructEmailBody(model, recruiterName);
+										break;
+								}
+							}
 
 							logger.info("Attempting to send email to recruiter: {} <{}> for job ID: {}",
 									recruiterName, recruiterEmail, model.getJobId());
@@ -274,6 +300,20 @@ public class RequirementsService {
 				"No further submissions are needed. Thank you for your efforts.<br><br>" +
 				"Regards,<br>Dataquad";
 	}
+
+	private String constructUpdatedEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",<br><br>" +
+				"The job requirement assigned to you has been <b>updated</b>. Please find the latest details below:<br><br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br>" +
+				"<b>Job Type:</b> " + model.getJobType() + "<br>" +
+				"<b>Experience Required:</b> " + model.getExperienceRequired() + " years<br>" +
+				"<b>Assigned By:</b> " + model.getAssignedBy() + "<br><br>" +
+				"Kindly check your dashboard for full updates and proceed accordingly.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
 
 
 	public String processJobDescriptionFile(MultipartFile jobDescriptionFile) throws IOException {
@@ -1473,17 +1513,15 @@ public class RequirementsService {
 			// 🔍 Filter only this recruiter's data
 			requirements = requirements.stream()
 					.filter(r -> userId.equals(r.getRecruiterId()))
-					.collect(Collectors.toList()); // ✅ returns modifiable list
+					.collect(Collectors.toList());
 		}
 
-		// 🚫 Handle case where no requirements found
 		if (requirements == null || requirements.isEmpty()) {
 			return "⚠️ No InProgress data found for: " + recruiterName;
 		}
 
 		logger.info("📨 Preparing to send InProgress email for: {}", recruiterName);
 
-		// ✅ Sort by teamlead name, then updatedDateTime desc
 		requirements.sort(Comparator
 				.comparing((InProgressRequirementDTO dto) ->
 						Optional.ofNullable(dto.getTeamlead()).orElse("zzzzzz"), String.CASE_INSENSITIVE_ORDER)
@@ -1493,12 +1531,10 @@ public class RequirementsService {
 
 		String subject = "InProgress Stats - " + recruiterName + " " + LocalDate.now();
 
-		// 📧 Use teamlead grouping only for "All Recruiters"
 		String html = (userId == null || "null".equalsIgnoreCase(userId))
 				? buildTeamleadWiseEmail(requirements)
 				: buildRecruiterWiseEmail(requirements, recruiterName);
 
-		// ✅ Fetch all director emails from DB
 		List<String> recipients = requirementsDao.findEmailsByDesignationIgnoreCase("director");
 
 		if (recipients.isEmpty()) {
@@ -1518,7 +1554,13 @@ public class RequirementsService {
 
 		sb.append("<h2>In Progress Submission Report</h2>");
 		sb.append("<p><strong>Generated For:</strong> All Recruiters</p>");
-		sb.append("<p><strong>Total Jobs:</strong> ").append(requirements.size()).append("</p><br>");
+		long distinctJobCount = requirements.stream()
+				.map(InProgressRequirementDTO::getJobId)
+				.filter(Objects::nonNull)
+				.distinct()
+				.count();
+
+		sb.append("<p><strong>Total Jobs:</strong> ").append(distinctJobCount).append("</p><br>");
 
 		// 🔍 Filter out entries with blank/null teamlead
 		List<InProgressRequirementDTO> filtered = requirements.stream()

@@ -1725,6 +1725,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
     JOIN roles rl ON ur.role_id = rl.id
     WHERE rl.name IN ('EMPLOYEE','TEAMLEAD')
     AND ud.status = 'ACTIVE'
+    AND ud.designation != 'testuser'
       AND NOT EXISTS (
           SELECT 1
           FROM job_recruiters jr
@@ -1771,6 +1772,7 @@ UNION ALL
     LEFT JOIN bdm_client b ON r.client_name = b.client_name
     WHERE r.status IN ('In Progress', 'Submitted')
     AND ud.status = 'ACTIVE'
+    AND ud.designation != 'testuser'
       AND DATE(r.updated_at) BETWEEN :startDate AND :endDate
 )
 ORDER BY recruiterName
