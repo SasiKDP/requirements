@@ -7,7 +7,9 @@ import java.util.Optional;
 
 import com.dataquadinc.dto.*;
 import jakarta.persistence.Tuple;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -657,7 +659,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         u.user_id AS employeeId,
         u.user_name AS employeeName,
         u.email AS employeeEmail,
-        COUNT(DISTINCT CASE\s
+        COUNT(DISTINCT CASE
             WHEN latest_status.interviewLevel = 'INTERNAL' THEN idt.interview_id
             ELSE NULL
         END) AS totalInterviews,            
@@ -679,7 +681,6 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
 
     FROM user_details u
     JOIN interview_details idt ON idt.assigned_to = u.user_id
-    JOIN user_roles ur ON u.user_id = ur.user_id
 
     -- Latest JSON object only
     JOIN JSON_TABLE(
@@ -693,10 +694,10 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         )
     ) AS latest_status ON TRUE
 
-    WHERE ur.role_id = :roleId
     GROUP BY u.user_id, u.user_name, u.email
     """, nativeQuery = true)
-    List<Tuple> countInterviewsByStatus(String roleId);
+    List<Tuple> countInterviewsByStatus();
+
 
 
 
@@ -1783,5 +1784,27 @@ ORDER BY recruiterName
             @Param("isToday") boolean isToday
     );
 
+//
+//    @Modifying
+//    @Transactional
+//    @Query(value = """
+//        UPDATE requirements_model r
+//        SET r.status = 'Closed'
+//        WHERE r.status NOT IN ('Closed')
+//          AND (
+//              DATEDIFF(CURDATE(), COALESCE(r.updated_at, r.requirement_added_time_stamp)) > 90
+//          )
+//          AND NOT EXISTS (
+//              SELECT 1 FROM candidate_submissions cs
+//              WHERE cs.job_id = r.job_id
+//          )
+//          AND NOT EXISTS (
+//                     SELECT 1
+//                     FROM job_recruiters jr
+//                     JOIN candidates c ON jr.recruiter_id = c.user_id
+//                     WHERE jr.job_id = r.job_id
+//          );
+//        """, nativeQuery = true)
+//    int autoCloseOutdatedRequirements();
 }
 
