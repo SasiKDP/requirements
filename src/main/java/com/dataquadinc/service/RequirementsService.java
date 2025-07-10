@@ -1560,7 +1560,14 @@ public class RequirementsService {
 				.distinct()
 				.count();
 
+		long totalSubmissionCount = requirements.stream()
+				.map(InProgressRequirementDTO::getNumberOfSubmissions)
+				.filter(Objects::nonNull)
+				.mapToLong(Long::longValue)
+				.sum();
+
 		sb.append("<p><strong>Total Jobs:</strong> ").append(distinctJobCount).append("</p><br>");
+		sb.append("<p><strong>Total Submissions:</strong> ").append(totalSubmissionCount).append("</p><br>");
 
 		// 🔍 Filter out entries with blank/null teamlead
 		List<InProgressRequirementDTO> filtered = requirements.stream()
