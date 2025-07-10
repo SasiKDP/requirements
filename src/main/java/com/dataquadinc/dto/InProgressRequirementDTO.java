@@ -10,7 +10,6 @@ import java.util.List;
 
 @Data
 @NoArgsConstructor
-src/main/java/com/dataquadinc/dto/InProgressRequirementDTO.java
 public class InProgressRequirementDTO {
     private String recruiterId;
     private String recruiterName;
