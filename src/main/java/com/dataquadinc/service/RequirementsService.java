@@ -966,7 +966,7 @@ public class RequirementsService {
 
 
 	public List<Coordinator_DTO> getCoordinatorStats() {
-		List<Tuple> tuples = requirementsDao.countInterviewsByStatus("8");
+		List<Tuple> tuples = requirementsDao.countInterviewsByStatus();
 		List<Coordinator_DTO> dtoList = new ArrayList<>();
 
 		for (Tuple tuple : tuples) {
