@@ -10,7 +10,6 @@ import java.util.List;
 
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class InProgressRequirementDTO {
     private String recruiterId;
     private String recruiterName;
@@ -22,6 +21,31 @@ public class InProgressRequirementDTO {
     private LocalDate postedDate;
     private LocalDateTime updatedDateTime;
     private long numberOfSubmissions;
+
+    public InProgressRequirementDTO(
+            String recruiterId,
+            String recruiterName,
+            String jobId,
+            String clientName,
+            String bdm,
+            String teamlead,
+            String technology,
+            LocalDate postedDate,
+            LocalDateTime updatedDateTime,
+            long numberOfSubmissions
+    ) {
+        this.recruiterId = recruiterId;
+        this.recruiterName = recruiterName;
+        this.jobId = jobId;
+        this.clientName = clientName;
+        this.bdm = bdm;
+        this.teamlead = teamlead;
+        this.technology = technology;
+        this.postedDate = postedDate;
+        this.updatedDateTime = updatedDateTime;
+        this.numberOfSubmissions = numberOfSubmissions;
+    }
+
 
     public String getRecruiterId() {
         return recruiterId;
