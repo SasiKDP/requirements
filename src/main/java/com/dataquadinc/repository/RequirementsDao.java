@@ -168,7 +168,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             cd.qualification, 
             cs.skills, 
             cs.overall_feedback, 
-            cd.user_id,
+            cs.user_id,
             r.job_id, 
             r.job_title, 
             b.client_name
@@ -189,7 +189,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
         cd.qualification, 
         cs.skills, 
         cs.overall_feedback, 
-        cd.user_id,
+        cs.user_id,
         r.job_id, 
         r.job_title, 
         b.client_name
@@ -360,7 +360,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             SELECT COUNT(DISTINCT cd.candidate_id) 
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
         ), 0) AS numberOfSubmissions,
         
         COALESCE((
@@ -368,7 +368,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND idt.interview_date_time IS NOT NULL
         ), 0) AS numberOfInterviews,
         
@@ -377,7 +377,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                         FROM interview_details idt
                         JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
                         JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-                        WHERE cd.user_id = u.user_id
+                        WHERE cs.user_id = u.user_id
                           AND idt.interview_date_time IS NOT NULL -- ✅ interview must be scheduled
                           AND (
                               -- CASE 1: Direct string match
@@ -443,7 +443,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             SELECT COUNT(*)
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
         ), 0) AS selfSubmissions,
         
         -- Self Interviews
@@ -452,7 +452,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND idt.interview_date_time >= NOW()
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -466,7 +466,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND (
                 idt.interview_status = 'Placed'
                 OR (
@@ -497,7 +497,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id != u.user_id
+            WHERE cs.user_id != u.user_id
             AND idt.interview_date_time IS NOT NULL
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -513,7 +513,7 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
                    JOIN candidates cd ON cs.candidate_id = cd.candidate_id
                    JOIN requirements_model r2 ON cs.job_id = r2.job_id
                    WHERE REPLACE(REPLACE(r2.assigned_by, '"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '"', ''), '"', '')
-                     AND cd.user_id != u.user_id
+                     AND cs.user_id != u.user_id
                      AND idt.interview_date_time IS NOT NULL
                      AND (
                          -- Case 1: Direct string match
@@ -1073,7 +1073,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             SELECT COUNT(*)
             FROM candidates cd
             JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
         ), 0) AS selfSubmissions,
         
@@ -1083,11 +1083,10 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE idt.user_id = u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
-                WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
             )
         ), 0) AS selfInterviews,
         
@@ -1097,7 +1096,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id = u.user_id
+            WHERE cs.user_id = u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND (
                 idt.interview_status = 'PLACED'
@@ -1130,7 +1129,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             FROM interview_details idt
             JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE cd.user_id != u.user_id
+            WHERE idt.user_id != u.user_id
             AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
             AND cs.job_id IN (
                 SELECT job_id FROM requirements_model r2
@@ -1146,7 +1145,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             JOIN candidates cd ON cs.candidate_id = cd.candidate_id
             JOIN requirements_model r2 ON cs.job_id = r2.job_id
             WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            AND cd.user_id != u.user_id
+            AND cs.user_id != u.user_id
             AND DATE(idt.timestamp) BETWEEN :startDate AND :endDate
             AND (
                 idt.interview_status = 'PLACED'
