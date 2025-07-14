@@ -1494,6 +1494,7 @@ public class RequirementsService {
 		Object rawPostedDate = row[7];
 		Object rawUpdatedDateTime = row[8];
 		Object rawNumberOfSubmissions = row[9];
+		Object rawNumberOfScreenReject = row[10];
 
 		LocalDate postedDate = parseToLocalDate(rawPostedDate);
 		LocalDateTime updatedDateTime = parseToLocalDateTime(rawUpdatedDateTime);
@@ -1506,6 +1507,7 @@ public class RequirementsService {
 		}
 
 		long numberOfSubmissions = rawNumberOfSubmissions != null ? ((Number) rawNumberOfSubmissions).longValue() : 0;
+		long numberOfScreenReject = rawNumberOfScreenReject != null ? ((Number) rawNumberOfScreenReject).longValue() : 0;
 
 		return new InProgressRequirementDTO(
 				recruiterId,
@@ -1517,7 +1519,8 @@ public class RequirementsService {
 				technologies,
 				postedDate,
 				updatedDateTime,
-				numberOfSubmissions
+				numberOfSubmissions,
+				numberOfScreenReject
 		);
 	}
 

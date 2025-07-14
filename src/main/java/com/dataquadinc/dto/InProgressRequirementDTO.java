@@ -21,6 +21,7 @@ public class InProgressRequirementDTO {
     private LocalDate postedDate;
     private LocalDateTime updatedDateTime;
     private long numberOfSubmissions;
+    private long numberOfScreenReject;
 
     public InProgressRequirementDTO(
             String recruiterId,
@@ -32,7 +33,8 @@ public class InProgressRequirementDTO {
             String technology,
             LocalDate postedDate,
             LocalDateTime updatedDateTime,
-            long numberOfSubmissions
+            long numberOfSubmissions,
+            long numberOfScreenReject
     ) {
         this.recruiterId = recruiterId;
         this.recruiterName = recruiterName;
@@ -44,6 +46,7 @@ public class InProgressRequirementDTO {
         this.postedDate = postedDate;
         this.updatedDateTime = updatedDateTime;
         this.numberOfSubmissions = numberOfSubmissions;
+        this.numberOfScreenReject = numberOfScreenReject;
     }
 
 
@@ -125,5 +128,13 @@ public class InProgressRequirementDTO {
 
     public void setNumberOfSubmissions(long numberOfSubmissions) {
         this.numberOfSubmissions = numberOfSubmissions;
+    }
+
+    public long getNumberOfScreenReject() {
+        return numberOfScreenReject;
+    }
+
+    public void setNumberOfScreenReject(long numberOfScreenReject) {
+        this.numberOfScreenReject = numberOfScreenReject;
     }
 }
