@@ -72,7 +72,8 @@ public class RequirementsController {
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
 			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
-			@RequestParam("assignedBy") String assignedBy
+			@RequestParam("assignedBy") String assignedBy,
+			@RequestParam(value = "assignedTo", required = false) String assignedTo // ✅ NEW
 	) throws IOException {
 		try {
 			// Validate that only one of jobDescription or jobDescriptionFile is provided
@@ -123,7 +124,13 @@ public class RequirementsController {
 			requirementsDto.setNoOfPositions(noOfPositions);
 			requirementsDto.setRecruiterIds(recruiterIds);
 			requirementsDto.setRecruiterName(recruiterName);
-			requirementsDto.setAssignedBy(assignedBy);
+
+			// ✅ AssignedBy logic using assignedTo
+			if (assignedTo != null && !assignedTo.isBlank()) {
+				requirementsDto.setAssignedBy(assignedTo);
+			} else {
+				requirementsDto.setAssignedBy(assignedBy);
+			}
 
 			// Call the service to create the requirement
 			RequirementAddedResponse response = service.createRequirement(requirementsDto);
@@ -432,7 +439,8 @@ public class RequirementsController {
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
 			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
-			@RequestParam("assignedBy") String assignedBy // Added assignedBy parameter
+			@RequestParam("assignedBy") String assignedBy,
+			@RequestParam(value = "assignedTo", required = false) String assignedTo
 	) throws IOException {
 		try {
 			// Validate that only one of jobDescription or jobDescriptionFile is provided
@@ -521,8 +529,12 @@ public class RequirementsController {
 			if (recruiterName != null && !recruiterName.isEmpty()) existingRequirement.setRecruiterName(recruiterName);
 			else existingRequirement.setRecruiterName(null);
 
-			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
-			else existingRequirement.setAssignedBy(null);
+			// ✅ AssignedBy fallback from assignedTo
+			if (assignedTo != null && !assignedTo.isBlank()) {
+				existingRequirement.setAssignedBy(assignedTo);
+			} else {
+				existingRequirement.setAssignedBy(assignedBy);
+			}
 
 			// Call the service to update the requirement
 			ResponseBean response = service.updateRequirementDetails(existingRequirement);

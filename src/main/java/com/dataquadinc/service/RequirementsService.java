@@ -29,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.dataquadinc.model.RequirementsModel;
 import com.dataquadinc.repository.RequirementsDao;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -109,7 +110,6 @@ public class RequirementsService {
 
 
 		// If jobId is not set, let @PrePersist handle the generation
-		// If jobId is not set, let @PrePersist handle the generation
 		if (model.getJobId() == null || model.getJobId().isEmpty()) {
 			model.setStatus("In Progress");
 			model.setRequirementAddedTimeStamp(LocalDateTime.now());
@@ -171,89 +171,143 @@ public class RequirementsService {
 
 		try {
 			Set<String> recruiterIds = model.getRecruiterIds();
+			String assignedBy = model.getAssignedBy();
+
+			Set<String> sentEmails = new HashSet<>(); // To prevent duplicate emails
+
 			if (recruiterIds == null || recruiterIds.isEmpty()) {
 				logger.warn("No recruiter IDs found for job ID: {}", model.getJobId());
-				return;
-			}
+			} else {
+				logger.info("Found {} recruiters to send emails to for job ID: {}", recruiterIds.size(), model.getJobId());
 
-			logger.info("Found {} recruiters to send emails to for job ID: {}", recruiterIds.size(), model.getJobId());
+				for (String recruiterId : recruiterIds) {
+					try {
+						String cleanedRecruiterId = cleanRecruiterId(recruiterId);
+						logger.debug("Processing recruiter ID: {}", cleanedRecruiterId);
 
-			for (String recruiterId : recruiterIds) {
-				try {
-					// Clean the recruiterId (remove quotes if present)
-					String cleanedRecruiterId = cleanRecruiterId(recruiterId);
-					logger.debug("Processing recruiter with ID: {} (cleaned ID: {})", recruiterId, cleanedRecruiterId);
+						boolean isUpdate = model.getUpdatedAt() != null &&
+								model.getRequirementAddedTimeStamp() != null &&
+								!model.getUpdatedAt().isEqual(model.getRequirementAddedTimeStamp());
 
-					// 🔍 Detect if it's an update
-					boolean isUpdate = model.getUpdatedAt() != null &&
-							model.getRequirementAddedTimeStamp() != null &&
-							!model.getUpdatedAt().isEqual(model.getRequirementAddedTimeStamp());
+						Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
+						if (userTuple != null) {
+							String recruiterEmail = userTuple.get(0, String.class);
+							String recruiterName = userTuple.get(1, String.class);
 
-					// Fetch recruiter email and username from the database
-					Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
+							if (recruiterEmail != null && !recruiterEmail.isEmpty() && sentEmails.add(recruiterEmail)) {
+								String status = model.getStatus() != null ? model.getStatus().toLowerCase() : "inprogress";
+								String subject, text;
 
-					if (userTuple != null) {
-						String recruiterEmail = userTuple.get(0, String.class);  // Fetch email
-						String recruiterName = userTuple.get(1, String.class);  // Fetch username
-
-						if (recruiterEmail != null && !recruiterEmail.isEmpty()) {
-							// Construct and send email
-                            String status = model.getStatus() != null ? model.getStatus().toLowerCase() : "inprogress";
-							String subject;
-							String text;
-
-							if (isUpdate) {
-								subject = "Requirement Updated: " + model.getJobTitle();
-								text = constructUpdatedEmailBody(model, recruiterName);
-							} else {
-								switch (status) {
-									case "hold":
-										subject = "Job On Hold: " + model.getJobTitle();
-										text = constructHoldEmailBody(model, recruiterName);
-										break;
-									case "closed":
-										subject = "Job Closed: " + model.getJobTitle();
-										text = constructClosedEmailBody(model, recruiterName);
-										break;
-									default:
-										subject = "New Job Assignment: " + model.getJobTitle();
-										text = constructEmailBody(model, recruiterName);
-										break;
+								if (isUpdate) {
+									subject = "Requirement Updated: " + model.getJobTitle();
+									text = constructUpdatedEmailBody(model, recruiterName);
+								} else {
+									switch (status) {
+										case "hold":
+											subject = "Job On Hold: " + model.getJobTitle();
+											text = constructHoldEmailBody(model, recruiterName);
+											break;
+										case "closed":
+											subject = "Job Closed: " + model.getJobTitle();
+											text = constructClosedEmailBody(model, recruiterName);
+											break;
+										default:
+											subject = "New Job Assignment: " + model.getJobTitle();
+											text = constructEmailBody(model, recruiterName);
+											break;
+									}
 								}
-							}
 
-							logger.info("Attempting to send email to recruiter: {} <{}> for job ID: {}",
-									recruiterName, recruiterEmail, model.getJobId());
-
-							try {
 								emailService.sendEmail(recruiterEmail, subject, text);
-								logger.info("Email successfully sent to recruiter: {} <{}> for job ID: {}",
-										recruiterName, recruiterEmail, model.getJobId());
-							} catch (Exception e) {
-								logger.error("Failed to send email to recruiter: {} <{}> for job ID: {}. Error: {}",
-										recruiterName, recruiterEmail, model.getJobId(), e.getMessage(), e);
+								logger.info("Email sent to recruiter: {} <{}>", recruiterName, recruiterEmail);
 							}
 						} else {
-							logger.error("Empty or null email found for recruiter ID: {} (Name: {}) for job ID: {}",
-									cleanedRecruiterId, recruiterName, model.getJobId());
+							logger.warn("No user info found for recruiter ID: {}", recruiterId);
+						}
+					} catch (Exception e) {
+						logger.error("Error processing recruiter {}: {}", recruiterId, e.getMessage(), e);
+					}
+				}
+			}
+
+			// ✅ Send email to Team Lead (assignedBy)
+			if (assignedBy != null && !assignedBy.isEmpty()) {
+				try {
+					Tuple teamLeadTuple = requirementsDao.findUserEmailAndUsernameByAssignedBy(assignedBy);
+					if (teamLeadTuple != null) {
+						String leadEmail = teamLeadTuple.get(0, String.class);
+						String leadName = teamLeadTuple.get(1, String.class);
+
+						if (leadEmail != null && !leadEmail.isEmpty() && sentEmails.add(leadEmail)) {
+							String subject = "Team Assignment Notification: " + model.getJobTitle();
+							String text = constructTeamLeadEmailBodyByStatus(model, leadName);
+							emailService.sendEmail(leadEmail, subject, text);
+							logger.info("Email sent to Team Lead: {} <{}>", leadName, leadEmail);
 						}
 					} else {
-						logger.error("No user information found for recruiter ID: {} for job ID: {}",
-								cleanedRecruiterId, model.getJobId());
+						logger.warn("No user info found for Team Lead: {}", assignedBy);
 					}
 				} catch (Exception e) {
-					logger.error("Error processing recruiter {} for job ID: {}. Error: {}" + e.getMessage(),
-							recruiterId, model.getJobId(), e.getMessage(), e);
+					logger.error("Failed to send email to Team Lead ({}): {}", assignedBy, e.getMessage(), e);
 				}
 			}
 
 			logger.info("Completed email sending process for job ID: {}", model.getJobId());
 		} catch (Exception e) {
-			logger.error("Critical error in sending emails to recruiters for job ID: {}. Error: {}" + e.getMessage(),
-					model.getJobId(), e.getMessage(), e);
-			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage(), e);
+			logger.error("Critical error in sending emails for job ID: {}: {}", model.getJobId(), e.getMessage(), e);
+			throw new RuntimeException("Error in sending emails: " + e.getMessage(), e);
 		}
 	}
+
+	private String constructTeamLeadEmailBodyByStatus(RequirementsModel model, String leadName) {
+		String status = model.getStatus() != null ? model.getStatus().toLowerCase() : "inprogress";
+		switch (status) {
+			case "hold":
+				return constructTeamLeadHoldEmail(model, leadName);
+			case "closed":
+				return constructTeamLeadClosedEmail(model, leadName);
+			default:
+				return constructTeamLeadInProgressEmail(model, leadName);
+		}
+	}
+
+
+	private String constructTeamLeadInProgressEmail(RequirementsModel model, String leadName) {
+		return "Dear " + leadName + ",<br><br>" +
+				"You have successfully assigned the following requirement to your team.<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br>" +
+				"<b>Status:</b> " + model.getStatus() + "<br><br>" +
+				"Recruiters have been notified about this requirement.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+	private String constructTeamLeadHoldEmail(RequirementsModel model, String leadName) {
+		return "Dear " + leadName + ",<br><br>" +
+				"The following job requirement you assigned is currently on hold:<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br><br>" +
+				"Your team has been notified.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+	private String constructTeamLeadClosedEmail(RequirementsModel model, String leadName) {
+		return "Dear " + leadName + ",<br><br>" +
+				"This is to inform you that the following requirement you assigned has been <b>closed</b>:<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br><br>" +
+				"Recruiters have been notified. No further submissions are needed.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+
+
 
 	// Update constructEmailBody method to use recruiterName instead of fetching separately
 	private String constructEmailBody(RequirementsModel model, String recruiterName) {
@@ -271,6 +325,7 @@ public class RequirementsService {
 	private String constructInProgressEmailBody(RequirementsModel model, String recruiterName) {
 		return "Dear " + recruiterName + ",<br><br>" +
 				"You have been assigned a new job requirement. Please find the details below:<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
 				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
 				"<b>Client:</b> " + model.getClientName() + "<br>" +
 				"<b>Location:</b> " + model.getLocation() + "<br>" +
@@ -284,6 +339,7 @@ public class RequirementsService {
 	private String constructHoldEmailBody(RequirementsModel model, String recruiterName) {
 		return "Dear " + recruiterName + ",<br><br>" +
 				"The following job requirement is currently on hold:<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
 				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
 				"<b>Client:</b> " + model.getClientName() + "<br>" +
 				"<b>Location:</b> " + model.getLocation() + "<br><br>" +
@@ -304,6 +360,7 @@ public class RequirementsService {
 	private String constructUpdatedEmailBody(RequirementsModel model, String recruiterName) {
 		return "Dear " + recruiterName + ",<br><br>" +
 				"The job requirement assigned to you has been <b>updated</b>. Please find the latest details below:<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
 				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
 				"<b>Client:</b> " + model.getClientName() + "<br>" +
 				"<b>Location:</b> " + model.getLocation() + "<br>" +
@@ -639,7 +696,11 @@ public class RequirementsService {
 			existingRequirement.setNoOfPositions(requirementsDto.getNoOfPositions());
 			existingRequirement.setRecruiterIds(requirementsDto.getRecruiterIds());
 			existingRequirement.setRecruiterName(requirementsDto.getRecruiterName());
-			existingRequirement.setAssignedBy(requirementsDto.getAssignedBy());
+			if (StringUtils.hasText(requirementsDto.getAssignedTo())) {
+				existingRequirement.setAssignedBy(requirementsDto.getAssignedTo());
+			} else {
+				existingRequirement.setAssignedBy(requirementsDto.getAssignedBy());
+			}
 			existingRequirement.setUpdatedAt(LocalDateTime.now());
 			if (requirementsDto.getStatus() != null) existingRequirement.setStatus(requirementsDto.getStatus());
 
