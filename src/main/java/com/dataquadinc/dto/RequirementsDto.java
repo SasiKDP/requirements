@@ -106,6 +106,16 @@ public class RequirementsDto
 		return days + " days " + hours + " hours";
 	}
 
+	private String assignedTo; // optional field for controller use
+
+	public String getAssignedTo() {
+		return assignedTo;
+	}
+
+	public void setAssignedTo(String assignedTo) {
+		this.assignedTo = assignedTo;
+	}
+
 	public Integer getNumberOfSubmissions() {
 		return numberOfSubmissions;
 	}
