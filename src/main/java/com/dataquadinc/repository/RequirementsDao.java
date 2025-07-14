@@ -1719,7 +1719,8 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         NULL AS technology,
         NULL AS postedDate,
         NULL AS updatedDateTime,
-        0 AS numberOfSubmissions
+        0 AS numberOfSubmissions,
+        0 AS numberOfScreenReject
     FROM user_details ud
     JOIN user_roles ur ON ud.user_id = ur.user_id
     JOIN roles rl ON ur.role_id = rl.id
@@ -1763,7 +1764,18 @@ UNION ALL
                 (:isToday = true AND DATE(cs.submitted_at) = CURRENT_DATE)
                 OR (:isToday = false AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate)
               )
-        ) AS numberOfSubmissions
+        ) AS numberOfSubmissions,
+        (
+            SELECT COUNT(DISTINCT cs.submission_id)
+            FROM candidate_submissions cs
+            WHERE cs.job_id = r.job_id
+              AND cs.user_id = ud.user_id
+              AND cs.status = 'SCREEN REJECT'
+              AND (
+                (:isToday = true AND DATE(cs.submitted_at) = CURRENT_DATE)
+                OR (:isToday = false AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate)
+              )
+        ) AS numberOfScreenReject
     FROM user_details ud
     JOIN user_roles ur ON ud.user_id = ur.user_id
     JOIN roles rl ON ur.role_id = rl.id
