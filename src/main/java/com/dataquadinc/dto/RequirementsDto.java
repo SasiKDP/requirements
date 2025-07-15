@@ -106,6 +106,16 @@ public class RequirementsDto
 		return days + " days " + hours + " hours";
 	}
 
+	private LocalDateTime updatedAt;
+
+	public LocalDateTime getUpdatedAt() {
+		return updatedAt;
+	}
+
+	public void setUpdatedAt(LocalDateTime updatedAt) {
+		this.updatedAt = updatedAt;
+	}
+
 	private String assignedTo; // optional field for controller use
 
 	public String getAssignedTo() {

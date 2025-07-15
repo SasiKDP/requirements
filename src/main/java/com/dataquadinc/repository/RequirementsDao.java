@@ -1123,6 +1123,43 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             )
         ), 0) AS teamSubmissions,
         
+            COALESCE((
+                SELECT COUNT(DISTINCT cs.submission_id)
+                FROM interview_details idt
+                JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
+                JOIN requirements_model r2 ON cs.job_id = r2.job_id
+                WHERE\s
+                    (
+                        -- Team lead themselves
+                        cs.user_id = u.user_id
+            
+                        -- OR recruiters working on jobs assigned by the team lead
+                        OR REPLACE(REPLACE(r2.assigned_by, '\\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\\"', ''), '"', '')
+                       \s
+                        -- OR team members assigned via job_recruiters table
+                        OR EXISTS (
+                            SELECT 1
+                            FROM production.job_recruiters jr
+                            WHERE jr.job_id = r2.job_id
+                            AND jr.recruiter_id = u.user_id
+                        )
+                    )
+                AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
+                AND idt.interview_level = 'Internal'
+                AND (
+                    idt.interview_status = 'REJECTED'
+                    OR (
+                        JSON_VALID(idt.interview_status)
+                        AND JSON_UNQUOTE(
+                            JSON_EXTRACT(
+                                idt.interview_status,
+                                CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
+                            )
+                        ) = 'REJECTED'
+                    )
+                )
+            ), 0) AS teamScreenRejectCount,            
+        
         -- Team Interviews (filter by interview_date_time)
         COALESCE((
             SELECT COUNT(DISTINCT idt.interview_id)
@@ -1206,7 +1243,32 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
                     )
                 )
         ), 0) AS numberOfSubmissions,
-        
+
+        COALESCE((
+            SELECT COUNT(DISTINCT cs.submission_id)
+            FROM candidates cd
+            JOIN candidate_submissions cs ON cd.candidate_id = cs.candidate_id
+            LEFT JOIN interview_details idt ON idt.candidate_id = cd.candidate_id AND idt.job_id = cs.job_id
+            WHERE cs.user_id = u.user_id
+            AND DATE(cs.submitted_at) BETWEEN :startDate AND :endDate
+            AND (
+                idt.interview_date_time IS NOT NULL
+                AND idt.interview_level = 'Internal'
+                AND (
+                    idt.interview_status = 'REJECTED'
+                    OR (
+                        JSON_VALID(idt.interview_status)
+                        AND JSON_UNQUOTE(
+                            JSON_EXTRACT(
+                                idt.interview_status,
+                                CONCAT('$[', JSON_LENGTH(idt.interview_status) - 1, '].status')
+                            )
+                        ) = 'REJECTED'
+                    )
+                )
+            )
+        ), 0) AS numberOfScreenRejects,
+
         COALESCE((
             SELECT COUNT(idt.interview_id)
             FROM interview_details idt
