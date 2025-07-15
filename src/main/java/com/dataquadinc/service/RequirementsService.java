@@ -23,13 +23,15 @@ import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dataquadinc.model.RequirementsModel;
 import com.dataquadinc.repository.RequirementsDao;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -45,6 +47,10 @@ public class RequirementsService {
 
 	@Autowired
 	private EmailService emailService;
+
+	@Autowired
+	private RestTemplate restTemplate;
+
 
 	private static final Logger log = LoggerFactory.getLogger(BDM_service.class);
 
@@ -704,7 +710,46 @@ public class RequirementsService {
 			existingRequirement.setUpdatedAt(LocalDateTime.now());
 			if (requirementsDto.getStatus() != null) existingRequirement.setStatus(requirementsDto.getStatus());
 
+			if (requirementsDto.getStatus() != null) {
+				existingRequirement.setStatus(requirementsDto.getStatus());
 
+				// ✅ If requirement is marked as CLOSED → trigger bench import
+				if ("closed".equalsIgnoreCase(requirementsDto.getStatus())) {
+					try {
+						String jobId = requirementsDto.getJobId();
+
+						// 1. Fetch candidates for jobId
+						String fetchUrl = "https://mymulya.com/candidate/closedjobs/" + jobId;
+
+						ResponseEntity<List<Map<String, Object>>> fetchResponse = restTemplate.exchange(
+								fetchUrl,
+								HttpMethod.GET,
+								null,
+								new ParameterizedTypeReference<List<Map<String, Object>>>() {}
+						);
+
+						List<Map<String, Object>> candidateList = fetchResponse.getBody();
+
+						if (candidateList != null && !candidateList.isEmpty()) {
+							// 2. Post candidates to /bench/import
+							String benchUrl = "https://mymulya.com/candidate/bench/import";
+
+							HttpHeaders headers = new HttpHeaders();
+							headers.setContentType(MediaType.APPLICATION_JSON);
+
+							HttpEntity<List<Map<String, Object>>> benchRequest = new HttpEntity<>(candidateList, headers);
+
+							ResponseEntity<String> benchResponse = restTemplate.postForEntity(benchUrl, benchRequest, String.class);
+
+							logger.info("Bench import response for jobId {}: {}", jobId, benchResponse.getBody());
+						} else {
+							logger.warn("No candidates found for closed jobId: {}", jobId);
+						}
+					} catch (Exception ex) {
+						logger.error("Failed to push candidates to bench for jobId: {}", requirementsDto.getJobId(), ex);
+					}
+				}
+			}
 			// Save the updated requirement to the database
 			requirementsDao.save(existingRequirement);
 
