@@ -42,6 +42,9 @@ public class RecruiterRequirementsDto {
 
 	private LocalDateTime requirementAddedTimeStamp;
 
+	private LocalDateTime updatedAt;
+
+
 	private String status;
 	private String assignedBy;
 	public String getAge() {
@@ -56,6 +59,14 @@ public class RecruiterRequirementsDto {
 		long hours = duration.toHours() % 24;
 
 		return days + " days " + hours + " hours";
+	}
+
+	public LocalDateTime getUpdatedAt() {
+		return updatedAt;
+	}
+
+	public void setUpdatedAt(LocalDateTime updatedAt) {
+		this.updatedAt = updatedAt;
 	}
 
 	public String getJobId() {

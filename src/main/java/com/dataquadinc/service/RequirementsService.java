@@ -466,14 +466,14 @@ public class RequirementsService {
 					dto.setStatus(requirement.getStatus());
 					dto.setRecruiterName(requirement.getRecruiterName());
 					dto.setAssignedBy(requirement.getAssignedBy());
+					dto.setUpdatedAt(requirement.getUpdatedAt());
 
 					// Submissions and Interviews
 					String jobId = requirement.getJobId();
 					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
 					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
 
-					// No need to manually set age anymore
-
+					// No need to manually set age anym
 					return dto;
 				})
 				.collect(Collectors.toList());
