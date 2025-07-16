@@ -1,8 +1,7 @@
-
 FROM openjdk:17-jdk-slim AS builder
 
-# Install Maven
-RUN apt-get update && apt-get install -y maven && apt-get install -y curl
+# Install Maven and curl
+RUN apt-get update && apt-get install -y maven curl ca-certificates
 
 # Set the working directory in the container
 WORKDIR /app
@@ -10,27 +9,43 @@ WORKDIR /app
 # Copy the Maven project file
 COPY pom.xml .
 
-# Download dependencies (this step is caching the dependencies layer)
+# Download dependencies
 RUN mvn dependency:go-offline -B
 
 # Copy the rest of the application source code
 COPY src ./src
 
-# Build the application (the JAR file will be generated in the target folder)
+# Build the application
 RUN mvn clean package -DskipTests
 
-# Use the official openjdk image for running the application
+# ------------------------------------
+# Final image
+# ------------------------------------
 FROM openjdk:17-jdk-slim
 
-# Set the working directory in the container
+# Set working directory
 WORKDIR /app
 
-# Copy the JAR file from the build stage into the container
+# Install certificate tools
+RUN apt-get update && apt-get install -y ca-certificates
+
+# Create a folder for SSL cert
+RUN mkdir -p /etc/ssl/certs/custom
+
+# Copy JAR from builder
 COPY --from=builder /app/target/DataquadRequirementsApi-0.0.1-SNAPSHOT.jar app.jar
 
-# Expose the port the app runs on
+# Copy SSL certificate (GitHub Actions will ensure this exists)
+COPY nginx/ssl/mymulya.crt /etc/ssl/certs/custom/mymulya.crt
+
+# Import cert into Java truststore
+RUN keytool -import -trustcacerts -alias mymulya_cert \
+    -file /etc/ssl/certs/custom/mymulya.crt \
+    -keystore $JAVA_HOME/lib/security/cacerts \
+    -storepass changeit -noprompt
+
+# Expose app port
 EXPOSE 8111
 
-# Run the JAR file
+# Start the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
-
