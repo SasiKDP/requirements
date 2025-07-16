@@ -719,7 +719,7 @@ public class RequirementsService {
 						String jobId = requirementsDto.getJobId();
 
 						// 1. Fetch candidates for jobId
-						String fetchUrl = "https://mymulya.com/candidate/closedjobs/" + jobId;
+						String fetchUrl = "http://localhost:8085/candidate/closedjobs/" + jobId;
 
 						ResponseEntity<List<Map<String, Object>>> fetchResponse = restTemplate.exchange(
 								fetchUrl,
@@ -732,7 +732,7 @@ public class RequirementsService {
 
 						if (candidateList != null && !candidateList.isEmpty()) {
 							// 2. Post candidates to /bench/import
-							String benchUrl = "https://mymulya.com/candidate/bench/import";
+							String benchUrl = "http://localhost:8085/candidate/bench/import";
 
 							HttpHeaders headers = new HttpHeaders();
 							headers.setContentType(MediaType.APPLICATION_JSON);
