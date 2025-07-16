@@ -17,7 +17,7 @@ jobs:
         run: mkdir -p nginx/ssl
 
       - name: Decode SSL Certificate from Secret
-        run: echo "${{ secrets.MYMULYA_CRT_BASE64 }}" | base64 -d > nginx/ssl/mymulya.crt
+        run: echo "${{ secrets.MYMULYA_CRT_BASE64 }}" > nginx/ssl/mymulya.crt
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
