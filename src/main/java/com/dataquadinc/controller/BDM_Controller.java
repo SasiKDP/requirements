@@ -80,6 +80,7 @@ public class BDM_Controller {
 
     @GetMapping("/bdm/getAll")
     public ResponseEntity<ResponseBean> getAllClients() {
+        service.evaluateClientStatuses();  // ⬅ ensure latest statuses
         List<BDM_Dto> clients = service.getAllClients();
         return ResponseEntity.ok(ResponseBean.successResponse("Clients fetched successfully", clients));
     }
