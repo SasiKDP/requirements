@@ -67,6 +67,16 @@ public class BDM_Client {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
+    private String feedBack;
+
+    public String getFeedBack() {
+        return feedBack;
+    }
+
+    public void setFeedBack(String feedBack) {
+        this.feedBack = feedBack;
+    }
+
     public String getId() {
         return id;
     }
