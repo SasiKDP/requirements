@@ -9,6 +9,7 @@ import com.dataquadinc.repository.BDM_Repo;
 import com.dataquadinc.repository.BdmEmployeeProjection;
 import com.dataquadinc.repository.RequirementsDao;
 import jakarta.persistence.Tuple;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,6 +94,7 @@ public class BDM_service {
         dto.setClientSpocMobileNumber(client.getClientSpocMobileNumber());
         dto.setOnBoardedBy(client.getOnBoardedBy());
         dto.setPositionType(client.getPositionType());
+        dto.setStatus(client.getStatus());
         return dto;
     }
 
@@ -175,6 +177,23 @@ public class BDM_service {
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
+
+    @Transactional
+    public void evaluateClientStatuses() {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+
+        List<BDM_Client> allClients = repository.findAll();
+
+        for (BDM_Client client : allClients) {
+            boolean hasRecentJob = requirementsDao.existsByClientNameAndRequirementAddedTimeStampAfter(
+                    client.getClientName(), thirtyDaysAgo);
+
+            client.setStatus(hasRecentJob ? "ACTIVE" : "INACTIVE");
+        }
+
+        repository.saveAll(allClients); // bulk update
+    }
+
 
     public Optional<BDM_Dto> getClientById(String id) {
         return repository.findById(id).map(this::convertToDTO);

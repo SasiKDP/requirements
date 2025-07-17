@@ -31,6 +31,8 @@ public class BDM_Dto {
     private List<String> clientSpocMobileNumber;
     private String onBoardedBy;
     private String assignedTo;
+    private String status;
+
 
 
     @JsonIgnore // Prevents file data from being included in API responses
@@ -171,4 +173,15 @@ public class BDM_Dto {
     public void setDocumentData(byte[] documentData) {
         this.documentData = documentData;
     }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+
+
 }

@@ -1857,6 +1857,12 @@ ORDER BY recruiterName
             @Param("isToday") boolean isToday
     );
 
+    @Query("SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END " +
+            "FROM RequirementsModel r " +
+            "WHERE r.clientName = :clientName AND r.requirementAddedTimeStamp >= :date")
+    boolean existsByClientNameAndRequirementAddedTimeStampAfter(@Param("clientName") String clientName,
+                                                                @Param("date") LocalDateTime date);
+
 //
 //    @Modifying
 //    @Transactional
