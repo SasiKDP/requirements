@@ -95,6 +95,7 @@ public class BDM_service {
         dto.setOnBoardedBy(client.getOnBoardedBy());
         dto.setPositionType(client.getPositionType());
         dto.setStatus(client.getStatus());
+        dto.setFeedBack(client.getFeedBack());
         return dto;
     }
 
@@ -116,6 +117,7 @@ public class BDM_service {
         client.setClientSpocMobileNumber(dto.getClientSpocMobileNumber());
         client.setOnBoardedBy(dto.getOnBoardedBy());
         client.setPositionType(dto.getPositionType());
+        client.setFeedBack(dto.getFeedBack());
         return client;
     }
 
@@ -225,7 +227,7 @@ public class BDM_service {
             if (dto.getClientSpocMobileNumber() != null) existingClient.setClientSpocMobileNumber(dto.getClientSpocMobileNumber());
             if (dto.getPositionType() != null) existingClient.setPositionType(dto.getPositionType());
             if (dto.getSupportingCustomers() != null) existingClient.setSupportingCustomers(dto.getSupportingCustomers());
-
+            if (dto.getFeedBack() != null) existingClient.setFeedBack(dto.getFeedBack());
             // 🔁 File uploads
             try {
                 if (files != null && !files.isEmpty()) {

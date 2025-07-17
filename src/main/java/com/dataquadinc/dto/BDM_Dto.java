@@ -32,6 +32,15 @@ public class BDM_Dto {
     private String onBoardedBy;
     private String assignedTo;
     private String status;
+    private String feedBack;
+
+    public String getFeedBack() {
+        return feedBack;
+    }
+
+    public void setFeedBack(String feedBack) {
+        this.feedBack = feedBack;
+    }
 
 
 
