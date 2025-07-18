@@ -1085,16 +1085,40 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         
         -- Self Interviews (filter by interview_date_time)
         COALESCE((
-            SELECT COUNT(DISTINCT idt.interview_id)
-            FROM interview_details idt
-            JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
-            JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE idt.user_id = u.user_id
-            AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
-            AND cs.job_id IN (
-                SELECT job_id FROM requirements_model r2
-            )
-        ), 0) AS selfInterviews,
+                        SELECT COUNT(DISTINCT idt.interview_id)
+                        FROM interview_details idt
+                        JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
+                        JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+                        WHERE idt.user_id = u.user_id
+                          AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
+                          AND cs.job_id IN (
+                              SELECT job_id FROM requirements_model r2
+                          )
+                          AND JSON_VALID(idt.interview_status) = 1
+                          AND JSON_LENGTH(idt.interview_status) > 0
+                          AND NOT (
+                              JSON_UNQUOTE(
+                                  JSON_EXTRACT(
+                                      idt.interview_status,
+                                      CONCAT(
+                                          '$[',
+                                          CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                                          '].status'
+                                      )
+                                  )
+                              ) = 'REJECTED'
+                              AND JSON_UNQUOTE(
+                                  JSON_EXTRACT(
+                                      idt.interview_status,
+                                      CONCAT(
+                                          '$[',
+                                          CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                                          '].interviewLevel'
+                                      )
+                                  )
+                              ) = 'INTERNAL'
+                          )
+                    ), 0) AS selfInterviews,
         
         -- Self Placements (filter by created_at)
         COALESCE((
@@ -1168,17 +1192,41 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         
         -- Team Interviews (filter by interview_date_time)
         COALESCE((
-            SELECT COUNT(DISTINCT idt.interview_id)
-            FROM interview_details idt
-            JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
-            JOIN candidates cd ON cs.candidate_id = cd.candidate_id
-            WHERE idt.user_id != u.user_id
-            AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
-            AND cs.job_id IN (
-                SELECT job_id FROM requirements_model r2
-                WHERE REPLACE(REPLACE(r2.assigned_by, '\"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '\"', ''), '"', '')
-            )
-        ), 0) AS teamInterviews,
+                        SELECT COUNT(DISTINCT idt.interview_id)
+                        FROM interview_details idt
+                        JOIN candidate_submissions cs ON idt.candidate_id = cs.candidate_id
+                        JOIN candidates cd ON cs.candidate_id = cd.candidate_id
+                        WHERE idt.user_id != u.user_id
+                          AND DATE(idt.interview_date_time) BETWEEN :startDate AND :endDate
+                          AND cs.job_id IN (
+                              SELECT job_id FROM requirements_model r2
+                              WHERE REPLACE(REPLACE(r2.assigned_by, '"', ''), '"', '') = REPLACE(REPLACE(u.user_name, '"', ''), '"', '')
+                          )
+                          AND JSON_VALID(idt.interview_status) = 1
+                          AND JSON_LENGTH(idt.interview_status) > 0
+                          AND NOT (
+                              JSON_UNQUOTE(
+                                  JSON_EXTRACT(
+                                      idt.interview_status,
+                                      CONCAT(
+                                          '$[',
+                                          CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                                          '].status'
+                                      )
+                                  )
+                              ) = 'REJECTED'
+                              AND JSON_UNQUOTE(
+                                  JSON_EXTRACT(
+                                      idt.interview_status,
+                                      CONCAT(
+                                          '$[',
+                                          CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                                          '].interviewLevel'
+                                      )
+                                  )
+                              ) = 'INTERNAL'
+                          )
+                    ), 0) AS teamInterviews,
         
         -- Team Placements (filter by created_at)
         COALESCE((
@@ -1562,6 +1610,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         cd.qualification AS qualification,
         cs.skills AS skills,
 
+        -- Latest Status
         CASE 
             WHEN JSON_VALID(idt.interview_status) = 1 
               AND JSON_LENGTH(idt.interview_status) > 0
@@ -1578,6 +1627,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             ELSE NULL
         END AS interviewStatus,
 
+        -- Latest Interview Level
         CASE 
             WHEN JSON_VALID(idt.interview_status) = 1 
               AND JSON_LENGTH(idt.interview_status) > 0
@@ -1600,7 +1650,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         idt.client_name AS clientName,
         idt.user_id AS interviewTakenBy,
 
-        -- NEW: Identify if it’s a self or team interview
+        -- Self or Team
         CASE 
             WHEN idt.user_id = :assignedBy THEN 'SELF'
             ELSE 'TEAM'
@@ -1616,6 +1666,30 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
       AND JSON_VALID(idt.interview_status) = 1
       AND JSON_LENGTH(idt.interview_status) > 0
       AND idt.interview_date_time BETWEEN :startDate AND :endDate
+
+      -- EXCLUDE if latest level = 'Internal' AND latest status = 'Rejected'
+      AND NOT (
+          JSON_UNQUOTE(
+              JSON_EXTRACT(
+                  idt.interview_status,
+                  CONCAT(
+                      '$[',
+                      CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                      '].status'
+                  )
+              )
+          ) = 'REJECTED'
+          AND JSON_UNQUOTE(
+              JSON_EXTRACT(
+                  idt.interview_status,
+                  CONCAT(
+                      '$[',
+                      CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
+                      '].interviewLevel'
+                  )
+              )
+          ) = 'INTERNAL'
+      )
 """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByAssignedByAndDateRange(
             @Param("assignedBy") String assignedBy,
