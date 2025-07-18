@@ -452,6 +452,7 @@ public class RequirementsService {
 		List<RequirementsDto> dtoList = requirementsList.stream()
 				.map(requirement -> {
 					RequirementsDto dto = new RequirementsDto();
+					List<String> recruiterNames = requirementsDao.findRecruiterNamesByJobId(requirement.getJobId());
 
 					dto.setJobId(requirement.getJobId());
 					dto.setJobTitle(requirement.getJobTitle());
@@ -470,7 +471,7 @@ public class RequirementsService {
 					dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
 					dto.setRecruiterIds(requirement.getRecruiterIds());
 					dto.setStatus(requirement.getStatus());
-					dto.setRecruiterName(requirement.getRecruiterName());
+					dto.setRecruiterName(new HashSet<>(recruiterNames));
 					dto.setAssignedBy(requirement.getAssignedBy());
 					dto.setUpdatedAt(requirement.getUpdatedAt());
 
@@ -512,6 +513,8 @@ public class RequirementsService {
 		logger.info("✅ Fetched {} requirements between {} and {}", requirements.size(), startDate, endDate);
 
 		return requirements.stream().map(requirement -> {
+			List<String> recruiterNames = requirementsDao.findRecruiterNamesByJobId(requirement.getJobId());
+
 			RequirementsDto dto = new RequirementsDto();
 			dto.setJobId(requirement.getJobId());
 			dto.setJobTitle(requirement.getJobTitle());
@@ -530,7 +533,7 @@ public class RequirementsService {
 			dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
 			dto.setRecruiterIds(requirement.getRecruiterIds());
 			dto.setStatus(requirement.getStatus());
-			dto.setRecruiterName(requirement.getRecruiterName());
+			dto.setRecruiterName(new HashSet<>(recruiterNames));
 			dto.setAssignedBy(requirement.getAssignedBy());
 
 			// Stats
@@ -701,7 +704,6 @@ public class RequirementsService {
 			existingRequirement.setSalaryPackage(requirementsDto.getSalaryPackage());
 			existingRequirement.setNoOfPositions(requirementsDto.getNoOfPositions());
 			existingRequirement.setRecruiterIds(requirementsDto.getRecruiterIds());
-			existingRequirement.setRecruiterName(requirementsDto.getRecruiterName());
 			if (StringUtils.hasText(requirementsDto.getAssignedTo())) {
 				existingRequirement.setAssignedBy(requirementsDto.getAssignedTo());
 			} else {
@@ -884,7 +886,6 @@ public class RequirementsService {
 		dto.setNoOfPositions(requirement.getNoOfPositions());
 		dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
 		dto.setRecruiterIds(requirement.getRecruiterIds());
-		dto.setRecruiterName(requirement.getRecruiterName());
 		dto.setStatus(requirement.getStatus());
 		dto.setAssignedBy(requirement.getAssignedBy());
 		dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());
@@ -1303,7 +1304,6 @@ public class RequirementsService {
 					dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
 					dto.setRecruiterIds(requirement.getRecruiterIds());
 					dto.setStatus(requirement.getStatus());
-					dto.setRecruiterName(requirement.getRecruiterName());
 					dto.setAssignedBy(requirement.getAssignedBy());
 					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(requirement.getJobId()));
 					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(requirement.getJobId()));
@@ -1368,7 +1368,6 @@ public class RequirementsService {
 			dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
 			dto.setRecruiterIds(requirement.getRecruiterIds());
 			dto.setStatus(requirement.getStatus());
-			dto.setRecruiterName(requirement.getRecruiterName());
 			dto.setAssignedBy(requirement.getAssignedBy());
 			dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(requirement.getJobId()));
 			dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(requirement.getJobId()));

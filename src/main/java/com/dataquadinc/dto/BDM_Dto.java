@@ -33,6 +33,15 @@ public class BDM_Dto {
     private String assignedTo;
     private String status;
     private String feedBack;
+    private int numberOfRequirements;
+
+    public int getNumberOfRequirements() {
+        return numberOfRequirements;
+    }
+
+    public void setNumberOfRequirements(int numberOfRequirements) {
+        this.numberOfRequirements = numberOfRequirements;
+    }
 
     public String getFeedBack() {
         return feedBack;

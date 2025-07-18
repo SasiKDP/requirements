@@ -329,10 +329,7 @@ public class RequirementsController {
 						throw new RecruiterNotFoundException("Email for recruiter " + recruiterId + " not found");
 					}
 
-					// Add the recruiter name to the job requirement's recruiterName set
-					requirement.getRecruiterName().add(recruiterName); // Add recruiter name to Set
 
-					System.out.println("Recruiter names before saving: " + requirement.getRecruiterName());
 
 					// Prepare the email subject and body
 					String subject = "New Job Assignment: " + requirement.getJobTitle();

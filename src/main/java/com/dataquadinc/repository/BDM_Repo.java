@@ -223,4 +223,8 @@ public interface BDM_Repo extends JpaRepository<BDM_Client,String> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    @Query(value = "SELECT COUNT(*) FROM requirements_model WHERE client_name = :clientName", nativeQuery = true)
+    int countRequirementsByClientName(@Param("clientName") String clientName);
+
 }
