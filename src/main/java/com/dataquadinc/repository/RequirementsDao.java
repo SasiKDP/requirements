@@ -22,7 +22,13 @@ public interface RequirementsDao extends JpaRepository<RequirementsModel, String
     @Query("SELECT r FROM RequirementsModel r WHERE r.jobId = :jobId")
     Optional<RequirementsModel> findRecruitersByJobId(@Param("jobId") String jobId);
 
-
+    @Query(value = """
+    SELECT u.user_name 
+    FROM user_details u
+    JOIN job_recruiters jr ON u.user_id = jr.recruiter_id
+    WHERE jr.job_id = :jobId
+""", nativeQuery = true)
+    List<String> findRecruiterNamesByJobId(@Param("jobId") String jobId);
 
     @Query(value = """
 

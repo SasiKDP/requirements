@@ -53,6 +53,10 @@ public class BDM_Client {
     @Column
     private String status;
 
+    @Transient
+    private int numberOfRequirements; // 👈 won't be persisted
+
+
     @Lob
     @Column(columnDefinition = "LONGBLOB")
     private byte[] documentedData;  // Stores actual file content
@@ -68,6 +72,14 @@ public class BDM_Client {
     private LocalDateTime createdAt;
 
     private String feedBack;
+
+    public int getNumberOfRequirements() {
+        return numberOfRequirements;
+    }
+
+    public void setNumberOfRequirements(int numberOfRequirements) {
+        this.numberOfRequirements = numberOfRequirements;
+    }
 
     public String getFeedBack() {
         return feedBack;

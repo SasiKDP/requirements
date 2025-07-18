@@ -74,7 +74,6 @@ public class RequirementsModel {
 
 
     private String status;
-    private Set<String> recruiterName;
     private String assignedBy;
 
     private LocalDateTime updatedAt;
@@ -170,13 +169,6 @@ public class RequirementsModel {
         this.status = status;
     }
 
-    public Set<String> getRecruiterName() {
-        return recruiterName;
-    }
-
-    public void setRecruiterName(Set<String> recruiterName) {
-        this.recruiterName = recruiterName;
-    }
 
     // Getters and setters for other fields...
 

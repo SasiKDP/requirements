@@ -176,9 +176,14 @@ public class BDM_service {
 
         // 5. Return the list of clients
         return clients.stream()
-                .map(this::convertToDTO)
+                .map(client -> {
+                    BDM_Dto dto = convertToDTO(client);
+                    int requirementCount = repository.countRequirementsByClientName(client.getClientName());
+                    dto.setNumberOfRequirements(requirementCount); // ⬅️ Set count here
+                    return dto;
+                })
                 .collect(Collectors.toList());
-    }
+}
 
     @Transactional
     public void evaluateClientStatuses() {
@@ -774,7 +779,6 @@ public class BDM_service {
     }
 
     public List<BDM_Client> getClientsByCreatedAtRange(LocalDate startDate, LocalDate endDate) {
-        // 1. Validate date range
         if (startDate == null || endDate == null) {
             throw new DateRangeValidationException("Start date and End date must not be null.");
         }
@@ -783,15 +787,17 @@ public class BDM_service {
             throw new DateRangeValidationException("End date cannot be before start date.");
         }
 
-        // 2. Prepare datetime range
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
-        // 3. Fetch data
         List<BDM_Client> clients = repository.getClientsByCreatedAtRange(startDateTime, endDateTime);
 
+        // 🔁 Set requirement count for each client
+        for (BDM_Client client : clients) {
+            int count = repository.countRequirementsByClientName(client.getClientName());
+            client.setNumberOfRequirements(count);
+        }
 
-        // 4. Log and return
         logger.info("✅ Found {} clients created between {} and {}", clients.size(), startDate, endDate);
         return clients;
     }
