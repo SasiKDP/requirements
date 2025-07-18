@@ -1561,6 +1561,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
         cd.contact_number AS contactNumber,
         cd.qualification AS qualification,
         cs.skills AS skills,
+
         CASE 
             WHEN JSON_VALID(idt.interview_status) = 1 
               AND JSON_LENGTH(idt.interview_status) > 0
@@ -1576,6 +1577,7 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             )
             ELSE NULL
         END AS interviewStatus,
+
         CASE 
             WHEN JSON_VALID(idt.interview_status) = 1 
               AND JSON_LENGTH(idt.interview_status) > 0
@@ -1591,29 +1593,28 @@ WHERE TRIM(BOTH '\"' FROM r.assigned_by) = :username
             )
             ELSE NULL
         END AS interviewLevel,
+
         idt.interview_date_time AS interviewDateTime,
         r.job_id AS jobId,
         r.job_title AS jobTitle,
-        idt.client_name AS clientName
+        idt.client_name AS clientName,
+        idt.user_id AS interviewTakenBy,
+
+        -- NEW: Identify if it’s a self or team interview
+        CASE 
+            WHEN idt.user_id = :assignedBy THEN 'SELF'
+            ELSE 'TEAM'
+        END AS interviewType
+
     FROM interview_details idt
     JOIN candidate_submissions cs ON cs.candidate_id = idt.candidate_id
     JOIN candidates cd ON cd.candidate_id = cs.candidate_id
     JOIN requirements_model r ON cs.job_id = r.job_id
+
     WHERE r.assigned_by = :assignedBy
       AND idt.interview_date_time IS NOT NULL
-        AND (
-             JSON_VALID(idt.interview_status) = 1
-             AND JSON_UNQUOTE(
-                 JSON_EXTRACT(
-                      idt.interview_status,
-                          CONCAT(
-                              '$[',
-                                  CAST(JSON_LENGTH(idt.interview_status) - 1 AS CHAR),
-                              '].status'
-                         )
-                )
-            ) = 'PLACED'
-        )
+      AND JSON_VALID(idt.interview_status) = 1
+      AND JSON_LENGTH(idt.interview_status) > 0
       AND idt.interview_date_time BETWEEN :startDate AND :endDate
 """, nativeQuery = true)
     List<InterviewScheduledDTO> findScheduledInterviewsByAssignedByAndDateRange(
