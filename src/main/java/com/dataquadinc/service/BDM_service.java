@@ -6,8 +6,10 @@ import com.dataquadinc.exceptions.DateRangeValidationException;
 import com.dataquadinc.exceptions.ResourceNotFoundException;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
+import com.dataquadinc.repository.BdmEmployeeProjection;
 import com.dataquadinc.repository.RequirementsDao;
 import jakarta.persistence.Tuple;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,6 +94,8 @@ public class BDM_service {
         dto.setClientSpocMobileNumber(client.getClientSpocMobileNumber());
         dto.setOnBoardedBy(client.getOnBoardedBy());
         dto.setPositionType(client.getPositionType());
+        dto.setStatus(client.getStatus());
+        dto.setFeedBack(client.getFeedBack());
         return dto;
     }
 
@@ -113,6 +117,7 @@ public class BDM_service {
         client.setClientSpocMobileNumber(dto.getClientSpocMobileNumber());
         client.setOnBoardedBy(dto.getOnBoardedBy());
         client.setPositionType(dto.getPositionType());
+        client.setFeedBack(dto.getFeedBack());
         return client;
     }
 
@@ -121,15 +126,26 @@ public class BDM_service {
         if (!repo.findByClientName(dto.getClientName()).isEmpty()) {
             throw new ClientAlreadyExistsException("Client Name '" + dto.getClientName() + "' already exists.");
         }
+
         BDM_Client entity = convertToEntity(dto);
         entity.setId(generateCustomId()); // Generate custom ID
 
+        // ✅ Set assignedBy logic
+        String createdBy = dto.getOnBoardedBy();
+        String assignedTo = dto.getAssignedTo();
+
+        if (assignedTo != null && !assignedTo.isBlank()) {
+            entity.setOnBoardedBy(assignedTo);  // assigned to someone selected
+        } else {
+            entity.setOnBoardedBy(createdBy);   // assigned to creator
+        }
+
+        // ✅ File upload
         Path uploadDir = Paths.get("uploads");
         if (!Files.exists(uploadDir)) {
             Files.createDirectories(uploadDir);
         }
 
-        // Store only file names
         List<String> fileNames = new ArrayList<>();
         if (files != null && !files.isEmpty()) {
             for (MultipartFile file : files) {
@@ -143,13 +159,12 @@ public class BDM_service {
                 }
             }
         }
+
         entity.setSupportingDocuments(fileNames);  // ✅ Store file names in DB
 
         entity = repo.save(entity); // Save client in DB
         return convertToDTO(entity);
     }
-
-
 
     public List<BDM_Dto>getAllClients() {
 
@@ -161,9 +176,31 @@ public class BDM_service {
 
         // 5. Return the list of clients
         return clients.stream()
-                .map(this::convertToDTO)
+                .map(client -> {
+                    BDM_Dto dto = convertToDTO(client);
+                    int requirementCount = repository.countRequirementsByClientName(client.getClientName());
+                    dto.setNumberOfRequirements(requirementCount); // ⬅️ Set count here
+                    return dto;
+                })
                 .collect(Collectors.toList());
+}
+
+    @Transactional
+    public void evaluateClientStatuses() {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+
+        List<BDM_Client> allClients = repository.findAll();
+
+        for (BDM_Client client : allClients) {
+            boolean hasRecentJob = requirementsDao.existsByClientNameAndRequirementAddedTimeStampAfter(
+                    client.getClientName(), thirtyDaysAgo);
+
+            client.setStatus(hasRecentJob ? "ACTIVE" : "INACTIVE");
+        }
+
+        repository.saveAll(allClients); // bulk update
     }
+
 
     public Optional<BDM_Dto> getClientById(String id) {
         return repository.findById(id).map(this::convertToDTO);
@@ -172,9 +209,18 @@ public class BDM_service {
     public Optional<BDM_Dto> updateClient(String id, BDM_Dto dto, List<MultipartFile> files) {
         return repository.findById(id).map(existingClient -> {
 
-            // Update fields only if they are not null in dto
+            // 🔁 Assignment logic
+            String createdBy = dto.getOnBoardedBy();   // Person updating
+            String assignedTo = dto.getAssignedTo();   // Optional person reassigned to
+
+            if (assignedTo != null && !assignedTo.isBlank()) {
+                existingClient.setOnBoardedBy(assignedTo);  // Set to assigned person
+            } else if (createdBy != null && !createdBy.isBlank()) {
+                existingClient.setOnBoardedBy(createdBy);   // Set to updater if not reassigned
+            }
+
+            // 🔁 Update only non-null fields
             if (dto.getClientName() != null) existingClient.setClientName(dto.getClientName());
-            if (dto.getOnBoardedBy() != null) existingClient.setOnBoardedBy(dto.getOnBoardedBy());
             if (dto.getClientAddress() != null) existingClient.setClientAddress(dto.getClientAddress());
             if (dto.getNetPayment() != 0) existingClient.setNetPayment(dto.getNetPayment());
             if (dto.getGst() != 0.0) existingClient.setGst(dto.getGst());
@@ -184,11 +230,12 @@ public class BDM_service {
             if (dto.getClientSpocEmailid() != null) existingClient.setClientSpocEmailid(dto.getClientSpocEmailid());
             if (dto.getClientSpocLinkedin() != null) existingClient.setClientSpocLinkedin(dto.getClientSpocLinkedin());
             if (dto.getClientSpocMobileNumber() != null) existingClient.setClientSpocMobileNumber(dto.getClientSpocMobileNumber());
-            if(dto.getPositionType()!=null)existingClient.setPositionType(dto.getPositionType());
-
+            if (dto.getPositionType() != null) existingClient.setPositionType(dto.getPositionType());
+            if (dto.getSupportingCustomers() != null) existingClient.setSupportingCustomers(dto.getSupportingCustomers());
+            if (dto.getFeedBack() != null) existingClient.setFeedBack(dto.getFeedBack());
+            // 🔁 File uploads
             try {
                 if (files != null && !files.isEmpty()) {
-                    // Ensure the uploads directory exists
                     Path uploadDir = Paths.get("uploads");
                     if (!Files.exists(uploadDir)) {
                         Files.createDirectories(uploadDir);
@@ -201,16 +248,14 @@ public class BDM_service {
                             String fileName = file.getOriginalFilename();
                             fileNames.add(fileName);
 
-                            // Save the file to disk
                             Path filePath = uploadDir.resolve(fileName);
                             Files.write(filePath, file.getBytes());
                         }
                     }
-                    existingClient.setSupportingDocuments(fileNames);  // ✅ Store only file names
+                    existingClient.setSupportingDocuments(fileNames);
                 }
-
             } catch (IOException e) {
-                e.printStackTrace();
+                e.printStackTrace();  // Optionally convert to RuntimeException if needed
             }
 
             return convertToDTO(repository.save(existingClient));
@@ -218,6 +263,128 @@ public class BDM_service {
     }
 
 
+    // ✅ 1. Method with startDate and endDate passed
+    public List<BdmEmployeeDTO> getAllBdmEmployeesDateFilter(LocalDate startDate, LocalDate endDate) {
+        logger.info("📅 Fetching BDM employee stats from {} to {}", startDate, endDate);
+
+        List<BdmEmployeeProjection> bdmUsers = repository.findAllBdmEmployees();
+        logger.info("👥 Total BDM employees found: {}", bdmUsers.size());
+
+        List<BdmEmployeeDTO> result = new ArrayList<>();
+
+        for (BdmEmployeeProjection user : bdmUsers) {
+            String userId = user.getUserId();
+            String userName = user.getUserName();
+
+            logger.info("➡️ Processing BDM: {} (ID: {})", userName, userId);
+
+            long clientCount = repository.countClientsByUserIdAndDateRange(userId, startDate, endDate);
+            List<String> clientNames = repository.findClientNamesByUserIdAndDateRange(userId, startDate, endDate);
+
+            logger.info("📦 Clients for {}: {} | Count: {}", userName, clientNames, clientCount);
+
+            long submissionCount = 0;
+            long interviewCount = 0;
+            long placementCount = 0;
+            long requirementsCount = 0;
+
+            for (String client : clientNames) {
+                logger.debug("🔍 Client: {}", client);
+
+                long subCount = repository.countAllSubmissionsByClientNameAndDateRange(client, startDate, endDate);
+                long intCount = repository.countAllInterviewsByClientNameAndDateRange(client, startDate, endDate);
+                long plcCount = repository.countAllPlacementsByClientNameAndDateRange(client, startDate, endDate);
+                long reqCount = repository.countRequirementsByClientNameAndDateRange(client, startDate, endDate);
+
+                logger.debug("📑 Submissions: {}, Interviews: {}, Placements: {}, Requirements: {}",
+                        subCount, intCount, plcCount, reqCount);
+
+                submissionCount += subCount;
+                interviewCount += intCount;
+                placementCount += plcCount;
+                requirementsCount += reqCount;
+            }
+
+            result.add(new BdmEmployeeDTO(
+                    userId,
+                    userName,
+                    user.getRoleName(),
+                    user.getEmail(),
+                    user.getStatus(),
+                    clientCount,
+                    requirementsCount,
+                    submissionCount,
+                    interviewCount,
+                    placementCount
+            ));
+        }
+
+        logger.info("✅ BDM stats generation completed.");
+        return result;
+    }
+
+    // ✅ 2. Method for current month (auto sets date range)
+    public List<BdmEmployeeDTO> getAllBdmEmployees() {
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate = endDate.withDayOfMonth(1);
+
+        logger.info("🗓️ Defaulting to current month: {} to {}", startDate, endDate);
+
+        List<BdmEmployeeProjection> bdmUsers = repository.findAllBdmEmployees();
+        logger.info("👥 Total BDM employees found: {}", bdmUsers.size());
+
+        List<BdmEmployeeDTO> result = new ArrayList<>();
+
+        for (BdmEmployeeProjection user : bdmUsers) {
+            String userId = user.getUserId();
+            String userName = user.getUserName();
+
+            logger.info("➡️ Processing BDM: {} (ID: {})", userName, userId);
+
+            long clientCount = repository.countClientsByUserIdAndDateRange(userId, startDate, endDate);
+            List<String> clientNames = repository.findClientNamesByUserIdAndDateRange(userId, startDate, endDate);
+
+            logger.info("📦 Clients for {}: {} | Count: {}", userName, clientNames, clientCount);
+
+            long submissionCount = 0;
+            long interviewCount = 0;
+            long placementCount = 0;
+            long requirementsCount = 0;
+
+            for (String client : clientNames) {
+                logger.debug("🔍 Client: {}", client);
+
+                long subCount = repository.countAllSubmissionsByClientNameAndDateRange(client, startDate, endDate);
+                long intCount = repository.countAllInterviewsByClientNameAndDateRange(client, startDate, endDate);
+                long plcCount = repository.countAllPlacementsByClientNameAndDateRange(client, startDate, endDate);
+                long reqCount = repository.countRequirementsByClientNameAndDateRange(client, startDate, endDate);
+
+                logger.debug("📑 Submissions: {}, Interviews: {}, Placements: {}, Requirements: {}",
+                        subCount, intCount, plcCount, reqCount);
+
+                submissionCount += subCount;
+                interviewCount += intCount;
+                placementCount += plcCount;
+                requirementsCount += reqCount;
+            }
+
+            result.add(new BdmEmployeeDTO(
+                    userId,
+                    userName,
+                    user.getRoleName(),
+                    user.getEmail(),
+                    user.getStatus(),
+                    clientCount,
+                    requirementsCount,
+                    submissionCount,
+                    interviewCount,
+                    placementCount
+            ));
+        }
+
+        logger.info("✅ Current month BDM stats generation completed.");
+        return result;
+    }
 
     public void deleteClient(String id) {
         repository.deleteById(id);
@@ -236,7 +403,7 @@ public class BDM_service {
 
 
         // 2️⃣ Fetch Clients onboarded by the BDM
-        List<BdmClientDto> clientDetails = getClientDetails(userId,startDate,endDate);
+        List<BdmClientDto> clientDetails = getClientDetails(userId, startDate, endDate);
         log.info("✅ Fetched {} client details for userId: {}", clientDetails.size(), userId);
 
 
@@ -249,19 +416,19 @@ public class BDM_service {
         // 4️⃣ Fetch Interviews for each client
         Map<String, List<BdmInterviewDTO>> interviews = new HashMap<>();
         for (BdmClientDto client : clientDetails) {
-            interviews.put(client.getClientName(), getInterviewsDateFilter(client.getClientName(),startDate,endDate));
+            interviews.put(client.getClientName(), getInterviewsDateFilter(client.getClientName(), startDate, endDate));
         }
 
         // 5️⃣ Fetch Placements for each client
         Map<String, List<BdmPlacementDTO>> placements = new HashMap<>();
         for (BdmClientDto client : clientDetails) {
-            placements.put(client.getClientName(), getPlacementsDateFilter(client.getClientName(),startDate,endDate));
+            placements.put(client.getClientName(), getPlacementsDateFilter(client.getClientName(), startDate, endDate));
         }
 
         // 6️⃣ Fetch Requirements for each client (This section is now after client details)
         Map<String, List<RequirementDto>> requirements = new HashMap<>();
         for (BdmClientDto client : clientDetails) {
-            requirements.put(client.getClientName(), getRequirementsDateFilter(client.getClientName(),startDate,endDate));
+            requirements.put(client.getClientName(), getRequirements(client.getClientName()));
         }
 
         // 🔢 Logging total counts across all clients
@@ -269,6 +436,10 @@ public class BDM_service {
         int totalInterviews = interviews.values().stream().mapToInt(List::size).sum();
         int totalPlacements = placements.values().stream().mapToInt(List::size).sum();
         int totalRequirements = requirements.values().stream().mapToInt(List::size).sum();
+
+        System.out.println(String.format(
+                "Fetched BDM Count from %s to %s",
+                startDate, endDate));
 
         log.info("📊 Total Clients: {}", clientDetails.size());
         log.info("📊 Total Submissions (all clients combined): {}", totalSubmissions);
@@ -281,7 +452,6 @@ public class BDM_service {
 
         return new BdmClientDetailsDTO(bdmDetails, clientDetails, submissions, interviews, placements, requirements);
     }
-
     public BdmClientDetailsDTO getBdmClientDetailsDateRange(String userId,LocalDate startDate,LocalDate endDate) {
         log.info("🔍 Fetching BDM client details for userId: {}", userId);
 
@@ -325,6 +495,8 @@ public class BDM_service {
         int totalPlacements = placements.values().stream().mapToInt(List::size).sum();
         int totalRequirements = requirements.values().stream().mapToInt(List::size).sum();
 
+
+
         log.info("📊 Total Clients: {}", clientDetails.size());
         log.info("📊 Total Submissions (all clients combined): {}", totalSubmissions);
         log.info("📊 Total Interviews (all clients combined): {}", totalInterviews);
@@ -356,7 +528,6 @@ public class BDM_service {
                 ))
                 .collect(Collectors.toList());
     }
-
     private List<RequirementDto> getRequirementsDateFilter(String clientName,LocalDate startDate,LocalDate endDate) {
         log.info("🔍 Fetching requirements for client: {}", clientName);
 
@@ -376,7 +547,6 @@ public class BDM_service {
                 ))
                 .collect(Collectors.toList());
     }
-
 
 
     private List<BdmDetailsDto> getBdmDetails(String userId) {
@@ -439,7 +609,6 @@ public class BDM_service {
         }
         return null;
     }
-
     private List<BdmClientDto> getClientDetailsDateFilter(String userId,LocalDate startDate,LocalDate endDate) {
         List<Tuple> clientTuples = requirementsDao.findClientsByBdmUserIdAndCreatedAtBetween(userId,startDate,endDate);
         log.info("🔍 Fetching client details for userId: {}", userId);
@@ -458,10 +627,9 @@ public class BDM_service {
     }
 
 
-    private List<BdmClientDto> getClientDetails(String userId,LocalDate startDate,LocalDate endDate) {
-        List<Tuple> clientTuples = requirementsDao.findClientsByBdmUserIdAndCreatedAtBetween(userId,startDate,endDate);
+    private List<BdmClientDto> getClientDetails(String userId ,LocalDate startDate, LocalDate endDate) {
+        List<Tuple> clientTuples = requirementsDao.findClientsByBdmUserIdAndCreatedAtBetween(userId ,startDate, endDate);
         log.info("🔍 Fetching client details for userId: {}", userId);
-        log.info("SIze pf client tuples is {}", clientTuples.size());
 
         return clientTuples.stream()
                 .map(tuple -> new BdmClientDto(
@@ -492,7 +660,6 @@ public class BDM_service {
                 .collect(Collectors.toList());
     }
 
-
     private List<BdmSubmissionDTO> getSubmissionsDateFilter(String clientName,LocalDate startDate,LocalDate endDate) {
         List<Tuple> submissionTuples = requirementsDao.findAllSubmissionsByClientNameAndSubmittedAtBetween(clientName,startDate,endDate);
         log.info("🔍 Fetching submissions for client: {}", clientName);
@@ -512,8 +679,8 @@ public class BDM_service {
                 ))
                 .collect(Collectors.toList());
     }
-    private List<BdmSubmissionDTO> getSubmissions(String clientName,LocalDate startDate,LocalDate endDate) {
-        List<Tuple> submissionTuples = requirementsDao.findAllSubmissionsByClientNameAndSubmittedAtBetween(clientName,startDate,endDate);
+    private List<BdmSubmissionDTO> getSubmissions(String clientName, LocalDate startDate, LocalDate endDate) {
+        List<Tuple> submissionTuples = requirementsDao.findAllSubmissionsByClientNameAndSubmittedAtBetween(clientName, startDate, endDate);
         log.info("🔍 Fetching submissions for client: {}", clientName);
 
         return submissionTuples.stream()
@@ -582,6 +749,7 @@ public class BDM_service {
                 .collect(Collectors.toList());
     }
 
+
     private List<BdmPlacementDTO> getPlacements(String clientName) {
         List<Tuple> placementTuples = requirementsDao.findAllPlacementsByClientName(clientName);
         return placementTuples.stream()
@@ -595,6 +763,7 @@ public class BDM_service {
                 ))
                 .collect(Collectors.toList());
     }
+
     private List<BdmPlacementDTO> getPlacementsDateFilter(String clientName,LocalDate startDate,LocalDate endDate) {
         List<Tuple> placementTuples = requirementsDao.findAllPlacementsByClientNameDateFilter(clientName,startDate,endDate);
         return placementTuples.stream()
@@ -610,7 +779,6 @@ public class BDM_service {
     }
 
     public List<BDM_Client> getClientsByCreatedAtRange(LocalDate startDate, LocalDate endDate) {
-        // 1. Validate date range
         if (startDate == null || endDate == null) {
             throw new DateRangeValidationException("Start date and End date must not be null.");
         }
@@ -619,15 +787,17 @@ public class BDM_service {
             throw new DateRangeValidationException("End date cannot be before start date.");
         }
 
-        // 2. Prepare datetime range
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
-        // 3. Fetch data
         List<BDM_Client> clients = repository.getClientsByCreatedAtRange(startDateTime, endDateTime);
 
+        // 🔁 Set requirement count for each client
+        for (BDM_Client client : clients) {
+            int count = repository.countRequirementsByClientName(client.getClientName());
+            client.setNumberOfRequirements(count);
+        }
 
-        // 4. Log and return
         logger.info("✅ Found {} clients created between {} and {}", clients.size(), startDate, endDate);
         return clients;
     }
@@ -644,7 +814,7 @@ public class BDM_service {
         LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
         // ✅ Use the updated native query
-        List<Tuple> results = repo.findRequirementsByBdmUserIdAndDateRange(userId, startOfMonth, endOfMonth);
+        List<Tuple> results = repo.findRequirementsByBdmUserId(userId);
 
         List<RequirementsDto> dtos = results.stream().map(tuple -> {
             RequirementsDto dto = new RequirementsDto();

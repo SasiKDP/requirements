@@ -5,11 +5,9 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Timestamp;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -25,12 +23,15 @@ import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.dataquadinc.model.RequirementsModel;
 import com.dataquadinc.repository.RequirementsDao;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -47,8 +48,11 @@ public class RequirementsService {
 	@Autowired
 	private EmailService emailService;
 
-	private static final Logger log = LoggerFactory.getLogger(BDM_service.class);
+	@Autowired
+	private RestTemplate restTemplate;
 
+
+	private static final Logger log = LoggerFactory.getLogger(BDM_service.class);
 
 
 	@Transactional
@@ -112,10 +116,10 @@ public class RequirementsService {
 
 
 		// If jobId is not set, let @PrePersist handle the generation
-		// If jobId is not set, let @PrePersist handle the generation
 		if (model.getJobId() == null || model.getJobId().isEmpty()) {
 			model.setStatus("In Progress");
 			model.setRequirementAddedTimeStamp(LocalDateTime.now());
+			model.setUpdatedAt(LocalDateTime.now());
 			requirementsDao.save(model);
 		} else {
 			// Throw exception if the jobId already exists
@@ -173,80 +177,206 @@ public class RequirementsService {
 
 		try {
 			Set<String> recruiterIds = model.getRecruiterIds();
+			String assignedBy = model.getAssignedBy();
+
+			Set<String> sentEmails = new HashSet<>(); // To prevent duplicate emails
+
 			if (recruiterIds == null || recruiterIds.isEmpty()) {
 				logger.warn("No recruiter IDs found for job ID: {}", model.getJobId());
-				return;
-			}
+			} else {
+				logger.info("Found {} recruiters to send emails to for job ID: {}", recruiterIds.size(), model.getJobId());
 
-			logger.info("Found {} recruiters to send emails to for job ID: {}", recruiterIds.size(), model.getJobId());
+				for (String recruiterId : recruiterIds) {
+					try {
+						String cleanedRecruiterId = cleanRecruiterId(recruiterId);
+						logger.debug("Processing recruiter ID: {}", cleanedRecruiterId);
 
-			for (String recruiterId : recruiterIds) {
-				try {
-					// Clean the recruiterId (remove quotes if present)
-					String cleanedRecruiterId = cleanRecruiterId(recruiterId);
-					logger.debug("Processing recruiter with ID: {} (cleaned ID: {})", recruiterId, cleanedRecruiterId);
+						boolean isUpdate = model.getUpdatedAt() != null &&
+								model.getRequirementAddedTimeStamp() != null &&
+								!model.getUpdatedAt().isEqual(model.getRequirementAddedTimeStamp());
 
-					// Fetch recruiter email and username from the database
-					Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
+						Tuple userTuple = requirementsDao.findUserEmailAndUsernameByUserId(cleanedRecruiterId);
+						if (userTuple != null) {
+							String recruiterEmail = userTuple.get(0, String.class);
+							String recruiterName = userTuple.get(1, String.class);
 
-					if (userTuple != null) {
-						String recruiterEmail = userTuple.get(0, String.class);  // Fetch email
-						String recruiterName = userTuple.get(1, String.class);  // Fetch username
+							if (recruiterEmail != null && !recruiterEmail.isEmpty() && sentEmails.add(recruiterEmail)) {
+								String status = model.getStatus() != null ? model.getStatus().toLowerCase() : "inprogress";
+								String subject, text;
 
-						if (recruiterEmail != null && !recruiterEmail.isEmpty()) {
-							// Construct and send email
-							String subject = "New Job Assignment: " + model.getJobTitle();
-							String text = constructEmailBody(model, recruiterName);
+								if (isUpdate) {
+									subject = "Requirement Updated: " + model.getJobTitle();
+									text = constructUpdatedEmailBody(model, recruiterName);
+								} else {
+									switch (status) {
+										case "hold":
+											subject = "Job On Hold: " + model.getJobTitle();
+											text = constructHoldEmailBody(model, recruiterName);
+											break;
+										case "closed":
+											subject = "Job Closed: " + model.getJobTitle();
+											text = constructClosedEmailBody(model, recruiterName);
+											break;
+										default:
+											subject = "New Job Assignment: " + model.getJobTitle();
+											text = constructEmailBody(model, recruiterName);
+											break;
+									}
+								}
 
-							logger.info("Attempting to send email to recruiter: {} <{}> for job ID: {}",
-									recruiterName, recruiterEmail, model.getJobId());
-
-							try {
 								emailService.sendEmail(recruiterEmail, subject, text);
-								logger.info("Email successfully sent to recruiter: {} <{}> for job ID: {}",
-										recruiterName, recruiterEmail, model.getJobId());
-							} catch (Exception e) {
-								logger.error("Failed to send email to recruiter: {} <{}> for job ID: {}. Error: {}",
-										recruiterName, recruiterEmail, model.getJobId(), e.getMessage(), e);
+								logger.info("Email sent to recruiter: {} <{}>", recruiterName, recruiterEmail);
 							}
 						} else {
-							logger.error("Empty or null email found for recruiter ID: {} (Name: {}) for job ID: {}",
-									cleanedRecruiterId, recruiterName, model.getJobId());
+							logger.warn("No user info found for recruiter ID: {}", recruiterId);
+						}
+					} catch (Exception e) {
+						logger.error("Error processing recruiter {}: {}", recruiterId, e.getMessage(), e);
+					}
+				}
+			}
+
+			// ✅ Send email to Team Lead (assignedBy)
+			if (assignedBy != null && !assignedBy.isEmpty()) {
+				try {
+					Tuple teamLeadTuple = requirementsDao.findUserEmailAndUsernameByAssignedBy(assignedBy);
+					if (teamLeadTuple != null) {
+						String leadEmail = teamLeadTuple.get(0, String.class);
+						String leadName = teamLeadTuple.get(1, String.class);
+
+						if (leadEmail != null && !leadEmail.isEmpty() && sentEmails.add(leadEmail)) {
+							String subject = "Team Assignment Notification: " + model.getJobTitle();
+							String text = constructTeamLeadEmailBodyByStatus(model, leadName);
+							emailService.sendEmail(leadEmail, subject, text);
+							logger.info("Email sent to Team Lead: {} <{}>", leadName, leadEmail);
 						}
 					} else {
-						logger.error("No user information found for recruiter ID: {} for job ID: {}",
-								cleanedRecruiterId, model.getJobId());
+						logger.warn("No user info found for Team Lead: {}", assignedBy);
 					}
 				} catch (Exception e) {
-					logger.error("Error processing recruiter {} for job ID: {}. Error: {}",
-							recruiterId, model.getJobId(), e.getMessage(), e);
+					logger.error("Failed to send email to Team Lead ({}): {}", assignedBy, e.getMessage(), e);
 				}
 			}
 
 			logger.info("Completed email sending process for job ID: {}", model.getJobId());
 		} catch (Exception e) {
-			logger.error("Critical error in sending emails to recruiters for job ID: {}. Error: {}",
-					model.getJobId(), e.getMessage(), e);
-			throw new RuntimeException("Error in sending emails to recruiters: " + e.getMessage(), e);
+			logger.error("Critical error in sending emails for job ID: {}: {}", model.getJobId(), e.getMessage(), e);
+			throw new RuntimeException("Error in sending emails: " + e.getMessage(), e);
 		}
 	}
 
+	private String constructTeamLeadEmailBodyByStatus(RequirementsModel model, String leadName) {
+		String status = model.getStatus() != null ? model.getStatus().toLowerCase() : "inprogress";
+		switch (status) {
+			case "hold":
+				return constructTeamLeadHoldEmail(model, leadName);
+			case "closed":
+				return constructTeamLeadClosedEmail(model, leadName);
+			default:
+				return constructTeamLeadInProgressEmail(model, leadName);
+		}
+	}
+
+
+	private String constructTeamLeadInProgressEmail(RequirementsModel model, String leadName) {
+		return "Dear " + leadName + ",<br><br>" +
+				"You have successfully assigned the following requirement to your team.<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br>" +
+				"<b>Status:</b> " + model.getStatus() + "<br><br>" +
+				"Recruiters have been notified about this requirement.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+	private String constructTeamLeadHoldEmail(RequirementsModel model, String leadName) {
+		return "Dear " + leadName + ",<br><br>" +
+				"The following job requirement you assigned is currently on hold:<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br><br>" +
+				"Your team has been notified.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+	private String constructTeamLeadClosedEmail(RequirementsModel model, String leadName) {
+		return "Dear " + leadName + ",<br><br>" +
+				"This is to inform you that the following requirement you assigned has been <b>closed</b>:<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br><br>" +
+				"Recruiters have been notified. No further submissions are needed.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+
+
+
 	// Update constructEmailBody method to use recruiterName instead of fetching separately
 	private String constructEmailBody(RequirementsModel model, String recruiterName) {
-		return "Dear " + recruiterName + ",\n\n" +
-				"I hope you are doing well.\n\n" +
-				"You have been assigned a new job requirement. Please find the details below:\n\n" +
-				"▶ Job Title: " + model.getJobTitle() + "\n" +
-				"▶ Client: " + model.getClientName() + "\n" +
-				"▶ Location: " + model.getLocation() + "\n" +
-				"▶ Job Type: " + model.getJobType() + "\n" +
-				"▶ Experience Required: " + model.getExperienceRequired() + " years\n" +
-				"▶ Assigned By: " + model.getAssignedBy() + "\n\n" +
-				"Please review the details and proceed with the necessary actions. Additional information is available on your dashboard.\n\n" +
-				"If you have any questions or need further clarification, feel free to reach out.\n\n" +
-				"Best regards,\n" +
-				"Dataquad";
+		String status = model.getStatus() != null ? model.getStatus().toLowerCase() : "inprogress";
+		switch (status) {
+			case "hold":
+				return constructHoldEmailBody(model, recruiterName);
+			case "closed":
+				return constructClosedEmailBody(model, recruiterName);
+			default:
+				return constructInProgressEmailBody(model, recruiterName);
+		}
 	}
+
+	private String constructInProgressEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",<br><br>" +
+				"You have been assigned a new job requirement. Please find the details below:<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br>" +
+				"<b>Job Type:</b> " + model.getJobType() + "<br>" +
+				"<b>Experience Required:</b> " + model.getExperienceRequired() + " years<br>" +
+				"<b>Assigned By:</b> " + model.getAssignedBy() + "<br><br>" +
+				"Please start working on this requirement immediately. Check your dashboard for more details.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+	private String constructHoldEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",<br><br>" +
+				"The following job requirement is currently on hold:<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br><br>" +
+				"No further action is required at this moment. You will be notified once it's resumed.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+	private String constructClosedEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",<br><br>" +
+				"This is to inform you that the following job requirement has been <b>closed</b>:<br><br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br><br>" +
+				"No further submissions are needed. Thank you for your efforts.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
+	private String constructUpdatedEmailBody(RequirementsModel model, String recruiterName) {
+		return "Dear " + recruiterName + ",<br><br>" +
+				"The job requirement assigned to you has been <b>updated</b>. Please find the latest details below:<br><br>" +
+				"<b>Job Id:</b> " + model.getJobId() + "<br>" +
+				"<b>Job Title:</b> " + model.getJobTitle() + "<br>" +
+				"<b>Client:</b> " + model.getClientName() + "<br>" +
+				"<b>Location:</b> " + model.getLocation() + "<br>" +
+				"<b>Job Type:</b> " + model.getJobType() + "<br>" +
+				"<b>Experience Required:</b> " + model.getExperienceRequired() + " years<br>" +
+				"<b>Assigned By:</b> " + model.getAssignedBy() + "<br><br>" +
+				"Kindly check your dashboard for full updates and proceed accordingly.<br><br>" +
+				"Regards,<br>Dataquad";
+	}
+
 
 
 	public String processJobDescriptionFile(MultipartFile jobDescriptionFile) throws IOException {
@@ -314,12 +444,15 @@ public class RequirementsService {
 
 		// 2. Fetch data from repository
 		List<RequirementsModel> requirementsList =
-				requirementsDao.findByRequirementAddedTimeStampBetween(startOfMonth, endOfMonth);
+				requirementsDao.findByRequirementAdded();
+
+		logger.info("Fetched no of Requirements {}", requirementsList.size());
 
 		// 3. Convert to DTOs
 		List<RequirementsDto> dtoList = requirementsList.stream()
 				.map(requirement -> {
 					RequirementsDto dto = new RequirementsDto();
+					List<String> recruiterNames = requirementsDao.findRecruiterNamesByJobId(requirement.getJobId());
 
 					dto.setJobId(requirement.getJobId());
 					dto.setJobTitle(requirement.getJobTitle());
@@ -338,25 +471,28 @@ public class RequirementsService {
 					dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
 					dto.setRecruiterIds(requirement.getRecruiterIds());
 					dto.setStatus(requirement.getStatus());
-					dto.setRecruiterName(requirement.getRecruiterName());
+					dto.setRecruiterName(new HashSet<>(recruiterNames));
 					dto.setAssignedBy(requirement.getAssignedBy());
+					dto.setUpdatedAt(requirement.getUpdatedAt());
 
 					// Submissions and Interviews
 					String jobId = requirement.getJobId();
 					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(jobId));
 					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(jobId));
 
-					// No need to manually set age anymore
-
+					// No need to manually set age anym
 					return dto;
 				})
 				.collect(Collectors.toList());
 
 		// 4. Return appropriate response
-
+		if (dtoList.isEmpty()) {
+			return new ErrorResponse(HttpStatus.NOT_FOUND.value(), "Requirements Not Found", LocalDateTime.now());
+		} else {
 			return dtoList;
-
+		}
 	}
+
 
 	public List<RequirementsDto> getRequirementsByDateRange(LocalDate startDate, LocalDate endDate) {
 
@@ -377,6 +513,8 @@ public class RequirementsService {
 		logger.info("✅ Fetched {} requirements between {} and {}", requirements.size(), startDate, endDate);
 
 		return requirements.stream().map(requirement -> {
+			List<String> recruiterNames = requirementsDao.findRecruiterNamesByJobId(requirement.getJobId());
+
 			RequirementsDto dto = new RequirementsDto();
 			dto.setJobId(requirement.getJobId());
 			dto.setJobTitle(requirement.getJobTitle());
@@ -395,7 +533,7 @@ public class RequirementsService {
 			dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
 			dto.setRecruiterIds(requirement.getRecruiterIds());
 			dto.setStatus(requirement.getStatus());
-			dto.setRecruiterName(requirement.getRecruiterName());
+			dto.setRecruiterName(new HashSet<>(recruiterNames));
 			dto.setAssignedBy(requirement.getAssignedBy());
 
 			// Stats
@@ -406,7 +544,6 @@ public class RequirementsService {
 			return dto;
 		}).collect(Collectors.toList());
 	}
-
 
 
 	public RequirementsDto getRequirementDetailsById(String jobId) {
@@ -466,9 +603,9 @@ public class RequirementsService {
 		LocalDateTime endDateTime = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
 		// 🔍 Fetch jobs for recruiter within current month
-		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterIdAndDateRange(
+		List<RequirementsModel> jobsByRecruiterId = requirementsDao.findJobsByRecruiterId(
 				recruiterId, startDateTime, endDateTime);
-
+		logger.info("Number of Requirements {}", jobsByRecruiterId.size());
 
 
 		// 🔁 Map to DTOs
@@ -522,7 +659,6 @@ public class RequirementsService {
 	}
 
 
-
 	@Transactional
 	public ResponseBean updateRequirementDetails(RequirementsDto requirementsDto) {
 		try {
@@ -568,11 +704,54 @@ public class RequirementsService {
 			existingRequirement.setSalaryPackage(requirementsDto.getSalaryPackage());
 			existingRequirement.setNoOfPositions(requirementsDto.getNoOfPositions());
 			existingRequirement.setRecruiterIds(requirementsDto.getRecruiterIds());
-			existingRequirement.setRecruiterName(requirementsDto.getRecruiterName());
-			existingRequirement.setAssignedBy(requirementsDto.getAssignedBy());
+			if (StringUtils.hasText(requirementsDto.getAssignedTo())) {
+				existingRequirement.setAssignedBy(requirementsDto.getAssignedTo());
+			} else {
+				existingRequirement.setAssignedBy(requirementsDto.getAssignedBy());
+			}
+			existingRequirement.setUpdatedAt(LocalDateTime.now());
 			if (requirementsDto.getStatus() != null) existingRequirement.setStatus(requirementsDto.getStatus());
 
+			if (requirementsDto.getStatus() != null) {
+				existingRequirement.setStatus(requirementsDto.getStatus());
 
+				// ✅ If requirement is marked as CLOSED → trigger bench import
+				if ("closed".equalsIgnoreCase(requirementsDto.getStatus())) {
+					try {
+						String jobId = requirementsDto.getJobId();
+
+						// 1. Fetch candidates for jobId
+						String fetchUrl = "http://182.18.177.16/candidate/closedjobs/" + jobId;
+
+						ResponseEntity<List<Map<String, Object>>> fetchResponse = restTemplate.exchange(
+								fetchUrl,
+								HttpMethod.GET,
+								null,
+								new ParameterizedTypeReference<List<Map<String, Object>>>() {}
+						);
+
+						List<Map<String, Object>> candidateList = fetchResponse.getBody();
+
+						if (candidateList != null && !candidateList.isEmpty()) {
+							// 2. Post candidates to /bench/import
+							String benchUrl = "https://mymulya.com/candidate/bench/import";
+
+							HttpHeaders headers = new HttpHeaders();
+							headers.setContentType(MediaType.APPLICATION_JSON);
+
+							HttpEntity<List<Map<String, Object>>> benchRequest = new HttpEntity<>(candidateList, headers);
+
+							ResponseEntity<String> benchResponse = restTemplate.postForEntity(benchUrl, benchRequest, String.class);
+
+							logger.info("Bench import response for jobId {}: {}", jobId, benchResponse.getBody());
+						} else {
+							logger.warn("No candidates found for closed jobId: {}", jobId);
+						}
+					} catch (Exception ex) {
+						logger.error("Failed to push candidates to bench for jobId: {}", requirementsDto.getJobId(), ex);
+					}
+				}
+			}
 			// Save the updated requirement to the database
 			requirementsDao.save(existingRequirement);
 
@@ -585,8 +764,8 @@ public class RequirementsService {
 			// Return success response
 			return new ResponseBean(true, "Updated Successfully", null, null);
 		} catch (Exception e) {
-			logger.error("Error updating requirement", e);
-			return new ResponseBean(false, "Error updating requirement", "Internal Server Error", null);
+			logger.error("Error updating requirement", e.getMessage());
+			return new ResponseBean(false, "Error updating requirement" + e.getMessage(), "Internal Server Error", null);
 		}
 	}
 
@@ -620,8 +799,8 @@ public class RequirementsService {
 				return null;
 			}
 		} catch (Exception e) {
-			logger.error("Error fetching recruiter username", e);
-			throw new RuntimeException("Error fetching recruiter username", e);
+			logger.error("Error fetching recruiter username", e.getMessage());
+			throw new RuntimeException("Error fetching recruiter username" + e.getMessage(), e);
 		}
 	}
 
@@ -660,6 +839,7 @@ public class RequirementsService {
 
 		return recruiters;
 	}
+
 	public RequirementDetailsDto getRequirementDetailsByJobId(String jobId) {
 		// Fetch the requirement
 		RequirementsModel requirement = requirementsDao.findByJobId(jobId)
@@ -706,7 +886,6 @@ public class RequirementsService {
 		dto.setNoOfPositions(requirement.getNoOfPositions());
 		dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
 		dto.setRecruiterIds(requirement.getRecruiterIds());
-		dto.setRecruiterName(requirement.getRecruiterName());
 		dto.setStatus(requirement.getStatus());
 		dto.setAssignedBy(requirement.getAssignedBy());
 		dto.setJobDescriptionBlob(requirement.getJobDescriptionBlob());
@@ -820,8 +999,6 @@ public class RequirementsService {
 	}
 
 
-
-
 	/**
 	 * Safely retrieves values from Tuple, handling null cases.
 	 */
@@ -835,8 +1012,10 @@ public class RequirementsService {
 	}
 
 	public CandidateStatsResponse getCandidateStatsLast30Days() {
+
 		LocalDate endDate = LocalDate.now();
-		LocalDate startDate = endDate.withDayOfMonth(1);
+		LocalDate startDate = LocalDate.now().withDayOfMonth(1); // First day of this month
+
 
 		List<UserStatsDTO> userStatsList = new ArrayList<>();
 
@@ -853,6 +1032,7 @@ public class RequirementsService {
 					dto.setNumberOfClients(convertToInt(tuple.get("numberOfClients")));
 					dto.setNumberOfRequirements(convertToInt(tuple.get("numberOfRequirements")));
 					dto.setNumberOfSubmissions(convertToInt(tuple.get("numberOfSubmissions")));
+					dto.setNumberOfScreenRejects(convertToInt(tuple.get("numberOfScreenRejects")));
 					dto.setNumberOfInterviews(convertToInt(tuple.get("numberOfInterviews")));
 					dto.setNumberOfPlacements(convertToInt(tuple.get("numberOfPlacements")));
 
@@ -875,6 +1055,7 @@ public class RequirementsService {
 					dto.setSelfSubmissions(convertToInt(tuple.get("selfSubmissions")));
 					dto.setSelfInterviews(convertToInt(tuple.get("selfInterviews")));
 					dto.setSelfPlacements(convertToInt(tuple.get("selfPlacements")));
+					dto.setTeamScreenRejectCount(convertToInt(tuple.get("teamScreenRejectCount")));
 					dto.setTeamSubmissions(convertToInt(tuple.get("teamSubmissions")));
 					dto.setTeamInterviews(convertToInt(tuple.get("teamInterviews")));
 					dto.setTeamPlacements(convertToInt(tuple.get("teamPlacements")));
@@ -892,8 +1073,9 @@ public class RequirementsService {
 		return new CandidateStatsResponse(userStatsList);
 	}
 
+
 	public List<Coordinator_DTO> getCoordinatorStats() {
-		List<Tuple> tuples = requirementsDao.countInterviewsByStatus("8");
+		List<Tuple> tuples = requirementsDao.countInterviewsByStatus();
 		List<Coordinator_DTO> dtoList = new ArrayList<>();
 
 		for (Tuple tuple : tuples) {
@@ -903,7 +1085,8 @@ public class RequirementsService {
 			dto.setEmployeeName(tuple.get("employeeName", String.class));
 			dto.setEmployeeEmail(tuple.get("employeeEmail", String.class));
 
-			dto.setGetTotalInterviews(convertToInt(tuple.get("scheduledInterviewsCount")));
+			dto.setGetTotalInterviews(convertToInt(tuple.get("totalInterviews")));
+			dto.setTotalScheduled(convertToInt(tuple.get("scheduledInterviewsCount")));
 			dto.setTotalRejected(convertToInt(tuple.get("rejectedInterviewsCount")));
 			dto.setTotalSelected(convertToInt(tuple.get("selectedInterviewsCount")));
 
@@ -912,7 +1095,6 @@ public class RequirementsService {
 
 		return dtoList;
 	}
-
 
 	private int convertToInt(Object value) {
 		if (value instanceof BigInteger) {
@@ -937,6 +1119,21 @@ public class RequirementsService {
 		String username = roleInfo.get("userName", String.class);
 		log.info("✅ Retrieved role '{}' and username '{}' for userId: {}", role, username, userId);
 
+		LocalDate endDate = LocalDate.now();
+		LocalDate startDate = LocalDate.now().withDayOfMonth(1); // First day of this month
+
+
+		// 💥 First check: Null check for input dates
+		if (startDate == null || endDate == null) {
+			throw new DateRangeValidationException("Start date and End date must not be null.");
+		}
+
+		// 💥 Second check: End date must not be before start date
+		if (endDate.isBefore(startDate)) {
+			throw new DateRangeValidationException("End date cannot be before start date.");
+		}
+
+
 		List<SubmittedCandidateDTO> submittedCandidates;
 		List<InterviewScheduledDTO> scheduledInterviews;
 		List<JobDetailsDTO> jobDetails;
@@ -947,19 +1144,19 @@ public class RequirementsService {
 		// 2️⃣ Fetch data based on role
 		if ("Teamlead".equalsIgnoreCase(role)) {
 			log.info("🧩 User is a Teamlead. Fetching data assigned by username: {}", username);
-			submittedCandidates = requirementsDao.findSubmittedCandidatesByAssignedBy(username);
-			scheduledInterviews = requirementsDao.findScheduledInterviewsByAssignedBy(username);
-			jobDetails = requirementsDao.findJobDetailsByAssignedBy(username);
-			placementDetails = requirementsDao.findPlacementCandidatesByAssignedBy(username);
-			clientDetails = requirementsDao.findClientDetailsByAssignedBy(username);
+			submittedCandidates = requirementsDao.findSubmittedCandidatesByAssignedByAndDateRange(username, startDate, endDate);
+			scheduledInterviews = requirementsDao.findScheduledInterviewsByAssignedByAndDateRange(username, startDate, endDate);
+			jobDetails = requirementsDao.findJobDetailsByAssignedByAndDateRange(username, startDate, endDate);
+			placementDetails = requirementsDao.findPlacementCandidatesByAssignedByAndDateRange(username, startDate, endDate);
+			clientDetails = requirementsDao.findClientDetailsByAssignedByAndDateRange(username, startDate, endDate);
 			employeeDetailsTuples = requirementsDao.getTeamleadDetailsByUserId(userId);
 		} else {
 			log.info("🧩 User is an individual contributor. Fetching data by userId: {}", userId);
-			submittedCandidates = requirementsDao.findSubmittedCandidatesByUserId(userId);
-			scheduledInterviews = requirementsDao.findScheduledInterviewsByUserId(userId);
-			jobDetails = requirementsDao.findJobDetailsByUserId(userId);
-			placementDetails = requirementsDao.findPlacementCandidatesByUserId(userId);
-			clientDetails = requirementsDao.findClientDetailsByUserId(userId);
+			submittedCandidates = requirementsDao.findSubmittedCandidatesByUserIdAndDateRange(userId, startDate, endDate);
+			scheduledInterviews = requirementsDao.findScheduledInterviewsByUserIdAndDateRange(userId, startDate, endDate);
+			jobDetails = requirementsDao.findJobDetailsByUserIdAndDateRange(userId, startDate, endDate);
+			placementDetails = requirementsDao.findPlacementCandidatesByUserIdAndDateRange(userId, startDate, endDate);
+			clientDetails = requirementsDao.findClientDetailsByUserIdAndDateRange(userId, startDate, endDate);
 			employeeDetailsTuples = requirementsDao.getEmployeeDetailsByUserId(userId);
 		}
 
@@ -974,6 +1171,8 @@ public class RequirementsService {
 		// 4️⃣ Mapping employee details
 		log.info("🛠️ Mapping employee details for userId: {}", userId);
 		List<EmployeeDetailsDTO> employeeDetails = mapEmployeeDetailsTuples(employeeDetailsTuples);
+
+		log.info("📆 Date Range: From {} to {}", startDate, endDate);
 
 		// 🔢 Logging total counts
 		log.info("📊 Total Submitted Candidates: {}", submittedCandidates.size());
@@ -1055,7 +1254,6 @@ public class RequirementsService {
 	}
 
 
-
 	// helper method to check if alias exists in tuple
 	private boolean hasAlias(Tuple tuple, String alias) {
 		return tuple.getElements().stream().anyMatch(e -> alias.equalsIgnoreCase(e.getAlias()));
@@ -1078,9 +1276,7 @@ public class RequirementsService {
 		LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
 		// 4. Fetch requirements
-		List<RequirementsModel> requirements = requirementsDao.findJobsAssignedByNameAndDateRange(
-				assignedBy, startOfMonth, endOfMonth
-		);
+		List<RequirementsModel> requirements = requirementsDao.findJobsAssignedByName(assignedBy, startOfMonth, endOfMonth);
 
 		// 5. Logging
 		logger.info("Fetched {} requirements for user ID '{}' (assigned_by='{}') for current month {} to {}",
@@ -1108,7 +1304,6 @@ public class RequirementsService {
 					dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
 					dto.setRecruiterIds(requirement.getRecruiterIds());
 					dto.setStatus(requirement.getStatus());
-					dto.setRecruiterName(requirement.getRecruiterName());
 					dto.setAssignedBy(requirement.getAssignedBy());
 					dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(requirement.getJobId()));
 					dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(requirement.getJobId()));
@@ -1173,7 +1368,6 @@ public class RequirementsService {
 			dto.setRequirementAddedTimeStamp(requirement.getRequirementAddedTimeStamp());
 			dto.setRecruiterIds(requirement.getRecruiterIds());
 			dto.setStatus(requirement.getStatus());
-			dto.setRecruiterName(requirement.getRecruiterName());
 			dto.setAssignedBy(requirement.getAssignedBy());
 			dto.setNumberOfSubmissions(requirementsDao.getNumberOfSubmissionsByJobId(requirement.getJobId()));
 			dto.setNumberOfInterviews(requirementsDao.getNumberOfInterviewsByJobId(requirement.getJobId()));
@@ -1188,11 +1382,11 @@ public class RequirementsService {
 		return dtoList;
 	}
 
-	public CandidateStatsResponse getCandidateStatsDateFilter(LocalDate startDate,LocalDate endDate) {
+	public CandidateStatsResponse getCandidateStatsDateFilter(LocalDate startDate, LocalDate endDate) {
 		List<UserStatsDTO> userStatsList = new ArrayList<>();
 
 		// 👤 Employee Stats
-		List<Tuple> employeeStats = requirementsDao.getEmployeeCandidateStats(startDate,endDate);
+		List<Tuple> employeeStats = requirementsDao.getEmployeeCandidateStats(startDate, endDate);
 		userStatsList.addAll(employeeStats.stream()
 				.map(tuple -> {
 					UserStatsDTO dto = new UserStatsDTO();
@@ -1212,7 +1406,7 @@ public class RequirementsService {
 		);
 
 		// 👨‍🏫 Teamlead Stats
-		List<Tuple> teamleadStats = requirementsDao.getTeamleadCandidateStats(startDate,endDate);
+		List<Tuple> teamleadStats = requirementsDao.getTeamleadCandidateStats(startDate, endDate);
 		userStatsList.addAll(teamleadStats.stream()
 				.map(tuple -> {
 					UserStatsDTO dto = new UserStatsDTO();
@@ -1301,4 +1495,292 @@ public class RequirementsService {
 				employeeDetails
 		);
 	}
+
+	public List<InProgressRequirementDTO> getInProgressRequirements(LocalDate startDate, LocalDate endDate) {
+		log.info("🔍 Fetching 'In Progress' requirements between {} and {}", startDate, endDate);
+
+		boolean isToday = startDate.equals(endDate) && startDate.equals(LocalDate.now());
+
+		List<Object[]> results = requirementsDao.findInProgressRequirementsByDateRange(startDate, endDate, isToday);
+		log.debug("✅ Raw DB results fetched: {}", results.size());
+
+		List<InProgressRequirementDTO> dtos = new ArrayList<>();
+
+		for (Object[] row : results) {
+			try {
+				InProgressRequirementDTO dto = mapRowToDTO(row);
+				if (dto != null) {
+					dtos.add(dto);
+				}
+			} catch (Exception ex) {
+				log.error("❌ Error mapping row to DTO: {}", Arrays.toString(row), ex);
+			}
+		}
+
+		log.info("✅ Successfully mapped {} simplified In Progress requirements.", dtos.size());
+
+		dtos.sort(
+				Comparator.comparing(
+						InProgressRequirementDTO::getUpdatedDateTime,
+						Comparator.nullsLast(Comparator.reverseOrder())
+				)
+		);
+
+		return dtos;
+	}
+
+	private InProgressRequirementDTO mapRowToDTO(Object[] row) {
+		String recruiterId = (String) row[0];
+		String recruiterName = (String) row[1];
+		String jobId = (String) row[2];
+		String clientName = (String) row[3];
+		String bdmName = (String) row[4];
+		String teamlead = (String) row[5];
+		String technologies = (String) row[6];
+		Object rawPostedDate = row[7];
+		Object rawUpdatedDateTime = row[8];
+		Object rawNumberOfSubmissions = row[9];
+		Object rawNumberOfScreenReject = row[10];
+
+		LocalDate postedDate = parseToLocalDate(rawPostedDate);
+		LocalDateTime updatedDateTime = parseToLocalDateTime(rawUpdatedDateTime);
+
+		// Optional: Convert to IST (only if needed — if DB stores UTC timestamps)
+		if (updatedDateTime != null) {
+			updatedDateTime = updatedDateTime.atZone(ZoneId.of("UTC"))
+					.withZoneSameInstant(ZoneId.of("Asia/Kolkata"))
+					.toLocalDateTime();
+		}
+
+		long numberOfSubmissions = rawNumberOfSubmissions != null ? ((Number) rawNumberOfSubmissions).longValue() : 0;
+		long numberOfScreenReject = rawNumberOfScreenReject != null ? ((Number) rawNumberOfScreenReject).longValue() : 0;
+
+		return new InProgressRequirementDTO(
+				recruiterId,
+				recruiterName,
+				jobId,
+				clientName,
+				bdmName,
+				teamlead,
+				technologies,
+				postedDate,
+				updatedDateTime,
+				numberOfSubmissions,
+				numberOfScreenReject
+		);
+	}
+
+	private LocalDate parseToLocalDate(Object obj) {
+		if (obj instanceof String str) {
+			try {
+				return LocalDate.parse(str);
+			} catch (DateTimeParseException e) {
+				log.warn("⚠️ Error parsing LocalDate: {}", str, e);
+			}
+		} else if (obj instanceof LocalDate date) {
+			return date;
+		}
+		return null;
+	}
+
+	private LocalDateTime parseToLocalDateTime(Object obj) {
+		if (obj instanceof String str) {
+			try {
+				return LocalDateTime.parse(str, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+			} catch (DateTimeParseException e) {
+				log.warn("⚠️ Error parsing LocalDateTime: {}", str, e);
+			}
+		} else if (obj instanceof LocalDateTime dateTime) {
+			return dateTime;
+		}
+		return null;
+	}
+
+
+	public String sendInProgressEmail(String userId, List<InProgressRequirementDTO> requirements) {
+		String recruiterName;
+
+		// ✅ If userId is null or "null", treat it as request for all recruiters
+		if (userId == null || "null".equalsIgnoreCase(userId)) {
+			recruiterName = "All Recruiters";
+
+			// 🔁 If no requirements provided, fetch from DB
+			if (requirements == null) {
+				LocalDate today = LocalDate.now();
+				requirements = getInProgressRequirements(today, today);
+			}
+
+		} else {
+			recruiterName = requirementsDao.findUserNameByUserId(userId);
+			if (recruiterName == null || recruiterName.isEmpty()) {
+				throw new UserNotFoundException("No User Found with User Id: " + userId);
+			}
+
+			if (requirements == null) {
+				throw new IllegalArgumentException("❌ Recruiter-specific email requires data in request body.");
+			}
+
+			// 🔍 Filter only this recruiter's data
+			requirements = requirements.stream()
+					.filter(r -> userId.equals(r.getRecruiterId()))
+					.collect(Collectors.toList());
+		}
+
+		if (requirements == null || requirements.isEmpty()) {
+			return "⚠️ No InProgress data found for: " + recruiterName;
+		}
+
+		logger.info("📨 Preparing to send InProgress email for: {}", recruiterName);
+
+		requirements.sort(Comparator
+				.comparing((InProgressRequirementDTO dto) ->
+						Optional.ofNullable(dto.getTeamlead()).orElse("zzzzzz"), String.CASE_INSENSITIVE_ORDER)
+				.thenComparing(InProgressRequirementDTO::getUpdatedDateTime,
+						Comparator.nullsLast(Comparator.reverseOrder()))
+		);
+
+		String subject = "InProgress Stats - " + recruiterName + " " + LocalDate.now();
+
+		String html = (userId == null || "null".equalsIgnoreCase(userId))
+				? buildTeamleadWiseEmail(requirements)
+				: buildRecruiterWiseEmail(requirements, recruiterName);
+
+		List<String> recipients = requirementsDao.findEmailsByDesignationIgnoreCase("director");
+
+		if (recipients.isEmpty()) {
+			throw new RuntimeException("No recipients found with designation = 'director'");
+		}
+
+		for (String email : recipients) {
+			emailService.sendEmail(email, subject, html);
+		}
+		return "✅ Email Sent Successfully for: " + recruiterName;
+	}
+
+
+
+	private String buildTeamleadWiseEmail(List<InProgressRequirementDTO> requirements) {
+		StringBuilder sb = new StringBuilder();
+
+		sb.append("<h2>In Progress Submission Report</h2>");
+		sb.append("<p><strong>Generated For:</strong> All Recruiters</p>");
+		long distinctJobCount = requirements.stream()
+				.map(InProgressRequirementDTO::getJobId)
+				.filter(Objects::nonNull)
+				.distinct()
+				.count();
+
+		long totalSubmissionCount = requirements.stream()
+				.map(InProgressRequirementDTO::getNumberOfSubmissions)
+				.filter(Objects::nonNull)
+				.mapToLong(Long::longValue)
+				.sum();
+
+		sb.append("<p><strong>Total Jobs:</strong> ").append(distinctJobCount).append("</p><br>");
+		sb.append("<p><strong>Total Submissions:</strong> ").append(totalSubmissionCount).append("</p><br>");
+
+		// 🔍 Filter out entries with blank/null teamlead
+		List<InProgressRequirementDTO> filtered = requirements.stream()
+				.filter(r -> r.getTeamlead() != null && !r.getTeamlead().isBlank())
+				.toList();
+
+		// 🔄 Group by teamlead
+		Map<String, List<InProgressRequirementDTO>> groupedByTeamlead = filtered.stream()
+				.collect(Collectors.groupingBy(InProgressRequirementDTO::getTeamlead));
+
+		// 📌 Sort teamleads alphabetically
+		List<String> sortedTeamleads = new ArrayList<>(groupedByTeamlead.keySet());
+		sortedTeamleads.sort(String.CASE_INSENSITIVE_ORDER);
+
+		for (String teamlead : sortedTeamleads) {
+			List<InProgressRequirementDTO> teamleadRequirements = groupedByTeamlead.get(teamlead);
+
+			long distinctRecruiters = teamleadRequirements.stream()
+					.map(InProgressRequirementDTO::getRecruiterId)
+					.filter(Objects::nonNull)
+					.distinct()
+					.count();
+
+			long distinctJobs = teamleadRequirements.stream()
+					.map(InProgressRequirementDTO::getJobId)
+					.filter(Objects::nonNull)
+					.distinct()
+					.count();
+
+			long totalSubmissions = teamleadRequirements.stream()
+					.mapToLong(InProgressRequirementDTO::getNumberOfSubmissions)
+					.sum();
+
+			// ⬇️ Section Header
+			sb.append("<h3>Team Lead: ").append(teamlead).append("</h3>");
+			sb.append("<p>👤 Recruiters: ").append(distinctRecruiters)
+					.append(" | 📌 Jobs: ").append(distinctJobs)
+					.append(" | 📥 Submissions: ").append(totalSubmissions)
+					.append("</p>");
+
+			// ⬇️ Table
+			sb.append("<table style='border-collapse: collapse; width: 100%; margin-bottom: 30px;' border='1' cellspacing='0' cellpadding='8'>");
+			sb.append("<thead style='background-color: #f2f2f2;'>")
+					.append("<tr>")
+					.append("<th>Recruiter</th>")
+					.append("<th>BDM</th>")
+					.append("<th>Job ID</th>")
+					.append("<th>Client</th>")
+					.append("<th>Technologies</th>")
+					.append("<th>Submissions</th>")
+					.append("</tr>")
+					.append("</thead><tbody>");
+
+			for (InProgressRequirementDTO req : teamleadRequirements) {
+				sb.append("<tr>")
+						.append("<td>").append(Optional.ofNullable(req.getRecruiterName()).orElse("-")).append("</td>")
+						.append("<td>").append(Optional.ofNullable(req.getBdm()).orElse("-")).append("</td>")
+						.append("<td>").append(Optional.ofNullable(req.getJobId()).orElse("-")).append("</td>")
+						.append("<td>").append(Optional.ofNullable(req.getClientName()).orElse("-")).append("</td>")
+						.append("<td>").append(Optional.ofNullable(req.getTechnology()).orElse("-")).append("</td>")
+						.append("<td>").append(req.getNumberOfSubmissions()).append("</td>")
+						.append("</tr>");
+			}
+
+			sb.append("</tbody></table>");
+		}
+
+		return sb.toString();
+	}
+
+
+	private String buildRecruiterWiseEmail(List<InProgressRequirementDTO> requirements, String recruiterName) {
+		StringBuilder sb = new StringBuilder();
+
+		sb.append("<h3>In Progress Submission Report for Recruiter: ").append(recruiterName).append("</h3>");
+		sb.append("<p>Total Jobs: ").append(requirements.size()).append("</p>");
+
+		sb.append("<table style='border-collapse: collapse; width: 100%;' border='1' cellspacing='0' cellpadding='8'>");
+		sb.append("<thead style='background-color: #f2f2f2;'>");
+		sb.append("<tr>")
+				.append("<th>BDM</th>")
+				.append("<th>Team Lead</th>")
+				.append("<th>Job ID</th>")
+				.append("<th>Client</th>")
+				.append("<th>Technologies</th>")
+				.append("<th>Submissions</th>")
+				.append("</tr>");
+		sb.append("</thead><tbody>");
+
+		for (InProgressRequirementDTO req : requirements) {
+			sb.append("<tr>")
+					.append("<td>").append(Optional.ofNullable(req.getBdm()).orElse("-")).append("</td>")
+					.append("<td>").append(Optional.ofNullable(req.getTeamlead()).orElse("-")).append("</td>")
+					.append("<td>").append(Optional.ofNullable(req.getJobId()).orElse("-")).append("</td>")
+					.append("<td>").append(Optional.ofNullable(req.getClientName()).orElse("-")).append("</td>")
+					.append("<td>").append(Optional.ofNullable(req.getTechnology()).orElse("-")).append("</td>")
+					.append("<td>").append(req.getNumberOfSubmissions()).append("</td>")
+					.append("</tr>");
+		}
+
+		sb.append("</tbody></table>");
+
+		return sb.toString();
+	}
+
 }

@@ -6,6 +6,7 @@ public class Coordinator_DTO {
     private String employeeName;
     private String employeeEmail;
     private int  getTotalInterviews;
+    private int totalScheduled;
     private int totalSelected;
     private int totalRejected;
 
@@ -39,6 +40,14 @@ public class Coordinator_DTO {
 
     public void setGetTotalInterviews(int getTotalInterviews) {
         this.getTotalInterviews = getTotalInterviews;
+    }
+
+    public int getTotalScheduled() {
+        return totalScheduled;
+    }
+
+    public void setTotalScheduled(int totalScheduled) {
+        this.totalScheduled = totalScheduled;
     }
 
     public int getTotalSelected() {
