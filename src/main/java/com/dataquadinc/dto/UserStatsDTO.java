@@ -12,6 +12,7 @@ public class UserStatsDTO {
 
     // Employee-specific
     private int numberOfSubmissions;
+    private int numberOfScreenRejects;
     private int numberOfInterviews;
     private int numberOfPlacements;
 
@@ -19,12 +20,29 @@ public class UserStatsDTO {
     private int selfSubmissions;
     private int selfInterviews;
     private int selfPlacements;
+    private int teamScreenRejectCount;
     private int teamSubmissions;
     private int teamInterviews;
     private int teamPlacements;
 
     // Getters and setters...
 
+
+    public int getTeamScreenRejectCount() {
+        return teamScreenRejectCount;
+    }
+
+    public void setTeamScreenRejectCount(int teamScreenRejectCount) {
+        this.teamScreenRejectCount = teamScreenRejectCount;
+    }
+
+    public int getNumberOfScreenRejects() {
+        return numberOfScreenRejects;
+    }
+
+    public void setNumberOfScreenRejects(int numberOfScreenRejects) {
+        this.numberOfScreenRejects = numberOfScreenRejects;
+    }
 
     public String getEmployeeId() {
         return employeeId;

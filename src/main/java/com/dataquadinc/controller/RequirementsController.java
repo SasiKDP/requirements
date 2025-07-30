@@ -36,9 +36,9 @@ import com.dataquadinc.service.RequirementsService;
 import org.springframework.web.multipart.MultipartFile;
 
 
-
 @RestController
 @RequestMapping("/requirements")
+//@CrossOrigin("*")
 public class RequirementsController {
 
 	@Autowired
@@ -70,7 +70,8 @@ public class RequirementsController {
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
 			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
-			@RequestParam("assignedBy") String assignedBy
+			@RequestParam("assignedBy") String assignedBy,
+			@RequestParam(value = "assignedTo", required = false) String assignedTo // ✅ NEW
 	) throws IOException {
 		try {
 			// Validate that only one of jobDescription or jobDescriptionFile is provided
@@ -121,7 +122,13 @@ public class RequirementsController {
 			requirementsDto.setNoOfPositions(noOfPositions);
 			requirementsDto.setRecruiterIds(recruiterIds);
 			requirementsDto.setRecruiterName(recruiterName);
-			requirementsDto.setAssignedBy(assignedBy);
+
+			// ✅ AssignedBy logic using assignedTo
+			if (assignedTo != null && !assignedTo.isBlank()) {
+				requirementsDto.setAssignedBy(assignedTo);
+			} else {
+				requirementsDto.setAssignedBy(assignedBy);
+			}
 
 			// Call the service to create the requirement
 			RequirementAddedResponse response = service.createRequirement(requirementsDto);
@@ -131,11 +138,11 @@ public class RequirementsController {
 
 		} catch (IllegalArgumentException e) {
 			// Handle specific validation error
-			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
+			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"+e.getMessage()));
 		} catch (Exception e) {
 			// General exception handling
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"));
+					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"+e.getMessage()));
 		}
 	}
 
@@ -320,26 +327,24 @@ public class RequirementsController {
 						throw new RecruiterNotFoundException("Email for recruiter " + recruiterId + " not found");
 					}
 
-					// Add the recruiter name to the job requirement's recruiterName set
-					requirement.getRecruiterName().add(recruiterName); // Add recruiter name to Set
 
-					System.out.println("Recruiter names before saving: " + requirement.getRecruiterName());
 
 					// Prepare the email subject and body
 					String subject = "New Job Assignment: " + requirement.getJobTitle();
 
-					String body = "Dear " + recruiterName + ",\n\n" +
-							"I hope this message finds you well. \n\n" +
-							"You have been assigned a new job requirement, and the details are outlined below:  \n\n" +
-							"Job Title: " + requirement.getJobTitle() + "\n" +
-							"Client: " + requirement.getClientName() + "\n" +
-							"Location: " + requirement.getLocation() + "\n" +
-							"Job Type: " + requirement.getJobType() + "\n" +
-							"Experience Required: " + requirement.getExperienceRequired() + " years\n\n" +
-							"Assigned By: " + requirement.getAssignedBy() + "\n\n" + // Added Assigned By field
-							"Please take a moment to review the details and proceed with the necessary actions. Additional information can be accessed via your dashboard.\n\n" +
-							"If you have any questions or require further clarification, feel free to reach out.\n\n" +
-							"Best Regards,\nDataquad";
+					String body = "Dear " + recruiterName + ",<br><br>" +
+							"I hope you are doing well.<br><br>" +
+							"You have been assigned a new job requirement. Please find the details below:<br><br>" +
+							"▶ <b>Job Title:</b> " + requirement.getJobTitle() + "<br>" +
+							"▶ <b>Client:</b> " + requirement.getClientName() + "<br>" +
+							"▶ <b>Location:</b> " + requirement.getLocation() + "<br>" +
+							"▶ <b>Job Type:</b> " + requirement.getJobType() + "<br>" +
+							"▶ <b>Experience Required:</b> " + requirement.getExperienceRequired() + " years<br>" +
+							"▶ <b>Assigned By:</b> " + requirement.getAssignedBy() + "<br><br>" +
+							"Please review the details and proceed with the necessary actions. Additional information is available on your dashboard.<br><br>" +
+							"If you have any questions or need further clarification, feel free to reach out.<br><br>" +
+							"Best regards,<br>" +
+							"Dataquad";
 
 					// Send email to the recruiter
 					emailService.sendEmail(recruiterEmail, subject, body);
@@ -349,7 +354,7 @@ public class RequirementsController {
 
 				} catch (Exception e) {
 					// Log the full exception stack trace for better error diagnosis
-					logger.error("Failed to send email to recruiter {} for job {}. Error: {}", recruiterId, requirement.getJobTitle(), e.getMessage(), e);
+					logger.error("Failed to send email to recruiter {} for job {}. Error: {}"+e.getMessage(), recruiterId, requirement.getJobTitle(), e.getMessage(), e);
 					allEmailsSentSuccessfully = false;
 				}
 			}
@@ -397,15 +402,15 @@ public class RequirementsController {
 
 		} catch (NoJobsAssignedToRecruiterException ex) {
 			// Log and return 404 with error message
-			logger.error("No jobs found for recruiterId: {} between {} and {}", recruiterId, startDate, endDate);
+			logger.error("No jobs found for recruiterId: {} between {} and {}", recruiterId, startDate, endDate,ex.getMessage());
 			return ResponseEntity.status(HttpStatus.NOT_FOUND)
 					.body(Collections.singletonMap("message", ex.getMessage()));
 
 		} catch (Exception ex) {
 			// Log and return 500 with generic error message
-			logger.error("An error occurred while fetching jobs for recruiterId: {}", recruiterId, ex);
+			logger.error("An error occurred while fetching jobs for recruiterId: {}", recruiterId, ex.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(Collections.singletonMap("message", "An internal error occurred while fetching recruiter jobs."));
+					.body(Collections.singletonMap("message", "An internal error occurred while fetching recruiter jobs."+ex.getMessage()));
 		}
 	}
 
@@ -429,7 +434,8 @@ public class RequirementsController {
 			@RequestParam("noOfPositions") int noOfPositions,
 			@RequestParam("recruiterIds") Set<String> recruiterIds,
 			@RequestParam(value = "recruiterName", required = false) Set<String> recruiterName,
-			@RequestParam("assignedBy") String assignedBy // Added assignedBy parameter
+			@RequestParam("assignedBy") String assignedBy,
+			@RequestParam(value = "assignedTo", required = false) String assignedTo
 	) throws IOException {
 		try {
 			// Validate that only one of jobDescription or jobDescriptionFile is provided
@@ -518,8 +524,12 @@ public class RequirementsController {
 			if (recruiterName != null && !recruiterName.isEmpty()) existingRequirement.setRecruiterName(recruiterName);
 			else existingRequirement.setRecruiterName(null);
 
-			if (assignedBy != null && !assignedBy.isEmpty()) existingRequirement.setAssignedBy(assignedBy); // Added assignedBy field
-			else existingRequirement.setAssignedBy(null);
+			// ✅ AssignedBy fallback from assignedTo
+			if (assignedTo != null && !assignedTo.isBlank()) {
+				existingRequirement.setAssignedBy(assignedTo);
+			} else {
+				existingRequirement.setAssignedBy(assignedBy);
+			}
 
 			// Call the service to update the requirement
 			ResponseBean response = service.updateRequirementDetails(existingRequirement);
@@ -531,10 +541,10 @@ public class RequirementsController {
 			return ResponseEntity.status(HttpStatus.OK).body(ResponseBean.successResponse("Requirement updated successfully", response));
 
 		} catch (IllegalArgumentException e) {
-			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"));
+			return ResponseEntity.badRequest().body(ResponseBean.errorResponse(e.getMessage(), "Bad Request"+e.getMessage()));
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"));
+					.body(ResponseBean.errorResponse("Unexpected error occurred: " + e.getMessage(), "Internal Server Error"+e.getMessage()));
 		}
 	}
 
@@ -591,10 +601,6 @@ public class RequirementsController {
 		List<Coordinator_DTO> stats= service.getCoordinatorStats();
 		return ResponseEntity.ok(stats);
 	}
-
-
-
-
 	@GetMapping("/stats/filterByDate")
 	public ResponseEntity<CandidateStatsResponse> getCandidateStats(
 			@RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -610,6 +616,8 @@ public class RequirementsController {
 	public CandidateResponseDTO getCandidateData(@PathVariable String userId) {
 		return service.getCandidateData(userId);
 	}
+
+
 
 
 	@GetMapping("/teamleadrequirements/{id}")
@@ -662,14 +670,14 @@ public class RequirementsController {
 			return ResponseEntity.ok(requirements);
 
 		} catch (AssignedByNotFoundException ex) {
-			logger.error("User ID not found: {} between {} and {}", userId, startDate, endDate);
+			logger.error("User ID not found: {} between {} and {}", userId, startDate, endDate,ex.getMessage());
 			return ResponseEntity.status(HttpStatus.NOT_FOUND)
 					.body(Collections.singletonMap("message", ex.getMessage()));
 
 		} catch (Exception ex) {
-			logger.error("An error occurred while fetching requirements for userId: {}", userId, ex);
+			logger.error("An error occurred while fetching requirements for userId: {}", userId, ex.getMessage());
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-					.body(Collections.singletonMap("message", "An internal error occurred while fetching requirements."));
+					.body(Collections.singletonMap("message", "An internal error occurred while fetching requirements."+ex.getMessage()));
 		}
 	}
 
@@ -684,6 +692,57 @@ public class RequirementsController {
 		} else {
 			return service.getCandidateData(userId);
 		}
+	}
+
+
+	@GetMapping("/inprogress")
+	public ResponseEntity<List<InProgressRequirementDTO>> getInProgressRequirements(
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		if (startDate == null || endDate == null) {
+			LocalDate today = LocalDate.now();
+			startDate = today;
+			endDate = today;
+			logger.info("StartDate or EndDate not provided. Using today's date: {}", today);
+		}
+
+		List<InProgressRequirementDTO> result = service.getInProgressRequirements(startDate, endDate);
+		return ResponseEntity.ok(result);
+	}
+
+	@GetMapping("/inprogress/filterByDate")
+	public ResponseEntity<List<InProgressRequirementDTO>> getInProgressRequirementsWithDateRange(
+			@RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+			@RequestParam(value = "endDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+		if (startDate != null && endDate != null) {
+			logger.info("📅 Fetching In Progress requirements from {} to {}", startDate, endDate);
+			return ResponseEntity.ok(service.getInProgressRequirements(startDate, endDate));
+		} else {
+			// Default to today if no dates provided
+			LocalDate today = LocalDate.now();
+			logger.info("📅 No date range provided. Fetching for today: {}", today);
+			return ResponseEntity.ok(service.getInProgressRequirements(today, today));
+		}
+	}
+
+	@PostMapping("/sendInprogressEmail/{userId}")
+	public ResponseEntity<String> sendEmail(
+			@PathVariable String userId,
+			@RequestBody(required = false) List<InProgressRequirementDTO> dto) {
+
+		if ("null".equalsIgnoreCase(userId)) {
+			// Case 1: userId is "null" → fetch all data internally
+			return ResponseEntity.ok(service.sendInProgressEmail(null, null));
+		}
+
+		if (dto == null || dto.isEmpty()) {
+			return ResponseEntity.badRequest().body("❌ Request body is required for recruiter-specific email.");
+		}
+
+		// Case 2: userId present → use provided list
+		return ResponseEntity.ok(service.sendInProgressEmail(userId, dto));
 	}
 
 

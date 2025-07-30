@@ -48,7 +48,14 @@ public class BDM_Client {
     private List<String> clientSpocMobileNumber;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    private List<String> supportingDocuments;  // Stores file paths as JSON
+    private List<String> supportingDocuments;
+
+    @Column
+    private String status;
+
+    @Transient
+    private int numberOfRequirements; // 👈 won't be persisted
+
 
     @Lob
     @Column(columnDefinition = "LONGBLOB")
@@ -63,6 +70,24 @@ public class BDM_Client {
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    private String feedBack;
+
+    public int getNumberOfRequirements() {
+        return numberOfRequirements;
+    }
+
+    public void setNumberOfRequirements(int numberOfRequirements) {
+        this.numberOfRequirements = numberOfRequirements;
+    }
+
+    public String getFeedBack() {
+        return feedBack;
+    }
+
+    public void setFeedBack(String feedBack) {
+        this.feedBack = feedBack;
+    }
 
     public String getId() {
         return id;
@@ -198,5 +223,13 @@ public class BDM_Client {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

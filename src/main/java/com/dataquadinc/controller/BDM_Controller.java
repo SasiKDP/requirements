@@ -1,10 +1,7 @@
 
 package com.dataquadinc.controller;
 
-import com.dataquadinc.dto.BDM_Dto;
-import com.dataquadinc.dto.BdmClientDetailsDTO;
-import com.dataquadinc.dto.RequirementsDto;
-import com.dataquadinc.dto.ResponseBean;
+import com.dataquadinc.dto.*;
 import com.dataquadinc.exceptions.ErrorResponse;
 import com.dataquadinc.model.BDM_Client;
 import com.dataquadinc.repository.BDM_Repo;
@@ -36,9 +33,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
-//@CrossOrigin(origins = {"http://35.188.150.92", "http://192.168.0.140:3000", "http://192.168.0.139:3000","https://mymulya.com","http://localhost:3000",
-//        "http://192.168.0.135:80/","http://192.168.0.135/","http://182.18.177.16:443","http://mymulya.com:443","http://localhost/","http://182.18.177.16/"})
 
 @RestController
 @RequestMapping("/requirements")
@@ -84,6 +78,7 @@ public class BDM_Controller {
 
     @GetMapping("/bdm/getAll")
     public ResponseEntity<ResponseBean> getAllClients() {
+        service.evaluateClientStatuses();  // ⬅ ensure latest statuses
         List<BDM_Dto> clients = service.getAllClients();
         return ResponseEntity.ok(ResponseBean.successResponse("Clients fetched successfully", clients));
     }
@@ -123,7 +118,7 @@ public class BDM_Controller {
                     .body(ResponseBean.errorResponse("Invalid JSON Format", "Error in JSON structure: " + e.getMessage()));
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ResponseBean.errorResponse("JSON Parsing Error", "Could not parse client data."));
+                    .body(ResponseBean.errorResponse("JSON Parsing Error", "Could not parse client data."+e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ResponseBean.errorResponse("Unexpected Error", "Something went wrong: " + e.getMessage()));
@@ -178,6 +173,29 @@ public class BDM_Controller {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
+
+    @GetMapping("/bdmlist")
+    public ResponseEntity<List<BdmEmployeeDTO>> getBdmEmployees() {
+        List<BdmEmployeeDTO> bdmEmployees = service.getAllBdmEmployees();
+        if (bdmEmployees.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        }
+        return new ResponseEntity<>(bdmEmployees, HttpStatus.OK);
+    }
+
+
+    @GetMapping("/bdmlist/filterByDate")
+    public ResponseEntity<List<BdmEmployeeDTO>> getBdmEmployeesDateFilter(
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
+    ) {
+        List<BdmEmployeeDTO> bdmEmployees = service.getAllBdmEmployeesDateFilter(startDate,endDate);
+        if (bdmEmployees.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        }
+        return new ResponseEntity<>(bdmEmployees, HttpStatus.OK);
+    }
+
     @GetMapping("/bdm/details/{userId}")
     public BdmClientDetailsDTO getBdmClientDetails(@PathVariable String userId) {
         return service.getBdmClientDetails(userId);
@@ -185,8 +203,8 @@ public class BDM_Controller {
 
     @GetMapping("/bdm/details/{userId}/filterByDate")
     public BdmClientDetailsDTO getBdmClientDetailsDateRange(@PathVariable String userId,
-                                                            @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-                                                            @RequestParam(value = "endDate",required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+                @RequestParam(value = "startDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+                 @RequestParam(value = "endDate",required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         if(startDate!=null && endDate!=null)
             return service.getBdmClientDetailsDateRange(userId,startDate,endDate);
         else
@@ -228,7 +246,7 @@ public class BDM_Controller {
             logger.debug("Found {} requirements for userId: {}", requirements.size(), userId);
             return new ResponseEntity<>(requirements, HttpStatus.OK);
         } catch (Exception ex) {
-            logger.error("An unexpected error occurred while fetching requirements for userId: {}", userId, ex);
+            logger.error("An unexpected error occurred while fetching requirements for userId: {}", userId, ex.getMessage());
             // Handle unexpected exceptions
             return new ResponseEntity<>(new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "An unexpected error occurred", LocalDateTime.now()), HttpStatus.INTERNAL_SERVER_ERROR);
         }

@@ -30,6 +30,28 @@ public class BDM_Dto {
     private List<String> clientSpocLinkedin;
     private List<String> clientSpocMobileNumber;
     private String onBoardedBy;
+    private String assignedTo;
+    private String status;
+    private String feedBack;
+    private int numberOfRequirements;
+
+    public int getNumberOfRequirements() {
+        return numberOfRequirements;
+    }
+
+    public void setNumberOfRequirements(int numberOfRequirements) {
+        this.numberOfRequirements = numberOfRequirements;
+    }
+
+    public String getFeedBack() {
+        return feedBack;
+    }
+
+    public void setFeedBack(String feedBack) {
+        this.feedBack = feedBack;
+    }
+
+
 
     @JsonIgnore // Prevents file data from being included in API responses
     private byte[] documentData;
@@ -154,6 +176,14 @@ public class BDM_Dto {
         this.onBoardedBy = onBoardedBy;
     }
 
+    public String getAssignedTo() {
+        return assignedTo;
+    }
+
+    public void setAssignedTo(String assignedTo) {
+        this.assignedTo = assignedTo;
+    }
+
     public byte[] getDocumentData() {
         return documentData;
     }
@@ -161,4 +191,15 @@ public class BDM_Dto {
     public void setDocumentData(byte[] documentData) {
         this.documentData = documentData;
     }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+
+
 }
