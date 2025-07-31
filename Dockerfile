@@ -35,14 +35,14 @@ RUN mkdir -p /etc/ssl/certs/custom
 # Copy JAR from builder
 COPY --from=builder /app/target/DataquadRequirementsApi-0.0.1-SNAPSHOT.jar app.jar
 
-# Copy SSL certificate (GitHub Actions will ensure this exists)
-COPY nginx/ssl/mymulya.crt /etc/ssl/certs/custom/mymulya.crt
+# # Copy SSL certificate (GitHub Actions will ensure this exists)
+# COPY nginx/ssl/mymulya.crt /etc/ssl/certs/custom/mymulya.crt
 
-# Import cert into Java truststore
-RUN keytool -import -trustcacerts -alias mymulya_cert \
-    -file /etc/ssl/certs/custom/mymulya.crt \
-    -keystore $JAVA_HOME/lib/security/cacerts \
-    -storepass changeit -noprompt
+# # Import cert into Java truststore
+# RUN keytool -import -trustcacerts -alias mymulya_cert \
+#     -file /etc/ssl/certs/custom/mymulya.crt \
+#     -keystore $JAVA_HOME/lib/security/cacerts \
+#     -storepass changeit -noprompt
 
 # Expose app port
 EXPOSE 8111
